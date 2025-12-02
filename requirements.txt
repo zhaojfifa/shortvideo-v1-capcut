@@ -2,6 +2,7 @@ fastapi
 uvicorn[standard]
 httpx
 pydantic
+pydantic-settings   # ← 新增
 python-dotenv
 requests
 tqdm
