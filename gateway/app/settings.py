@@ -1,22 +1,24 @@
-from pydantic import BaseSettings, Field
-
-
 # gateway/app/settings.py
-from pydantic_settings import BaseSettings  # ← 从这里引 BaseSettings
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
     """
     Settings for the shortvideo gateway.
-    Values are taken from environment variables with the same names.
+
+    Values are read from environment variables with the same names, e.g.:
+      XIONGMAO_API_BASE
+      XIONGMAO_APP_ID
+      XIONGMAO_API_KEY
     """
+
     XIONGMAO_API_BASE: str = "https://api.guijianpan.com"
     XIONGMAO_APP_ID: str = "xxmQsyByAk"
-    XIONGMAO_API_KEY: str = ""  # 在 Render 的环境变量里覆盖
+    XIONGMAO_API_KEY: str = ""  # 在 Render 环境变量中覆盖
 
-    # 如果你暂时不需要从 .env 读，这里可以不用任何 Config / model_config
+    # Pydantic v2 / pydantic-settings 配置
+    model_config = SettingsConfigDict(extra="ignore")
+
 
 settings = Settings()
-
-
-
-settings = get_settings()
