@@ -6,10 +6,13 @@ from gateway.app.providers.xiongmao import XiongmaoError, parse_with_xiongmao
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 
 
+from pydantic import BaseModel  # 不再用 HttpUrl
+
 class ParseRequest(BaseModel):
     task_id: str | None = None
-    platform: str | None = None
-    link: HttpUrl
+    platform: str = "douyin"
+    link: str   # 允许整段分享文案或 URL
+
 
 
 @app.post("/v1/parse")
