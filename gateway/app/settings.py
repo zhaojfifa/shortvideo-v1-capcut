@@ -19,6 +19,18 @@ class Settings(BaseSettings):
 
     # Pydantic v2 / pydantic-settings 配置
     model_config = SettingsConfigDict(extra="ignore")
+    # 兼容 providers 中使用的小写属性名
+    @property
+    def xiongmao_api_base(self) -> str:
+        return self.XIONGMAO_API_BASE
+
+    @property
+    def xiongmao_app_id(self) -> str:
+        return self.XIONGMAO_APP_ID
+
+    @property
+    def xiongmao_api_key(self) -> str:
+        return self.XIONGMAO_API_KEY
 
 
 settings = Settings()
