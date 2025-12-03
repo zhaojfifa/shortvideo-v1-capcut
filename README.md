@@ -58,7 +58,7 @@ video_workspace/
     deliver/    # final exported videos for upload (manual)
     assets/     # reusable assets (BGM, templates, common segments, covers, etc.)
 
-Rules / 约定
+## 3 Rules / 约定
 
 raw/
 
@@ -92,7 +92,7 @@ EN: long-lived, reusable materials (logo, BGM, common segments, CapCut templates
 
 WORKSPACE_ROOT 环境变量指向 tv1_validation 这一层目录。
 
-3. Minimal Toolchain / 最小工具链说明
+## 3. Minimal Toolchain / 最小工具链说明
 
 EN
 
@@ -150,7 +150,7 @@ GPT-4o / 4o-mini 将字幕翻译成缅语 *_mm.srt
 
 剪辑师在剪映/CapCut 模板工程中导入上述素材，完成剪辑成片。
 
-4. API Overview / 接口总览
+## 4. API Overview / 接口总览
 
 所有接口路径统一在 /v1/* 下。
 
