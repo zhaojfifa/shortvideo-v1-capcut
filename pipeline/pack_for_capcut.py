@@ -1,6 +1,8 @@
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 
+from pipeline.workspace import packs_dir
+
 README_TEMPLATE = """CapCut 剪辑包使用说明
 
 1. 在 CapCut 新建项目，导入 zip 解压后的文件。
@@ -20,9 +22,8 @@ def pack_for_capcut(task_id: str, raw_path: Path, audio_path: Path, subs_path: P
       - README.txt (editor instructions)
     """
 
-    packs_dir = Path("packs")
-    packs_dir.mkdir(parents=True, exist_ok=True)
-    pack_path = packs_dir / f"{task_id}_capcut_pack.zip"
+    pack_root = packs_dir()
+    pack_path = pack_root / f"{task_id}_capcut_pack.zip"
 
     with ZipFile(pack_path, "w", compression=ZIP_DEFLATED) as zf:
         zf.write(raw_path, arcname="raw.mp4")

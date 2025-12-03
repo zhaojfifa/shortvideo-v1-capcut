@@ -5,6 +5,7 @@ import requests
 from tqdm import tqdm
 
 from pipeline import config
+from pipeline.workspace import raw_path
 
 
 def fetch_raw_via_gateway(task_id: str, platform: str, link: str) -> Path:
@@ -22,9 +23,7 @@ def fetch_raw_via_gateway(task_id: str, platform: str, link: str) -> Path:
     if not download_url:
         raise ValueError("no download_url returned from gateway")
 
-    raw_dir = Path("raw")
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    out_path = raw_dir / f"{task_id}.mp4"
+    out_path = raw_path(task_id)
 
     with requests.get(download_url, stream=True, timeout=60) as stream:
         stream.raise_for_status()

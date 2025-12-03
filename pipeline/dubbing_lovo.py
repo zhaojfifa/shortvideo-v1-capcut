@@ -1,8 +1,11 @@
 from pathlib import Path
 
+from pathlib import Path
+
 import requests
 
 from pipeline import config
+from pipeline.workspace import audio_dir
 
 
 def _combine_srt_text(srt_path: Path) -> str:
@@ -25,9 +28,8 @@ def synthesize_burmese_voice(task_id: str, burmese_srt_path: Path) -> Path:
     call LOVO API to synthesize wav, save to edits/audio/<task_id>_mm_vo.wav.
     """
 
-    audio_dir = Path("edits/audio")
-    audio_dir.mkdir(parents=True, exist_ok=True)
-    out_path = audio_dir / f"{task_id}_mm_vo.wav"
+    output_dir = audio_dir()
+    out_path = output_dir / f"{task_id}_mm_vo.wav"
 
     text = _combine_srt_text(burmese_srt_path)
     payload = {

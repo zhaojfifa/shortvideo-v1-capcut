@@ -6,6 +6,7 @@ raw/
 edits/
 packs/
 deliver/
+workspace/
 *.pyc
 *.pyo
 *.pyd

@@ -1,23 +1,54 @@
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, HttpUrl
 
+from gateway.app.core.workspace import raw_path
 from gateway.app.providers.xiongmao import XiongmaoError, parse_with_xiongmao
+from gateway.app.services.dubbing import DubbingError, synthesize_voice
+from gateway.app.services.download import DownloadError, download_raw_video
+from gateway.app.services.pack import PackError, create_capcut_pack
+from gateway.app.services.subtitles import SubtitleError, generate_subtitles
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 
 
 class ParseRequest(BaseModel):
-    task_id: str | None = None
+    task_id: str
     platform: str | None = None
     link: HttpUrl
+
+
+class SubtitlesRequest(BaseModel):
+    task_id: str
+    target_lang: str = "my"
+    force: bool = False
+    translate: bool = True
+
+
+class DubRequest(BaseModel):
+    task_id: str
+    voice_id: str | None = None
+    target_lang: str = "my"
+    force: bool = False
+
+
+class PackRequest(BaseModel):
+    task_id: str
 
 
 @app.post("/v1/parse")
 async def parse(request: ParseRequest):
     try:
         parsed = await parse_with_xiongmao(str(request.link))
+        raw_file = await download_raw_video(request.task_id, parsed.get("download_url") or "")
     except XiongmaoError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except DownloadError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    relative_raw = Path("raw") / f"{request.task_id}.mp4"
 
     return {
         "task_id": request.task_id,
@@ -28,4 +59,117 @@ async def parse(request: ParseRequest):
         "cover": parsed.get("cover"),
         "origin_text": parsed.get("origin_text"),
         "raw": parsed.get("raw"),
+        "raw_exists": raw_file.exists(),
+        "raw_path": str(relative_raw),
     }
+
+
+@app.get("/v1/tasks/{task_id}/raw")
+async def get_raw(task_id: str):
+    path = raw_path(task_id)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="raw video not found")
+    return FileResponse(path, media_type="video/mp4", filename=f"{task_id}.mp4")
+
+
+@app.post("/v1/subtitles")
+async def subtitles(request: SubtitlesRequest):
+    raw_file = raw_path(request.task_id)
+    if not raw_file.exists():
+        raise HTTPException(status_code=404, detail="raw video not found")
+
+    try:
+        result = generate_subtitles(
+            task_id=request.task_id,
+            raw_video=raw_file,
+            target_lang=request.target_lang,
+            force=request.force,
+            translate_enabled=request.translate,
+        )
+    except SubtitleError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return {
+        "task_id": request.task_id,
+        "target_lang": request.target_lang,
+        "wav": result.get("audio_path"),
+        "origin_srt": result.get("origin_srt"),
+        "mm_srt": result.get("translated_srt"),
+        "origin_preview": result.get("origin_preview") or [],
+        "mm_preview": result.get("translated_preview") or [],
+    }
+
+
+@app.get("/v1/tasks/{task_id}/subs_origin")
+async def get_origin_subs(task_id: str):
+    origin = raw_path(task_id).parent.parent / "edits" / "subs" / f"{task_id}_origin.srt"
+    if not origin.exists():
+        raise HTTPException(status_code=404, detail="origin subtitles not found")
+    return FileResponse(origin, media_type="text/plain", filename=f"{task_id}_origin.srt")
+
+
+@app.get("/v1/tasks/{task_id}/subs_mm")
+async def get_mm_subs(task_id: str):
+    subs = raw_path(task_id).parent.parent / "edits" / "subs" / f"{task_id}_my.srt"
+    if not subs.exists():
+        subs = raw_path(task_id).parent.parent / "edits" / "subs" / f"{task_id}_mm.srt"
+    if not subs.exists():
+        raise HTTPException(status_code=404, detail="burmese subtitles not found")
+    return FileResponse(subs, media_type="text/plain", filename=subs.name)
+
+
+@app.post("/v1/dub")
+async def dub(request: DubRequest):
+    try:
+        result = synthesize_voice(
+            task_id=request.task_id,
+            target_lang=request.target_lang,
+            voice_id=request.voice_id,
+            force=request.force,
+        )
+    except DubbingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "task_id": request.task_id,
+        "voice_id": request.voice_id,
+        "audio_path": result.get("audio_path"),
+        "duration_sec": result.get("duration_sec"),
+    }
+
+
+@app.get("/v1/tasks/{task_id}/audio_mm")
+async def get_audio(task_id: str):
+    audio = raw_path(task_id).parent.parent / "edits" / "audio" / f"{task_id}_mm_vo.wav"
+    if not audio.exists():
+        raise HTTPException(status_code=404, detail="dubbed audio not found")
+    return FileResponse(audio, media_type="audio/wav", filename=audio.name)
+
+
+@app.post("/v1/pack")
+async def pack(request: PackRequest):
+    base_root = raw_path(request.task_id).parent.parent
+    raw_file = base_root / "raw" / f"{request.task_id}.mp4"
+    audio_file = base_root / "edits" / "audio" / f"{request.task_id}_mm_vo.wav"
+    subs_file = base_root / "edits" / "subs" / f"{request.task_id}_my.srt"
+    if not subs_file.exists():
+        subs_file = base_root / "edits" / "subs" / f"{request.task_id}_mm.srt"
+
+    try:
+        packed = create_capcut_pack(request.task_id, raw_file, audio_file, subs_file)
+    except PackError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "task_id": request.task_id,
+        "zip_path": packed.get("zip_path"),
+        "files": packed.get("files"),
+    }
+
+
+@app.get("/v1/tasks/{task_id}/pack")
+async def download_pack(task_id: str):
+    pack_file = raw_path(task_id).parent.parent / "packs" / f"{task_id}_capcut_pack.zip"
+    if not pack_file.exists():
+        raise HTTPException(status_code=404, detail="pack not found")
+    return FileResponse(pack_file, media_type="application/zip", filename=pack_file.name)

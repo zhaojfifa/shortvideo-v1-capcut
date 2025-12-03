@@ -4,14 +4,14 @@ from pathlib import Path
 from openai import OpenAI
 
 from pipeline import config
+from pipeline.workspace import subs_dir
 
 client = OpenAI(api_key=config.OPENAI_API_KEY, base_url=config.OPENAI_API_BASE)
 
 
 def extract_audio(task_id: str, raw_path: Path) -> Path:
-    subs_dir = Path("edits/subs")
-    subs_dir.mkdir(parents=True, exist_ok=True)
-    out_path = subs_dir / f"{task_id}.wav"
+    output_dir = subs_dir()
+    out_path = output_dir / f"{task_id}.wav"
     cmd = [
         "ffmpeg",
         "-y",
@@ -31,7 +31,7 @@ def extract_audio(task_id: str, raw_path: Path) -> Path:
 def transcribe_with_whisper(task_id: str, audio_path: Path) -> Path:
     """Call OpenAI Whisper API -> edits/subs/<task_id>_origin.srt"""
 
-    out_path = Path("edits/subs") / f"{task_id}_origin.srt"
+    out_path = subs_dir() / f"{task_id}_origin.srt"
     with open(audio_path, "rb") as audio_file:
         result = client.audio.transcriptions.create(
             model=config.WHISPER_MODEL,
@@ -45,7 +45,7 @@ def transcribe_with_whisper(task_id: str, audio_path: Path) -> Path:
 def translate_subtitles_to_burmese(task_id: str, origin_srt: Path) -> Path:
     """Call OpenAI GPT model to translate SRT content into Burmese -> *_mm.srt"""
 
-    burmese_path = Path("edits/subs") / f"{task_id}_mm.srt"
+    burmese_path = subs_dir() / f"{task_id}_mm.srt"
     origin_content = origin_srt.read_text(encoding="utf-8")
     prompt = (
         "你是一名专业的字幕翻译。请将以下 SRT 内容翻译成缅甸语，"

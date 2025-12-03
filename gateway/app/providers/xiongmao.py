@@ -1,6 +1,6 @@
 import httpx
 
-from gateway.app.settings import settings
+from gateway.app.config import settings
 
 
 class XiongmaoError(Exception):
