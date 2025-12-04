@@ -1,8 +1,11 @@
 from functools import lru_cache
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(case_sensitive=False)
+
     workspace_root: str = Field("./workspace", env="WORKSPACE_ROOT")
 
     xiongmao_api_base: str = Field(
@@ -19,13 +22,10 @@ class Settings(BaseSettings):
     lovo_api_key: str | None = Field(None, env="LOVO_API_KEY")
     lovo_voice_id_mm: str = Field("mm_female_1", env="LOVO_VOICE_ID_MM")
 
-    class Config:
-        case_sensitive = False
-
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()  # type: ignore[arg-type]
+    return Settings()
 
 
 settings = get_settings()
