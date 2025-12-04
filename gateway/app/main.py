@@ -1,7 +1,9 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, HttpUrl
 
+from gateway.app.config import get_settings
 from gateway.app.core.workspace import (
     dubbed_audio_path,
     origin_srt_path,
@@ -17,6 +19,7 @@ from gateway.app.services.pack import PackError, create_capcut_pack
 from gateway.app.services.subtitles import SubtitleError, generate_subtitles
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
+templates = Jinja2Templates(directory="gateway/app/templates")
 
 
 class ParseRequest(BaseModel):
@@ -41,6 +44,20 @@ class DubRequest(BaseModel):
 
 class PackRequest(BaseModel):
     task_id: str
+
+
+@app.get("/ui", response_class=HTMLResponse)
+async def pipeline_lab(request: Request):
+    settings = get_settings()
+    env_summary = {
+        "workspace_root": settings.workspace_root,
+        "douyin_api_base": settings.xiongmao_api_base,
+        "whisper_model": settings.whisper_model,
+        "gpt_model": settings.gpt_model,
+    }
+    return templates.TemplateResponse(
+        "pipeline_lab.html", {"request": request, "env_summary": env_summary}
+    )
 
 
 @app.post("/v1/parse")
