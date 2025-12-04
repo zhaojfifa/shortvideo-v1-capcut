@@ -1,10 +1,15 @@
-from pathlib import Path
-
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, HttpUrl
 
-from gateway.app.core.workspace import raw_path
+from gateway.app.core.workspace import (
+    dubbed_audio_path,
+    origin_srt_path,
+    pack_zip_path,
+    raw_path,
+    relative_to_workspace,
+    translated_srt_path,
+)
 from gateway.app.providers.xiongmao import XiongmaoError, parse_with_xiongmao
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.download import DownloadError, download_raw_video
@@ -48,8 +53,6 @@ async def parse(request: ParseRequest):
     except DownloadError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    relative_raw = Path("raw") / f"{request.task_id}.mp4"
-
     return {
         "task_id": request.task_id,
         "platform": request.platform,
@@ -60,7 +63,7 @@ async def parse(request: ParseRequest):
         "origin_text": parsed.get("origin_text"),
         "raw": parsed.get("raw"),
         "raw_exists": raw_file.exists(),
-        "raw_path": str(relative_raw),
+        "raw_path": relative_to_workspace(raw_file),
     }
 
 
@@ -102,7 +105,7 @@ async def subtitles(request: SubtitlesRequest):
 
 @app.get("/v1/tasks/{task_id}/subs_origin")
 async def get_origin_subs(task_id: str):
-    origin = raw_path(task_id).parent.parent / "edits" / "subs" / f"{task_id}_origin.srt"
+    origin = origin_srt_path(task_id)
     if not origin.exists():
         raise HTTPException(status_code=404, detail="origin subtitles not found")
     return FileResponse(origin, media_type="text/plain", filename=f"{task_id}_origin.srt")
@@ -110,9 +113,9 @@ async def get_origin_subs(task_id: str):
 
 @app.get("/v1/tasks/{task_id}/subs_mm")
 async def get_mm_subs(task_id: str):
-    subs = raw_path(task_id).parent.parent / "edits" / "subs" / f"{task_id}_my.srt"
+    subs = translated_srt_path(task_id, "my")
     if not subs.exists():
-        subs = raw_path(task_id).parent.parent / "edits" / "subs" / f"{task_id}_mm.srt"
+        subs = translated_srt_path(task_id, "mm")
     if not subs.exists():
         raise HTTPException(status_code=404, detail="burmese subtitles not found")
     return FileResponse(subs, media_type="text/plain", filename=subs.name)
@@ -140,7 +143,7 @@ async def dub(request: DubRequest):
 
 @app.get("/v1/tasks/{task_id}/audio_mm")
 async def get_audio(task_id: str):
-    audio = raw_path(task_id).parent.parent / "edits" / "audio" / f"{task_id}_mm_vo.wav"
+    audio = dubbed_audio_path(task_id)
     if not audio.exists():
         raise HTTPException(status_code=404, detail="dubbed audio not found")
     return FileResponse(audio, media_type="audio/wav", filename=audio.name)
@@ -148,12 +151,11 @@ async def get_audio(task_id: str):
 
 @app.post("/v1/pack")
 async def pack(request: PackRequest):
-    base_root = raw_path(request.task_id).parent.parent
-    raw_file = base_root / "raw" / f"{request.task_id}.mp4"
-    audio_file = base_root / "edits" / "audio" / f"{request.task_id}_mm_vo.wav"
-    subs_file = base_root / "edits" / "subs" / f"{request.task_id}_my.srt"
+    raw_file = raw_path(request.task_id)
+    audio_file = dubbed_audio_path(request.task_id)
+    subs_file = translated_srt_path(request.task_id, "my")
     if not subs_file.exists():
-        subs_file = base_root / "edits" / "subs" / f"{request.task_id}_mm.srt"
+        subs_file = translated_srt_path(request.task_id, "mm")
 
     try:
         packed = create_capcut_pack(request.task_id, raw_file, audio_file, subs_file)
@@ -169,7 +171,7 @@ async def pack(request: PackRequest):
 
 @app.get("/v1/tasks/{task_id}/pack")
 async def download_pack(task_id: str):
-    pack_file = raw_path(task_id).parent.parent / "packs" / f"{task_id}_capcut_pack.zip"
+    pack_file = pack_zip_path(task_id)
     if not pack_file.exists():
         raise HTTPException(status_code=404, detail="pack not found")
     return FileResponse(pack_file, media_type="application/zip", filename=pack_file.name)

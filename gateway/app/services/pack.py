@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from gateway.app.core.workspace import packs_dir
+from gateway.app.core.workspace import pack_zip_path, relative_to_workspace
 
 README_TEMPLATE = """CapCut 剪辑包使用说明\n\n1. 在 CapCut 新建项目，导入 zip 解压后的文件。\n2. 将 raw.mp4 放入视频轨道。\n3. 导入 subs_mm.srt，调整字体样式。\n4. 将 audio_mm.wav 放入音频轨道，与字幕对齐。\n5. 根据需要添加转场、贴纸等二次创作。\n"""
 
@@ -18,8 +18,7 @@ def create_capcut_pack(task_id: str, raw_path: Path, audio_path: Path, subs_path
         names = ", ".join(str(p) for p in missing)
         raise PackError(f"missing required files: {names}")
 
-    pack_root = packs_dir()
-    pack_path = pack_root / f"{task_id}_capcut_pack.zip"
+    pack_path = pack_zip_path(task_id)
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir) / f"pack_{task_id}"
@@ -35,4 +34,4 @@ def create_capcut_pack(task_id: str, raw_path: Path, audio_path: Path, subs_path
                 zf.write(item, arcname=item.name)
 
     files = ["raw.mp4", "audio_mm.wav", "subs_mm.srt", "README.txt"]
-    return {"zip_path": str(pack_path), "files": files}
+    return {"zip_path": relative_to_workspace(pack_path), "files": files}

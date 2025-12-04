@@ -5,7 +5,13 @@ from typing import Optional
 from openai import OpenAI
 
 from gateway.app.config import settings
-from gateway.app.core.workspace import subs_dir
+from gateway.app.core.workspace import (
+    audio_wav_path,
+    origin_srt_path,
+    relative_to_workspace,
+    subs_dir,
+    translated_srt_path,
+)
 
 
 class SubtitleError(Exception):
@@ -19,7 +25,7 @@ def _client() -> OpenAI:
 
 
 def extract_audio(task_id: str, raw_path: Path) -> Path:
-    output = subs_dir() / f"{task_id}.wav"
+    output = audio_wav_path(task_id)
     command = [
         "ffmpeg",
         "-y",
@@ -38,7 +44,7 @@ def extract_audio(task_id: str, raw_path: Path) -> Path:
 
 
 def transcribe(task_id: str, audio_path: Path, force: bool = False) -> Path:
-    origin_srt = subs_dir() / f"{task_id}_origin.srt"
+    origin_srt = origin_srt_path(task_id)
     if origin_srt.exists() and not force:
         return origin_srt
 
@@ -54,8 +60,7 @@ def transcribe(task_id: str, audio_path: Path, force: bool = False) -> Path:
 
 
 def translate(task_id: str, origin_srt: Path, target_lang: str, force: bool = False) -> Path:
-    target_suffix = target_lang or "mm"
-    target_srt = subs_dir() / f"{task_id}_{target_suffix}.srt"
+    target_srt = translated_srt_path(task_id, target_lang)
     if target_srt.exists() and not force:
         return target_srt
 
@@ -104,8 +109,8 @@ def generate_subtitles(
     audio_path = extract_audio(task_id, raw_video)
     origin_srt = transcribe(task_id, audio_path, force=force)
     result: dict[str, Optional[str] | list[str]] = {
-        "audio_path": str(audio_path),
-        "origin_srt": str(origin_srt),
+        "audio_path": relative_to_workspace(audio_path),
+        "origin_srt": relative_to_workspace(origin_srt),
         "translated_srt": None,
         "origin_preview": _preview_lines(origin_srt),
         "translated_preview": None,
@@ -113,7 +118,7 @@ def generate_subtitles(
 
     if translate_enabled:
         translated_srt = translate(task_id, origin_srt, target_lang, force=force)
-        result["translated_srt"] = str(translated_srt)
+        result["translated_srt"] = relative_to_workspace(translated_srt)
         result["translated_preview"] = _preview_lines(translated_srt)
 
     return result

@@ -24,15 +24,18 @@ pip install -r requirements.txt
 
 3. 配置工作目录
 
-`WORKSPACE_ROOT` 默认为 `./workspace`，首次运行会自动创建：
+`WORKSPACE_ROOT` 默认为 `./workspace`，首次运行会自动创建并按固定结构写入：
 
 ```
 workspace/
-  raw/
+  raw/        # 去水印原视频 <task_id>.mp4
   edits/
-    subs/
-    audio/
-  packs/
+    subs/     # 抽取音频 wav + *_origin.srt + *_mm.srt
+    audio/    # 缅语配音 *_mm_vo.wav
+    scenes/   # 预留场景/对齐文件
+  packs/      # <task_id>_capcut_pack.zip
+  deliver/    # 剪辑师导出的成片（手动）
+  assets/     # 可复用素材（BGM、模版等）
 ```
 
 4. 本地运行网关服务
@@ -64,17 +67,67 @@ python pipeline/run_v1_pipeline.py \
 python pipeline/run_v1_pipeline.py --task-id local_demo_v1 --input-file "raw/local_demo_v1.mp4"
 ```
 
-## API 说明
+## API 说明（4 个步骤）
 
-- `POST /v1/parse`
-  - 输入：`task_id`、`platform`、`link`
-  - 逻辑：调用 Xiongmao 解析并下载 mp4 至 `WORKSPACE_ROOT/raw/{task_id}.mp4`
-  - 输出：解析结果 + `raw_exists`、`raw_path`
-- `GET /v1/tasks/{task_id}/raw`：直接拉取已下载的原始 mp4。
-- `POST /v1/subtitles`
-  - 输入：`task_id`，可选 `target_lang`（默认缅甸语 my）、`force`、`translate`
-  - 逻辑：ffmpeg 提取音频 → Whisper 转写 → GPT 翻译（可选）
-  - 输出：音频/字幕文件的相对路径
+### 1) `POST /v1/parse`
+
+- 输入：`task_id`、`platform`、`link`
+- 逻辑：调用 Xiongmao 解析并下载 mp4 至 `WORKSPACE_ROOT/raw/{task_id}.mp4`
+- 输出：解析字段 + `raw_exists`、`raw_path`
+- 下载：`GET /v1/tasks/{task_id}/raw`
+
+示例：
+
+```bash
+curl -X POST "http://127.0.0.1:8000/v1/parse" \
+  -H "Content-Type: application/json" \
+  -d '{"task_id":"dy_demo_v1","platform":"douyin","link":"https://www.douyin.com/video/7578478453415851707"}'
+```
+
+### 2) `POST /v1/subtitles`（转写+翻译）
+
+- 输入：`task_id`，可选 `target_lang`（默认缅甸语 my）、`force`、`translate`
+- 逻辑：检查 raw 是否存在 → ffmpeg 提取音频 → Whisper 转写 `_origin.srt` → GPT 翻译 `_mm.srt`
+- 输出：`wav`、`origin_srt`、`mm_srt`、`origin_preview`、`mm_preview`
+- 下载：`GET /v1/tasks/{task_id}/subs_origin`、`GET /v1/tasks/{task_id}/subs_mm`
+
+示例：
+
+```bash
+curl -X POST "http://127.0.0.1:8000/v1/subtitles" \
+  -H "Content-Type: application/json" \
+  -d '{"task_id":"dy_demo_v1","target_lang":"my"}'
+```
+
+### 3) `POST /v1/dub`（缅语配音）
+
+- 输入：`task_id`，可选 `voice_id`（默认 LOVO_VOICE_ID_MM）、`force`
+- 逻辑：读取缅语 SRT 调用 LOVO 生成 `edits/audio/<task_id>_mm_vo.wav`
+- 输出：`audio_path`、`duration_sec`
+- 下载/试听：`GET /v1/tasks/{task_id}/audio_mm`
+
+示例：
+
+```bash
+curl -X POST "http://127.0.0.1:8000/v1/dub" \
+  -H "Content-Type: application/json" \
+  -d '{"task_id":"dy_demo_v1"}'
+```
+
+### 4) `POST /v1/pack`（打剪辑包）
+
+- 输入：`task_id`
+- 逻辑：检查 raw/mm_vo.wav/mm.srt，生成 `packs/<task_id>_capcut_pack.zip`
+- 输出：`zip_path`、`files`
+- 下载：`GET /v1/tasks/{task_id}/pack`
+
+示例：
+
+```bash
+curl -X POST "http://127.0.0.1:8000/v1/pack" \
+  -H "Content-Type: application/json" \
+  -d '{"task_id":"dy_demo_v1"}'
+```
 
 ## Render 部署说明
 

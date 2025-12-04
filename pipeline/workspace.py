@@ -22,9 +22,21 @@ def subs_dir() -> Path:
     return ensure_dir(workspace_root() / "edits" / "subs")
 
 
+def scenes_dir() -> Path:
+    return ensure_dir(workspace_root() / "edits" / "scenes")
+
+
 def audio_dir() -> Path:
     return ensure_dir(workspace_root() / "edits" / "audio")
 
 
 def packs_dir() -> Path:
     return ensure_dir(workspace_root() / "packs")
+
+
+def deliver_dir() -> Path:
+    return ensure_dir(workspace_root() / "deliver")
+
+
+def assets_dir() -> Path:
+    return ensure_dir(workspace_root() / "assets")

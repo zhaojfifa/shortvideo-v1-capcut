@@ -4,7 +4,12 @@ import wave
 import requests
 
 from gateway.app.config import settings
-from gateway.app.core.workspace import audio_dir, subs_dir
+from gateway.app.core.workspace import (
+    dubbed_audio_path,
+    relative_to_workspace,
+    subs_dir,
+    translated_srt_path,
+)
 
 
 class DubbingError(Exception):
@@ -38,15 +43,14 @@ def _duration_seconds(wav_path: Path) -> float | None:
 
 
 def synthesize_voice(task_id: str, target_lang: str, voice_id: str | None = None, force: bool = False) -> dict:
-    translated_srt = subs_dir() / f"{task_id}_{target_lang}.srt"
+    translated_srt = translated_srt_path(task_id, target_lang)
     if not translated_srt.exists():
         raise DubbingError("translated subtitles not found; run /v1/subtitles first")
 
-    output_dir = audio_dir()
-    out_path = output_dir / f"{task_id}_mm_vo.wav"
+    out_path = dubbed_audio_path(task_id)
     if out_path.exists() and not force:
         duration = _duration_seconds(out_path)
-        return {"audio_path": str(out_path), "duration_sec": duration}
+        return {"audio_path": relative_to_workspace(out_path), "duration_sec": duration}
 
     if not settings.lovo_api_key:
         raise DubbingError("LOVO_API_KEY is not configured")
@@ -70,4 +74,4 @@ def synthesize_voice(task_id: str, target_lang: str, voice_id: str | None = None
 
     out_path.write_bytes(response.content)
     duration = _duration_seconds(out_path)
-    return {"audio_path": str(out_path), "duration_sec": duration}
+    return {"audio_path": relative_to_workspace(out_path), "duration_sec": duration}
