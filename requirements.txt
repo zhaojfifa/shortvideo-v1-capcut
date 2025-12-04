@@ -1,9 +1,8 @@
 fastapi
 uvicorn[standard]
 httpx
-pydantic
+pydantic==1.10.13
 python-dotenv
-pydantic>=1.10,<3
 requests
 tqdm
 openai
