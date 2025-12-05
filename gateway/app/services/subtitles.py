@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -34,8 +35,46 @@ def transcribe(task_id: str, raw_path: Path, force: bool = False) -> Path:
             file=audio_file,
             response_format="srt",
         )
-    origin_srt.write_text(transcription, encoding="utf-8")
+    srt_text = transcription.text if hasattr(transcription, "text") else str(transcription)
+    origin_srt.write_text(srt_text, encoding="utf-8")
     return origin_srt
+
+
+def transcribe_with_ffmpeg(task_id: str, raw_path: Path, force: bool = False) -> tuple[Path, Path]:
+    origin_srt = origin_srt_path(task_id)
+    wav_path = subs_dir() / f"{task_id}.wav"
+
+    if origin_srt.exists() and wav_path.exists() and not force:
+        return origin_srt, wav_path
+
+    wav_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(raw_path),
+        "-vn",
+        "-ac",
+        "1",
+        "-ar",
+        "16000",
+        str(wav_path),
+    ]
+    proc = subprocess.run(cmd, capture_output=True)
+    if proc.returncode != 0:
+        stderr = proc.stderr.decode("utf-8", errors="ignore")
+        raise SubtitleError(f"ffmpeg failed: {stderr.strip()}")
+
+    client = _client()
+    with wav_path.open("rb") as audio_file:
+        transcription = client.audio.transcriptions.create(
+            model=settings.whisper_model,
+            file=audio_file,
+            response_format="srt",
+        )
+    srt_text = transcription.text if hasattr(transcription, "text") else str(transcription)
+    origin_srt.write_text(srt_text, encoding="utf-8")
+    return origin_srt, wav_path
 
 
 def translate(task_id: str, origin_srt: Path, target_lang: str, force: bool = False) -> Path:
@@ -88,13 +127,20 @@ def generate_subtitles(
     target_lang: str = "my",
     force: bool = False,
     translate_enabled: bool = True,
+    use_ffmpeg_extract: bool = False,
 ) -> dict:
     if not raw_video.exists():
         raise SubtitleError("raw video not found")
 
-    origin_srt = transcribe(task_id, raw_video, force=force)
+    audio_path: Optional[Path] = None
+
+    if use_ffmpeg_extract:
+        origin_srt, audio_path = transcribe_with_ffmpeg(task_id, raw_video, force=force)
+    else:
+        origin_srt = transcribe(task_id, raw_video, force=force)
+
     result: dict[str, Optional[str] | list[str]] = {
-        "audio_path": None,
+        "audio_path": relative_to_workspace(audio_path) if audio_path else None,
         "origin_srt": relative_to_workspace(origin_srt),
         "translated_srt": None,
         "origin_preview": _preview_lines(origin_srt),

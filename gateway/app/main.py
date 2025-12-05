@@ -22,6 +22,7 @@ from gateway.app.services.subtitles import SubtitleError, generate_subtitles
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 templates = Jinja2Templates(directory="gateway/app/templates")
+USE_FFMPEG_EXTRACT = False  # toggle to True locally if ffmpeg is available
 
 
 class ParseRequest(BaseModel):
@@ -107,6 +108,7 @@ async def subtitles(request: SubtitlesRequest):
             target_lang=request.target_lang,
             force=request.force,
             translate_enabled=request.translate,
+            use_ffmpeg_extract=USE_FFMPEG_EXTRACT,
         )
     except SubtitleError as exc:
         logging.exception("subtitles failed")
