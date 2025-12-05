@@ -1,4 +1,3 @@
-import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -6,7 +5,6 @@ from openai import OpenAI
 
 from gateway.app.config import settings
 from gateway.app.core.workspace import (
-    audio_wav_path,
     origin_srt_path,
     relative_to_workspace,
     subs_dir,
@@ -24,32 +22,13 @@ def _client() -> OpenAI:
     return OpenAI(api_key=settings.openai_api_key, base_url=settings.openai_api_base)
 
 
-def extract_audio(task_id: str, raw_path: Path) -> Path:
-    output = audio_wav_path(task_id)
-    command = [
-        "ffmpeg",
-        "-y",
-        "-i",
-        str(raw_path),
-        "-ar",
-        "16000",
-        "-ac",
-        "1",
-        str(output),
-    ]
-    result = subprocess.run(command, capture_output=True)
-    if result.returncode != 0:
-        raise SubtitleError(f"ffmpeg failed: {result.stderr.decode(errors='ignore')}")
-    return output
-
-
-def transcribe(task_id: str, audio_path: Path, force: bool = False) -> Path:
+def transcribe(task_id: str, raw_path: Path, force: bool = False) -> Path:
     origin_srt = origin_srt_path(task_id)
     if origin_srt.exists() and not force:
         return origin_srt
 
     client = _client()
-    with audio_path.open("rb") as audio_file:
+    with raw_path.open("rb") as audio_file:
         transcription = client.audio.transcriptions.create(
             model=settings.whisper_model,
             file=audio_file,
@@ -66,18 +45,18 @@ def translate(task_id: str, origin_srt: Path, target_lang: str, force: bool = Fa
 
     client = _client()
     content = origin_srt.read_text(encoding="utf-8")
-    prompt = (
-        "Translate the following SRT subtitles into the target language while keeping "
-        "the SRT timecodes and numbering. Return only valid SRT text."
-    )
     completion = client.chat.completions.create(
         model=settings.gpt_model,
         messages=[
-            {"role": "system", "content": prompt},
             {
-                "role": "user",
-                "content": f"Target language: {target_lang}\n\nSRT:\n{content}",
+                "role": "system",
+                "content": (
+                    "You are a subtitle translator. Translate the following SRT subtitles to"
+                    f" {target_lang}. "
+                    "Keep the SRT structure (indices and timestamps) unchanged, only translate the text lines."
+                ),
             },
+            {"role": "user", "content": content},
         ],
         temperature=0,
     )
@@ -92,8 +71,12 @@ def _preview_lines(path: Path, limit: int = 5) -> list[str]:
     lines = [line.strip("\ufeff").rstrip("\n") for line in path.read_text(encoding="utf-8").splitlines()]
     preview: list[str] = []
     for line in lines:
-        if line.strip():
-            preview.append(line.strip())
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.isdigit() or "-->" in stripped:
+            continue
+        preview.append(stripped)
         if len(preview) >= limit:
             break
     return preview
@@ -106,10 +89,12 @@ def generate_subtitles(
     force: bool = False,
     translate_enabled: bool = True,
 ) -> dict:
-    audio_path = extract_audio(task_id, raw_video)
-    origin_srt = transcribe(task_id, audio_path, force=force)
+    if not raw_video.exists():
+        raise SubtitleError("raw video not found")
+
+    origin_srt = transcribe(task_id, raw_video, force=force)
     result: dict[str, Optional[str] | list[str]] = {
-        "audio_path": relative_to_workspace(audio_path),
+        "audio_path": None,
         "origin_srt": relative_to_workspace(origin_srt),
         "translated_srt": None,
         "origin_preview": _preview_lines(origin_srt),

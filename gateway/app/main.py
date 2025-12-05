@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -107,7 +109,11 @@ async def subtitles(request: SubtitlesRequest):
             translate_enabled=request.translate,
         )
     except SubtitleError as exc:
+        logging.exception("subtitles failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive logging for runtime issues
+        logging.exception("subtitles failed")
+        raise HTTPException(status_code=500, detail="internal error") from exc
 
     return {
         "task_id": request.task_id,
