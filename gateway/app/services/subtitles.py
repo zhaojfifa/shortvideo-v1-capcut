@@ -8,10 +8,12 @@ from typing import List, Optional
 
 from gateway.app.core.workspace import (
     relative_to_workspace,
-    segments_json_path,
+    scenes_json_path,
     subs_dir,
+    translated_srt_path,
     workspace_root,
 )
+from gateway.app.providers.gemini_subtitles import translate_and_segment_with_gemini
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +77,7 @@ async def generate_subtitles_with_whisper(
     target_lang: str = "my",
     force: bool = False,
     translate_enabled: bool = True,
-    use_ffmpeg_extract: bool = False,
+    use_ffmpeg_extract: bool = True,
 ) -> dict:
     """Existing Whisper/GPT subtitle generation path."""
 
@@ -125,92 +127,116 @@ async def generate_subtitles_with_whisper(
     }
 
 
-async def generate_subtitles_with_gemini(settings, raw: Path, task_id: str) -> dict:
-    """Gemini-based subtitle generation."""
+async def generate_subtitles_with_gemini(
+    settings,
+    raw: Path,
+    task_id: str,
+    target_lang: str = "my",
+    force: bool = False,
+    translate_enabled: bool = True,
+    with_scenes: bool = True,
+) -> dict:
+    """ASR with Whisper + translation/segmentation with Gemini."""
 
-    if not settings.gemini_api_key:
-        raise SubtitleError("GEMINI_API_KEY is not configured")
     if not raw.exists():
         raise SubtitleError("raw video not found")
 
     try:
-        import google.generativeai as genai
-    except ImportError as exc:  # pragma: no cover - import guard
-        raise SubtitleError("google-generativeai is not installed") from exc
+        from gateway.app.services import subtitles_openai as openai_backend
+    except Exception as exc:  # pragma: no cover - defensive import
+        raise SubtitleError(str(exc)) from exc
 
+    if not settings.gemini_api_key:
+        raise SubtitleError("GEMINI_API_KEY is not configured")
+
+    subs_dir().mkdir(parents=True, exist_ok=True)
+
+    audio_path: Optional[Path] = None
     try:
-        genai.configure(api_key=settings.gemini_api_key)
-        model_name = settings.gemini_model or "gemini-1.5-flash"
-        model = genai.GenerativeModel(model_name)
-
-        prompt = (
-            "You are a subtitle engine for short social videos. "
-            "Watch this video and produce a JSON object with an array field 'segments'. "
-            "Each segment must have: index (int), start_sec (float), end_sec (float), "
-            "'origin' (original language text), and 'mm' (Burmese translation). "
-            "Keep each line short and suitable for subtitles. Return ONLY valid JSON."
+        origin_srt, audio_path = openai_backend.transcribe_with_ffmpeg(
+            task_id, raw, force=force
         )
+    except SubtitleError:
+        raise
+    except Exception as exc:  # pragma: no cover - guard runtime issues
+        raise SubtitleError(str(exc)) from exc
 
-        with raw.open("rb") as f:
-            response = model.generate_content(
-                [prompt, {"mime_type": "video/mp4", "data": f.read()}],
-                generation_config={"response_mime_type": "application/json"},
-                stream=False,
-            )
-    except Exception as exc:  # pragma: no cover - runtime guard
-        raise SubtitleError(f"Gemini request failed: {exc}") from exc
+    suffix = "mm" if (target_lang or "").lower() in {"my", "mm"} else (target_lang or "mm")
+    translated_srt: Optional[Path] = translated_srt_path(task_id, suffix)
+    scenes_path = scenes_json_path(task_id)
+    segments_rel: Optional[str] = None
+    scenes_preview: list = []
 
-    try:
-        data = json.loads(getattr(response, "text", ""))
-    except Exception:
-        logger.exception("Failed to parse Gemini JSON response: %s", getattr(response, "text", ""))
-        raise SubtitleError("Gemini returned non-JSON response")
-
-    segments_raw = data.get("segments", []) if isinstance(data, dict) else []
-    segments: list[SubtitleSegment] = []
-    for seg in segments_raw:
+    if translated_srt.exists() and not force:
         try:
-            segments.append(
-                SubtitleSegment(
-                    index=int(seg.get("index", len(segments) + 1)),
-                    start=float(seg.get("start_sec", seg.get("start", 0) or 0)),
-                    end=float(seg.get("end_sec", seg.get("end", 0) or 0)),
-                    origin=str(seg.get("origin", seg.get("text_zh", seg.get("text", "")))).strip(),
-                    mm=str(seg.get("mm", seg.get("text_my", ""))).strip() or None,
-                )
+            if scenes_path.exists():
+                segments_rel = str(scenes_path.relative_to(workspace_root()))
+                loaded = json.loads(scenes_path.read_text(encoding="utf-8"))
+                if isinstance(loaded, list):
+                    scenes_preview = loaded[:3]
+                elif isinstance(loaded, dict):
+                    scenes_preview = (loaded.get("scenes") or [])[:3]
+        except Exception:  # pragma: no cover - non-blocking preview
+            pass
+    elif translate_enabled:
+        try:
+            translation = translate_and_segment_with_gemini(
+                origin_srt.read_text(encoding="utf-8"), target_lang=target_lang or "my"
             )
-        except Exception:  # pragma: no cover - guard malformed segment
-            continue
+        except Exception as exc:  # pragma: no cover - external request guard
+            raise SubtitleError(f"Gemini translation failed: {exc}") from exc
 
-    subs_dir_path = subs_dir()
-    subs_dir_path.mkdir(parents=True, exist_ok=True)
+        segments_raw = translation.get("segments", []) if isinstance(translation, dict) else []
+        segments: list[SubtitleSegment] = []
+        for seg in segments_raw:
+            try:
+                segments.append(
+                    SubtitleSegment(
+                        index=int(seg.get("index", len(segments) + 1)),
+                        start=float(seg.get("start") or seg.get("start_sec") or 0),
+                        end=float(seg.get("end") or seg.get("end_sec") or 0),
+                        origin=str(seg.get("origin", "")).strip(),
+                        mm=(str(seg.get("mm", "")).strip() or None),
+                    )
+                )
+            except Exception:  # pragma: no cover - skip malformed segments
+                continue
 
-    origin_srt_path = subs_dir_path / f"{task_id}_origin.srt"
-    mm_srt_path = subs_dir_path / f"{task_id}_mm.srt"
+        if segments:
+            origin_text = segments_to_srt(segments, lang="origin")
+            origin_srt.write_text(origin_text, encoding="utf-8")
+            translated_srt.write_text(segments_to_srt(segments, lang="mm"), encoding="utf-8")
 
-    origin_srt = segments_to_srt(segments, lang="origin")
-    mm_srt = segments_to_srt(segments, lang="mm")
+        scenes_data = translation.get("scenes") if isinstance(translation, dict) else None
+        if with_scenes and scenes_data is not None:
+            try:
+                payload = translation if isinstance(translation, dict) else scenes_data
+                scenes_path.write_text(
+                    json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
+                segments_rel = str(scenes_path.relative_to(workspace_root()))
+                if isinstance(payload, dict):
+                    scenes_preview = (payload.get("scenes") or [])[:3]
+                elif isinstance(payload, list):
+                    scenes_preview = payload[:3]
+            except Exception:  # pragma: no cover - optional scenes persistence
+                segments_rel = None
 
-    origin_srt_path.write_text(origin_srt, encoding="utf-8")
-    mm_srt_path.write_text(mm_srt, encoding="utf-8")
-
-    scenes_path = segments_json_path(task_id)
-    try:
-        scenes_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        segments_rel = str(scenes_path.relative_to(workspace_root()))
-    except Exception:  # pragma: no cover - writing scenes is optional
-        segments_rel = None
-
-    origin_preview = preview_lines(origin_srt)
-    mm_preview = preview_lines(mm_srt)
+    origin_preview = preview_lines(origin_srt.read_text(encoding="utf-8"))
+    mm_preview: list[str] = []
+    if translated_srt.exists():
+        mm_preview = preview_lines(translated_srt.read_text(encoding="utf-8"))
 
     return {
         "task_id": task_id,
         "backend": "gemini",
-        "origin_srt": str(origin_srt_path.relative_to(workspace_root())),
-        "mm_srt": str(mm_srt_path.relative_to(workspace_root())),
+        "origin_srt": str(origin_srt.relative_to(workspace_root())),
+        "mm_srt": str(translated_srt.relative_to(workspace_root()))
+        if translated_srt and translated_srt.exists()
+        else None,
         "segments_json": segments_rel,
-        "wav": None,
+        "wav": relative_to_workspace(audio_path) if audio_path else None,
         "origin_preview": origin_preview,
         "mm_preview": mm_preview,
+        "scenes_preview": scenes_preview,
     }

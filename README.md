@@ -15,6 +15,8 @@
 cp .env.example .env
 # 根据实际填入 XIONGMAO_API_KEY、OPENAI_API_KEY、LOVO_API_KEY 等；
 # SUBTITLES_BACKEND/ASR_BACKEND 控制转写后端，默认 Gemini，也可以设为 whisper（Whisper+GPT）。
+# 默认字幕翻译/分段使用 Gemini 2.0 Flash，需要配置 GEMINI_API_KEY（Google AI Studio 密钥）
+# 和可选的 GEMINI_MODEL（默认 gemini-2.0-flash）。
 ```
 
 2. 安装依赖

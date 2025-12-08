@@ -49,19 +49,16 @@ async def generate_with_gemini(
         raise SubtitleError("GEMINI_API_KEY is not configured")
 
     try:
-        import google.generativeai as genai
+        from google import genai
     except ImportError as exc:  # pragma: no cover - import guard
-        raise SubtitleError("google-generativeai is not installed") from exc
+        raise SubtitleError("google-genai is not installed") from exc
 
     raw = raw_path(task_id)
     if not raw.exists():
         raise SubtitleError("raw video not found")
 
-    genai.configure(
-        api_key=settings.gemini_api_key,
-        client_options={"api_endpoint": settings.gemini_base_url},
-    )
-    model = genai.GenerativeModel(settings.gemini_model or "gemini-1.5-pro")
+    client = genai.Client(api_key=settings.gemini_api_key)
+    model = settings.gemini_model or "gemini-2.0-flash"
 
     prompt = (
         "You are a transcription and segmentation engine. Given a short social video, "
@@ -72,12 +69,13 @@ async def generate_with_gemini(
 
     try:
         with raw.open("rb") as f:
-            resp = model.generate_content(
-                [
+            resp = client.models.generate_content(
+                model=model,
+                contents=[
                     prompt,
                     {"mime_type": "video/mp4", "data": f.read()},
                 ],
-                generation_config={"response_mime_type": "application/json"},
+                config={"response_mime_type": "application/json"},
             )
     except Exception as exc:  # pragma: no cover - runtime guard
         raise SubtitleError(f"Gemini request failed: {exc}") from exc

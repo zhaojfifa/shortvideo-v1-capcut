@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     workspace_root: str = Field("./workspace", env="WORKSPACE_ROOT")
 
     subtitles_backend: str = Field(
-        "whisper", env="SUBTITLES_BACKEND", description="Subtitle backend: 'whisper' or 'gemini'"
+        "gemini", env="SUBTITLES_BACKEND", description="Subtitle backend: 'whisper' or 'gemini'"
     )
     asr_backend: str = Field("whisper", env="ASR_BACKEND")
 
@@ -24,11 +24,8 @@ class Settings(BaseSettings):
     whisper_model: str = Field("whisper-1", env="WHISPER_MODEL")
     gpt_model: str = Field("gpt-4o-mini", env="GPT_MODEL")
 
-    gemini_api_key: str | None = Field(None, env="GEMINI_API_KEY")
-    gemini_model: str = Field("gemini-1.5-pro", env="GEMINI_MODEL")
-    gemini_base_url: str = Field(
-        "https://generativelanguage.googleapis.com/v1beta", env="GEMINI_BASE_URL"
-    )
+    gemini_api_key: str = Field(..., env="GEMINI_API_KEY")
+    gemini_model: str = Field("gemini-2.0-flash", env="GEMINI_MODEL")
 
     lovo_api_key: str | None = Field(None, env="LOVO_API_KEY")
     lovo_voice_id_mm: str = Field("mm_female_1", env="LOVO_VOICE_ID_MM")

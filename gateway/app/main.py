@@ -27,7 +27,7 @@ from gateway.app.services.subtitles import (
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 templates = Jinja2Templates(directory="gateway/app/templates")
-USE_FFMPEG_EXTRACT = False  # toggle to True locally if ffmpeg is available
+USE_FFMPEG_EXTRACT = True  # toggle to False only if ffmpeg is unavailable
 
 
 class ParseRequest(BaseModel):
@@ -115,7 +115,13 @@ async def subtitles(
     try:
         if (settings.subtitles_backend or "whisper").lower() == "gemini":
             result = await generate_subtitles_with_gemini(
-                settings, raw_file, request.task_id
+                settings,
+                raw_file,
+                request.task_id,
+                target_lang=request.target_lang,
+                force=request.force,
+                translate_enabled=request.translate,
+                with_scenes=request.with_scenes,
             )
         else:
             result = await generate_subtitles_with_whisper(
@@ -152,6 +158,7 @@ async def subtitles(
         "mm_preview": result.get("mm_preview")
         or result.get("translated_preview")
         or [],
+        "scenes_preview": result.get("scenes_preview") or [],
     }
 
 

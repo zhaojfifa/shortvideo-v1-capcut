@@ -27,6 +27,12 @@ def scenes_dir() -> Path:
     return path
 
 
+def scenes_json_path(task_id: str) -> Path:
+    path = scenes_dir() / f"{task_id}_scenes.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def segments_json_path(task_id: str) -> Path:
     path = scenes_dir() / f"{task_id}_segments.json"
     path.parent.mkdir(parents=True, exist_ok=True)
