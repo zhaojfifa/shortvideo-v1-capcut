@@ -8,7 +8,9 @@ class Settings(BaseSettings):
 
     workspace_root: str = Field("./workspace", env="WORKSPACE_ROOT")
 
-    subtitles_backend: str = Field("gemini", env="SUBTITLES_BACKEND")
+    subtitles_backend: str = Field(
+        "whisper", env="SUBTITLES_BACKEND", description="Subtitle backend: 'whisper' or 'gemini'"
+    )
     asr_backend: str = Field("whisper", env="ASR_BACKEND")
 
     xiongmao_api_base: str = Field(

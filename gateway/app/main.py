@@ -1,11 +1,12 @@
 import logging
 
-from fastapi import FastAPI, HTTPException, Request
+import openai
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, HttpUrl
 
-from gateway.app.config import get_settings
+from gateway.app.config import Settings, get_settings
 from gateway.app.core.workspace import (
     dubbed_audio_path,
     origin_srt_path,
@@ -18,7 +19,11 @@ from gateway.app.providers.xiongmao import XiongmaoError, parse_with_xiongmao
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.download import DownloadError, download_raw_video
 from gateway.app.services.pack import PackError, create_capcut_pack
-from gateway.app.services.subtitles import SubtitleError, generate_subtitles
+from gateway.app.services.subtitles import (
+    SubtitleError,
+    generate_subtitles_with_gemini,
+    generate_subtitles_with_whisper,
+)
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 templates = Jinja2Templates(directory="gateway/app/templates")
@@ -100,25 +105,40 @@ async def get_raw(task_id: str):
 
 
 @app.post("/v1/subtitles")
-async def subtitles(request: SubtitlesRequest):
+async def subtitles(
+    request: SubtitlesRequest, settings: Settings = Depends(get_settings)
+):
     raw_file = raw_path(request.task_id)
     if not raw_file.exists():
-        raise HTTPException(status_code=404, detail="raw video not found")
+        raise HTTPException(status_code=400, detail="raw video not found")
 
     try:
-        result = await generate_subtitles(
-            task_id=request.task_id,
-            target_lang=request.target_lang,
-            force=request.force,
-            translate_enabled=request.translate,
-            use_ffmpeg_extract=USE_FFMPEG_EXTRACT,
-            with_scenes=request.with_scenes,
-        )
+        if (settings.subtitles_backend or "whisper").lower() == "gemini":
+            result = await generate_subtitles_with_gemini(
+                settings, raw_file, request.task_id
+            )
+        else:
+            result = await generate_subtitles_with_whisper(
+                settings,
+                raw_file,
+                request.task_id,
+                target_lang=request.target_lang,
+                force=request.force,
+                translate_enabled=request.translate,
+                use_ffmpeg_extract=USE_FFMPEG_EXTRACT,
+            )
+    except HTTPException:
+        raise
     except SubtitleError as exc:
         logging.exception("subtitles failed")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except openai.BadRequestError as exc:
+        logging.exception("OpenAI error in /v1/subtitles")
+        raise HTTPException(
+            status_code=402, detail="OpenAI Whisper quota or billing error"
+        ) from exc
     except Exception as exc:  # pragma: no cover - defensive logging for runtime issues
-        logging.exception("subtitles failed")
+        logging.exception("Unexpected error in /v1/subtitles")
         raise HTTPException(status_code=500, detail="internal error") from exc
 
     return {
