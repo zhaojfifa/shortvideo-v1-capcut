@@ -1,0 +1,41 @@
+from functools import lru_cache
+from typing import Literal
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(case_sensitive=False)
+
+    workspace_root: str = Field("./workspace", env="WORKSPACE_ROOT")
+
+    subtitles_backend: Literal["openai", "gemini"] = Field(
+        "gemini", env="SUBTITLES_BACKEND", description="Subtitle backend: 'whisper' or 'gemini'"
+    )
+    asr_backend: str = Field("whisper", env="ASR_BACKEND")
+
+    xiongmao_api_base: str = Field(
+        "https://api.guijianpan.com", env="XIONGMAO_API_BASE"
+    )
+    xiongmao_app_id: str = Field("xxmQsyByAk", env="XIONGMAO_APP_ID")
+    xiongmao_api_key: str = Field(..., env="XIONGMAO_API_KEY")
+
+    openai_api_key: str | None = Field(None, env="OPENAI_API_KEY")
+    openai_api_base: str = Field("https://api.openai.com/v1", env="OPENAI_API_BASE")
+    whisper_model: str = Field("whisper-1", env="WHISPER_MODEL")
+    gpt_model: str = Field("gpt-4o-mini", env="GPT_MODEL")
+
+    gemini_api_key: str | None = Field(default=None, env="GEMINI_API_KEY")
+    gemini_model: str = Field("gemini-2.0-flash", env="GEMINI_MODEL")
+
+    lovo_api_key: str | None = Field(None, env="LOVO_API_KEY")
+    lovo_voice_id_mm: str = Field("mm_female_1", env="LOVO_VOICE_ID_MM")
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+
+
+settings = get_settings()
