@@ -20,7 +20,7 @@ async def generate_subtitles(
     with_scenes: bool = True,
 ) -> dict[str, Any]:
     settings = get_settings()
-    backend = (settings.subtitles_backend or "openai").lower()
+    backend = (settings.asr_backend or settings.subtitles_backend or "openai").lower()
 
     if backend == "gemini":
         from gateway.app.services.subtitles_gemini import generate_with_gemini
@@ -30,7 +30,7 @@ async def generate_subtitles(
             target_lang=target_lang,
             with_scenes=with_scenes,
         )
-    if backend == "openai":
+    if backend in {"openai", "whisper"}:
         from gateway.app.services.subtitles_openai import generate_with_openai
 
         return await generate_with_openai(

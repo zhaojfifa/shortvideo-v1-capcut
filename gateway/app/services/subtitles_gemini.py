@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
-
-from google import genai
+from typing import Any
 
 from gateway.app.config import get_settings
 from gateway.app.core.workspace import (
@@ -15,18 +14,6 @@ from gateway.app.core.workspace import (
 from gateway.app.services.subtitles import SubtitleError, preview_lines
 
 
-def _client() -> genai.Client:
-    settings = get_settings()
-    if not settings.gemini_api_key:
-        raise SubtitleError("GEMINI_API_KEY is not configured")
-    return genai.Client(api_key=settings.gemini_api_key, base_url=settings.gemini_base_url)
-
-
-def _model(client: genai.Client):
-    settings = get_settings()
-    return client.models.get(settings.gemini_model)
-
-
 def _format_timestamp(seconds: float) -> str:
     total_ms = int(float(seconds) * 1000)
     hours, rem = divmod(total_ms, 3_600_000)
@@ -35,12 +22,15 @@ def _format_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
 
-def segments_to_srt(segments: list[dict]) -> str:
+def _segments_to_srt(segments: list[dict[str, Any]], text_key: str) -> str:
     lines: list[str] = []
     for idx, seg in enumerate(segments, start=1):
         start = _format_timestamp(seg.get("start", 0))
         end = _format_timestamp(seg.get("end", seg.get("start", 0)))
-        text = str(seg.get("text", "")).strip()
+        text = (
+            str(seg.get(text_key) or seg.get("text") or seg.get("text_zh") or "")
+            .strip()
+        )
         lines.extend([str(idx), f"{start} --> {end}", text, ""])
     return "\n".join(lines).strip() + "\n"
 
@@ -54,78 +44,82 @@ async def generate_with_gemini(
     target_lang: str = "my",
     with_scenes: bool = True,
 ) -> dict:
+    settings = get_settings()
+    if not settings.gemini_api_key:
+        raise SubtitleError("GEMINI_API_KEY is not configured")
+
+    try:
+        import google.generativeai as genai
+    except ImportError as exc:  # pragma: no cover - import guard
+        raise SubtitleError("google-generativeai is not installed") from exc
+
     raw = raw_path(task_id)
     if not raw.exists():
         raise SubtitleError("raw video not found")
 
-    client = _client()
-    model = _model(client)
-
-    file = client.files.upload(file=str(raw))
-    file_uri = getattr(file, "uri", None)
-    if not file_uri:
-        raise SubtitleError("failed to upload file to Gemini")
+    genai.configure(
+        api_key=settings.gemini_api_key,
+        client_options={"api_endpoint": settings.gemini_base_url},
+    )
+    model = genai.GenerativeModel(settings.gemini_model or "gemini-1.5-pro")
 
     prompt = (
-        "You are a transcription and scene segmentation engine.\n\n"
-        "- Watch and listen to the attached short video.\n"
-        "- Split it into natural scenes based on topic or visual changes.\n"
-        "- Return a JSON object with key \"segments\".\n"
-        "- Each segment:\n  {\n    \"scene_id\": <int starting from 1>,\n    \"start\": <float seconds>,\n    \"end\": <float seconds>,\n    \"text\": \"<original language transcript>\"\n  }\n"
-        "- Timestamps must be strictly increasing and non-overlapping.\n"
-        "- Use the original spoken language (do NOT translate).\n"
-        "- Return ONLY JSON."
+        "You are a transcription and segmentation engine. Given a short social video, "
+        "output JSON with an array 'segments', each having start (sec), end (sec), "
+        "text_zh (original language transcript), and text_my (Burmese translation). "
+        "Timestamps must be monotonic and contiguous."
     )
 
-    resp = model.generate_content(
-        contents=[
-            {
-                "role": "user",
-                "parts": [
-                    {"text": prompt},
-                    {"file_data": {"file_uri": file_uri}},
+    try:
+        with raw.open("rb") as f:
+            resp = model.generate_content(
+                [
+                    prompt,
+                    {"mime_type": "video/mp4", "data": f.read()},
                 ],
-            }
-        ],
-        config={"response_mime_type": "application/json"},
-    )
+                generation_config={"response_mime_type": "application/json"},
+            )
+    except Exception as exc:  # pragma: no cover - runtime guard
+        raise SubtitleError(f"Gemini request failed: {exc}") from exc
 
-    segments_obj = json.loads(getattr(resp, "text", "{}"))
+    try:
+        segments_obj = json.loads(getattr(resp, "text", "{}"))
+    except json.JSONDecodeError as exc:
+        raise SubtitleError(f"Gemini returned invalid JSON: {exc}") from exc
+
+    if not isinstance(segments_obj, dict):
+        raise SubtitleError("Gemini response is not a JSON object")
+
     segments = segments_obj.get("segments", []) if isinstance(segments_obj, dict) else []
+    if not isinstance(segments, list):
+        segments = []
 
     subs_dir().mkdir(parents=True, exist_ok=True)
+
     origin_path = origin_srt_path(task_id)
-    origin_srt_text = segments_to_srt(segments)
+    mm_path = translated_srt_path(task_id, "mm")
+    origin_srt_text = _segments_to_srt(segments, "text_zh")
+    mm_srt_text = _segments_to_srt(segments, "text_my")
+    if not mm_srt_text.strip():
+        mm_srt_text = _segments_to_srt(segments, "text")
+
     origin_path.write_text(origin_srt_text, encoding="utf-8")
+    mm_path.write_text(mm_srt_text, encoding="utf-8")
 
     scenes_path = segments_json_path(task_id)
-    scenes_path.write_text(json.dumps(segments_obj, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    translate_prompt = (
-        "You are a subtitle translator.\n\n"
-        "Input: SRT subtitles in the original language.\n"
-        "Task:\n"
-        "- Translate ONLY the subtitle text lines into Burmese (my).\n"
-        "- Keep indices and timestamps EXACTLY the same.\n"
-        "- Output valid SRT in UTF-8.\n\n"
-        "Here is the SRT:\n\n"
-        f"{origin_srt_text}"
-    )
-
-    translate_resp = model.generate_content(
-        contents=[{"role": "user", "parts": [{"text": translate_prompt}]}]
-    )
-    mm_srt_text = getattr(translate_resp, "text", "") or ""
-    suffix = "mm" if (target_lang or "").lower() in {"my", "mm"} else (target_lang or "mm")
-    mm_srt_path = translated_srt_path(task_id, suffix)
-    mm_srt_path.write_text(mm_srt_text, encoding="utf-8")
+    if with_scenes:
+        scenes_path.write_text(
+            json.dumps(segments_obj, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    else:
+        scenes_path = None
 
     return {
         "task_id": task_id,
         "origin_srt": str(origin_path.relative_to(workspace_root())),
-        "mm_srt": str(mm_srt_path.relative_to(workspace_root())),
-        "segments_json": str(scenes_path.relative_to(workspace_root())) if with_scenes else None,
+        "mm_srt": str(mm_path.relative_to(workspace_root())),
+        "segments_json": str(scenes_path.relative_to(workspace_root())) if scenes_path else None,
         "wav": None,
         "origin_preview": _preview_text(origin_path),
-        "mm_preview": _preview_text(mm_srt_path),
+        "mm_preview": _preview_text(mm_path),
     }

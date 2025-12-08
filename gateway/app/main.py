@@ -58,6 +58,7 @@ async def pipeline_lab(request: Request):
         "douyin_api_base": settings.xiongmao_api_base,
         "whisper_model": settings.whisper_model,
         "gpt_model": settings.gpt_model,
+        "asr_backend": settings.asr_backend,
         "subtitles_backend": settings.subtitles_backend,
         "gemini_model": settings.gemini_model,
     }
