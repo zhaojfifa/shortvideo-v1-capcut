@@ -8,6 +8,8 @@ class Settings(BaseSettings):
 
     workspace_root: str = Field("./workspace", env="WORKSPACE_ROOT")
 
+    subtitles_backend: str = Field("gemini", env="SUBTITLES_BACKEND")
+
     xiongmao_api_base: str = Field(
         "https://api.guijianpan.com", env="XIONGMAO_API_BASE"
     )
@@ -18,6 +20,12 @@ class Settings(BaseSettings):
     openai_api_base: str = Field("https://api.openai.com/v1", env="OPENAI_API_BASE")
     whisper_model: str = Field("whisper-1", env="WHISPER_MODEL")
     gpt_model: str = Field("gpt-4o-mini", env="GPT_MODEL")
+
+    gemini_api_key: str | None = Field(None, env="GEMINI_API_KEY")
+    gemini_model: str = Field("gemini-1.5-pro", env="GEMINI_MODEL")
+    gemini_base_url: str = Field(
+        "https://generativelanguage.googleapis.com/v1beta", env="GEMINI_BASE_URL"
+    )
 
     lovo_api_key: str | None = Field(None, env="LOVO_API_KEY")
     lovo_voice_id_mm: str = Field("mm_female_1", env="LOVO_VOICE_ID_MM")

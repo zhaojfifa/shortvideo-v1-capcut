@@ -13,7 +13,8 @@
 
 ```bash
 cp .env.example .env
-# 根据实际填入 XIONGMAO_API_KEY、OPENAI_API_KEY、LOVO_API_KEY 等
+# 根据实际填入 XIONGMAO_API_KEY、OPENAI_API_KEY、LOVO_API_KEY 等；
+# SUBTITLES_BACKEND 默认为 gemini，也可以设为 openai（Whisper+GPT）。
 ```
 
 2. 安装依赖
@@ -86,9 +87,9 @@ curl -X POST "http://127.0.0.1:8000/v1/parse" \
 
 ### 2) `POST /v1/subtitles`（转写+翻译）
 
-- 输入：`task_id`，可选 `target_lang`（默认缅甸语 my）、`force`、`translate`
-- 逻辑：检查 raw 是否存在 → ffmpeg 提取音频 → Whisper 转写 `_origin.srt` → GPT 翻译 `_mm.srt`
-- 输出：`wav`、`origin_srt`、`mm_srt`、`origin_preview`、`mm_preview`
+- 输入：`task_id`，可选 `target_lang`（默认缅甸语 my）、`force`、`translate`、`with_scenes`
+- 逻辑：检查 raw 是否存在 → 根据 `SUBTITLES_BACKEND` 选择 Gemini（默认，生成场景段落 JSON + 缅语翻译）或 OpenAI（Whisper/GPT，保留可选 ffmpeg 提取音频路径） → 写入 `_origin.srt`、`_mm.srt`，Gemini 还会生成 `edits/scenes/<task_id>_segments.json`。
+- 输出：`wav`（OpenAI+ffmpeg 时存在）、`origin_srt`、`mm_srt`、`segments_json`、`origin_preview`、`mm_preview`
 - 下载：`GET /v1/tasks/{task_id}/subs_origin`、`GET /v1/tasks/{task_id}/subs_mm`
 
 示例：

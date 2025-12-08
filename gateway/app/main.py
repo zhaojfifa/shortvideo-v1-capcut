@@ -36,6 +36,7 @@ class SubtitlesRequest(BaseModel):
     target_lang: str = "my"
     force: bool = False
     translate: bool = True
+    with_scenes: bool = True
 
 
 class DubRequest(BaseModel):
@@ -57,6 +58,8 @@ async def pipeline_lab(request: Request):
         "douyin_api_base": settings.xiongmao_api_base,
         "whisper_model": settings.whisper_model,
         "gpt_model": settings.gpt_model,
+        "subtitles_backend": settings.subtitles_backend,
+        "gemini_model": settings.gemini_model,
     }
     return templates.TemplateResponse(
         "pipeline_lab.html", {"request": request, "env_summary": env_summary}
@@ -102,13 +105,13 @@ async def subtitles(request: SubtitlesRequest):
         raise HTTPException(status_code=404, detail="raw video not found")
 
     try:
-        result = generate_subtitles(
+        result = await generate_subtitles(
             task_id=request.task_id,
-            raw_video=raw_file,
             target_lang=request.target_lang,
             force=request.force,
             translate_enabled=request.translate,
             use_ffmpeg_extract=USE_FFMPEG_EXTRACT,
+            with_scenes=request.with_scenes,
         )
     except SubtitleError as exc:
         logging.exception("subtitles failed")
@@ -120,11 +123,14 @@ async def subtitles(request: SubtitlesRequest):
     return {
         "task_id": request.task_id,
         "target_lang": request.target_lang,
-        "wav": result.get("audio_path"),
+        "wav": result.get("wav") or result.get("audio_path"),
         "origin_srt": result.get("origin_srt"),
-        "mm_srt": result.get("translated_srt"),
+        "mm_srt": result.get("mm_srt") or result.get("translated_srt"),
+        "segments_json": result.get("segments_json"),
         "origin_preview": result.get("origin_preview") or [],
-        "mm_preview": result.get("translated_preview") or [],
+        "mm_preview": result.get("mm_preview")
+        or result.get("translated_preview")
+        or [],
     }
 
 

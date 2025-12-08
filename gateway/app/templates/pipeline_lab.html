@@ -22,6 +22,7 @@
     <h1>Shortvideo V1 · Pipeline Lab</h1>
     <p>Workspace: <strong>{{ env_summary.workspace_root }}</strong></p>
     <p>Douyin API: <code>{{ env_summary.douyin_api_base }}</code> | Whisper: <code>{{ env_summary.whisper_model }}</code> | GPT: <code>{{ env_summary.gpt_model }}</code></p>
+    <p>Subtitles backend: <code>{{ env_summary.subtitles_backend }}</code> | Gemini model: <code>{{ env_summary.gemini_model }}</code></p>
   </header>
 
   <section id="task">
@@ -70,6 +71,7 @@
   <section>
     <h2>Step 2 · Transcribe & Translate</h2>
     <button onclick="runSubtitles()">Generate subtitles</button>
+    <pre id="subsOutput">(empty)</pre>
     <div class="row" style="margin-top:8px;">
       <div style="flex:1; min-width:240px;">
         <strong>Origin preview</strong>
@@ -143,7 +145,7 @@
     }
 
     async function runSubtitles() {
-      const body = { task_id: taskId(), target_lang: 'my', force: false, translate: true };
+      const body = { task_id: taskId(), target_lang: 'my', force: false, translate: true, with_scenes: true };
       log(`Calling /v1/subtitles for ${body.task_id}`);
       const res = await fetch('/v1/subtitles', {
         method: 'POST',
@@ -151,11 +153,15 @@
         body: JSON.stringify(body),
       });
       const json = await res.json();
+      document.getElementById('subsOutput').textContent = JSON.stringify(json, null, 2);
       if (!res.ok) {
         log(`Subtitles failed: ${json.detail || res.status}`);
       }
       document.getElementById('originPreview').textContent = (json.origin_preview || []).join('\n') || '(empty)';
       document.getElementById('mmPreview').textContent = (json.mm_preview || []).join('\n') || '(empty)';
+      if (json.segments_json) {
+        log(`Segments JSON ready: ${json.segments_json}`);
+      }
       log('Subtitles generated.');
       return json;
     }
