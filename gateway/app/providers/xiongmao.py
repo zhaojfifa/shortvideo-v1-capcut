@@ -1,6 +1,10 @@
+import logging
+
 import httpx
 
 from gateway.app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class XiongmaoError(Exception):
@@ -39,8 +43,13 @@ async def parse_with_xiongmao(link: str) -> dict:
         "link": link,
     }
     url = f"{settings.douyin_api_base}/waterRemoveDetail/{app_id}"
-    async with httpx.AsyncClient(timeout=20) as client:
-        response = await client.get(url, params=params)
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+    except httpx.HTTPError as exc:  # pragma: no cover - network dependent
+        logger.exception("Xiongmao provider HTTP error for link %s", link)
+        raise
     try:
         data = response.json()
     except ValueError as exc:  # pragma: no cover - network dependent

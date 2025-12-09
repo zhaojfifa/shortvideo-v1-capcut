@@ -1,6 +1,8 @@
 import logging
 import subprocess
 
+import httpx
+
 import openai
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -29,6 +31,7 @@ from gateway.app.core.errors import SubtitlesError
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 templates = Jinja2Templates(directory="gateway/app/templates")
 USE_FFMPEG_EXTRACT = True  # toggle to False only if ffmpeg is unavailable
+logger = logging.getLogger(__name__)
 
 
 class ParseRequest(BaseModel):
@@ -196,19 +199,21 @@ async def subtitles(
     if not raw_file.exists():
         raise HTTPException(status_code=400, detail="raw video not found")
 
+    backend = getattr(settings, "subtitles_backend", "gemini")
+    backend = (backend or "gemini").lower()
+
     try:
-        result = await generate_subtitles(
-            settings,
-            raw_file,
-            request.task_id,
-            target_lang=request.target_lang,
-            force=request.force,
-            translate_enabled=request.translate,
-            use_ffmpeg_extract=USE_FFMPEG_EXTRACT,
-        )
+        if backend == "gemini":
+            result = await _subtitles_with_gemini(request, settings)
+        elif backend == "openai":
+            result = await _subtitles_with_openai(request, settings)
+        else:
+            raise HTTPException(
+                status_code=500, detail=f"Unknown subtitles backend: {backend}"
+            )
     except HTTPException:
         raise
-    except SubtitlesError as exc:
+    except SubtitleError as exc:
         logging.exception("subtitles failed")
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except openai.BadRequestError as exc:

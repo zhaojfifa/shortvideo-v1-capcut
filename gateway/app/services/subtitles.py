@@ -5,27 +5,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-from gateway.app.core.workspace import (
-    relative_to_workspace,
-    subs_dir,
-    origin_srt_path,
-    translated_srt_path,
-    audio_wav_path,
-    raw_path,
-)
+from gateway.app.core.workspace import relative_to_workspace, subs_dir
 from gateway.app.services import subtitles_openai as openai_backend
-from gateway.app.core.errors import SubtitlesError
-from gateway.app.config import get_settings
-
-import subprocess
-import json
-try:
-    from google import genai
-except Exception:
-    genai = None
-import openai
 
 logger = logging.getLogger(__name__)
+
+
+class SubtitleError(Exception):
+    """Raised when subtitle processing fails."""
 
 
 @dataclass
@@ -61,7 +48,19 @@ def segments_to_srt(segments: List[SubtitleSegment], lang: str) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
-from gateway.app.core.subtitle_utils import preview_lines
+def preview_lines(text: str, limit: int = 5) -> list[str]:
+    lines = [line.strip("\ufeff").rstrip("\n") for line in text.splitlines()]
+    preview: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.isdigit() or "-->" in stripped:
+            continue
+        preview.append(stripped)
+        if len(preview) >= limit:
+            break
+    return preview
 
 
 async def generate_subtitles_with_whisper(
@@ -76,11 +75,11 @@ async def generate_subtitles_with_whisper(
     """Existing Whisper/GPT subtitle generation path."""
 
     if not settings.openai_api_key:
-        raise SubtitlesError(
+        raise SubtitleError(
             "OPENAI_API_KEY is not configured; subtitles backend 'openai' is disabled."
         )
     if not raw.exists():
-        raise SubtitlesError("raw video not found")
+        raise SubtitleError("raw video not found")
 
     subs_dir().mkdir(parents=True, exist_ok=True)
 
@@ -99,7 +98,7 @@ async def generate_subtitles_with_whisper(
                 task_id, origin_srt, target_lang, force=force
             )
     except Exception as exc:  # pragma: no cover - defensive guard
-        raise SubtitlesError(str(exc), cause=exc) from exc
+        raise SubtitleError(str(exc)) from exc
 
     origin_preview = preview_lines(origin_srt.read_text(encoding="utf-8"))
     mm_preview = (
