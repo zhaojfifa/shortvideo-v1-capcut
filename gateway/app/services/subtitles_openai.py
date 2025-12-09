@@ -118,6 +118,10 @@ async def generate_with_openai(
     translate_enabled: bool = True,
     use_ffmpeg_extract: bool = False,
 ) -> dict:
+    settings = get_settings()
+    if not settings.openai_api_key:
+        raise SubtitleError("OPENAI_API_KEY is not configured; subtitles backend 'openai' is disabled.")
+
     raw = raw_path(task_id)
     if not raw.exists():
         raise SubtitleError("raw video not found")

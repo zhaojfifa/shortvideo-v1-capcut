@@ -1,4 +1,5 @@
 import logging
+import subprocess
 
 import openai
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -13,17 +14,16 @@ from gateway.app.core.workspace import (
     pack_zip_path,
     raw_path,
     relative_to_workspace,
+    subs_dir,
     translated_srt_path,
 )
 from gateway.app.providers.xiongmao import XiongmaoError, parse_with_xiongmao
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.download import DownloadError, download_raw_video
 from gateway.app.services.pack import PackError, create_capcut_pack
-from gateway.app.services.subtitles import (
-    SubtitleError,
-    generate_subtitles_with_gemini,
-    generate_subtitles_with_whisper,
-)
+from gateway.app.services.subtitles import SubtitleError, preview_lines
+from gateway.app.services.gemini_subtitles import transcribe_and_translate_with_gemini
+from gateway.app.services.subtitles import generate_subtitles_with_whisper
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 templates = Jinja2Templates(directory="gateway/app/templates")
@@ -53,6 +53,89 @@ class DubRequest(BaseModel):
 
 class PackRequest(BaseModel):
     task_id: str
+
+
+async def _subtitles_with_openai(request: SubtitlesRequest, settings: Settings) -> dict:
+    result = await generate_subtitles_with_whisper(
+        settings,
+        raw_path(request.task_id),
+        request.task_id,
+        target_lang=request.target_lang,
+        force=request.force,
+        translate_enabled=request.translate,
+        use_ffmpeg_extract=USE_FFMPEG_EXTRACT,
+    )
+
+    return {
+        "task_id": request.task_id,
+        "origin_srt": result.get("origin_srt"),
+        "mm_srt": result.get("mm_srt"),
+        "wav": result.get("wav"),
+        "segments_json": result.get("segments_json"),
+        "origin_preview": result.get("origin_preview") or [],
+        "mm_preview": result.get("mm_preview") or [],
+        "scenes_preview": result.get("scenes_preview") or [],
+    }
+
+
+async def _subtitles_with_gemini(request: SubtitlesRequest, settings: Settings) -> dict:
+    task_id = request.task_id
+    raw_mp4 = raw_path(task_id)
+    if not raw_mp4.exists():
+        raise HTTPException(status_code=400, detail=f"raw video not found for task {task_id}")
+
+    subs_root = subs_dir()
+    subs_root.mkdir(parents=True, exist_ok=True)
+
+    wav_path = subs_root / f"{task_id}.wav"
+    origin_srt_path = subs_root / f"{task_id}_origin.srt"
+    mm_srt_path = subs_root / f"{task_id}_mm.srt"
+
+    if request.force or not wav_path.exists():
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(raw_mp4),
+            "-vn",
+            "-acodec",
+            "pcm_s16le",
+            "-ar",
+            "16000",
+            "-ac",
+            "1",
+            str(wav_path),
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise HTTPException(status_code=500, detail=f"ffmpeg failed: {proc.stderr[:400]}")
+
+    try:
+        origin_srt, mm_srt = transcribe_and_translate_with_gemini(
+            wav_path, target_lang=request.target_lang or "my"
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:  # pragma: no cover - external dependency safety
+        logging.exception("Gemini subtitles failed")
+        raise HTTPException(status_code=502, detail="Gemini subtitles failed") from exc
+
+    origin_srt_path.write_text(origin_srt, encoding="utf-8")
+    mm_srt_path.write_text(mm_srt, encoding="utf-8")
+
+    origin_preview = preview_lines(origin_srt)
+    mm_preview = preview_lines(mm_srt)
+
+    return {
+        "task_id": task_id,
+        "origin_srt": relative_to_workspace(origin_srt_path),
+        "mm_srt": relative_to_workspace(mm_srt_path),
+        "wav": relative_to_workspace(wav_path),
+        "segments_json": None,
+        "origin_preview": origin_preview,
+        "mm_preview": mm_preview,
+        "scenes_preview": [],
+    }
 
 
 @app.get("/ui", response_class=HTMLResponse)
@@ -112,26 +195,16 @@ async def subtitles(
     if not raw_file.exists():
         raise HTTPException(status_code=400, detail="raw video not found")
 
+    backend = (settings.subtitles_backend or "gemini").lower()
+
     try:
-        if (settings.subtitles_backend or "whisper").lower() == "gemini":
-            result = await generate_subtitles_with_gemini(
-                settings,
-                raw_file,
-                request.task_id,
-                target_lang=request.target_lang,
-                force=request.force,
-                translate_enabled=request.translate,
-                with_scenes=request.with_scenes,
-            )
+        if backend == "gemini":
+            result = await _subtitles_with_gemini(request, settings)
+        elif backend == "openai":
+            result = await _subtitles_with_openai(request, settings)
         else:
-            result = await generate_subtitles_with_whisper(
-                settings,
-                raw_file,
-                request.task_id,
-                target_lang=request.target_lang,
-                force=request.force,
-                translate_enabled=request.translate,
-                use_ffmpeg_extract=USE_FFMPEG_EXTRACT,
+            raise HTTPException(
+                status_code=500, detail=f"Unknown subtitles backend: {backend}"
             )
     except HTTPException:
         raise
@@ -147,19 +220,7 @@ async def subtitles(
         logging.exception("Unexpected error in /v1/subtitles")
         raise HTTPException(status_code=500, detail="internal error") from exc
 
-    return {
-        "task_id": request.task_id,
-        "target_lang": request.target_lang,
-        "wav": result.get("wav") or result.get("audio_path"),
-        "origin_srt": result.get("origin_srt"),
-        "mm_srt": result.get("mm_srt") or result.get("translated_srt"),
-        "segments_json": result.get("segments_json"),
-        "origin_preview": result.get("origin_preview") or [],
-        "mm_preview": result.get("mm_preview")
-        or result.get("translated_preview")
-        or [],
-        "scenes_preview": result.get("scenes_preview") or [],
-    }
+    return result
 
 
 @app.get("/v1/tasks/{task_id}/subs_origin")

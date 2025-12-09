@@ -1,4 +1,6 @@
 from functools import lru_cache
+from typing import Literal
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -8,7 +10,7 @@ class Settings(BaseSettings):
 
     workspace_root: str = Field("./workspace", env="WORKSPACE_ROOT")
 
-    subtitles_backend: str = Field(
+    subtitles_backend: Literal["openai", "gemini"] = Field(
         "gemini", env="SUBTITLES_BACKEND", description="Subtitle backend: 'whisper' or 'gemini'"
     )
     asr_backend: str = Field("whisper", env="ASR_BACKEND")
@@ -24,7 +26,7 @@ class Settings(BaseSettings):
     whisper_model: str = Field("whisper-1", env="WHISPER_MODEL")
     gpt_model: str = Field("gpt-4o-mini", env="GPT_MODEL")
 
-    gemini_api_key: str = Field(..., env="GEMINI_API_KEY")
+    gemini_api_key: str | None = Field(default=None, env="GEMINI_API_KEY")
     gemini_model: str = Field("gemini-2.0-flash", env="GEMINI_MODEL")
 
     lovo_api_key: str | None = Field(None, env="LOVO_API_KEY")
