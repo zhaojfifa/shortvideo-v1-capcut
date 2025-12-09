@@ -143,12 +143,12 @@ async def pipeline_lab(request: Request):
     settings = get_settings()
     env_summary = {
         "workspace_root": settings.workspace_root,
-        "douyin_api_base": settings.xiongmao_api_base,
-        "whisper_model": settings.whisper_model,
-        "gpt_model": settings.gpt_model,
-        "asr_backend": settings.asr_backend,
-        "subtitles_backend": settings.subtitles_backend,
-        "gemini_model": settings.gemini_model,
+        "douyin_api_base": getattr(settings, "douyin_api_base", ""),
+        "whisper_model": getattr(settings, "whisper_model", ""),
+        "gpt_model": getattr(settings, "gpt_model", ""),
+        "asr_backend": getattr(settings, "asr_backend", "whisper"),
+        "subtitles_backend": getattr(settings, "subtitles_backend", "gemini"),
+        "gemini_model": getattr(settings, "gemini_model", ""),
     }
     return templates.TemplateResponse(
         "pipeline_lab.html", {"request": request, "env_summary": env_summary}
@@ -195,7 +195,8 @@ async def subtitles(
     if not raw_file.exists():
         raise HTTPException(status_code=400, detail="raw video not found")
 
-    backend = (settings.subtitles_backend or "gemini").lower()
+    backend = getattr(settings, "subtitles_backend", "gemini")
+    backend = (backend or "gemini").lower()
 
     try:
         if backend == "gemini":

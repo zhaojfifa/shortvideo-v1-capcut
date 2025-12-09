@@ -1,6 +1,6 @@
 import httpx
 
-from gateway.app.config import settings
+from gateway.app.config import get_settings
 
 
 class XiongmaoError(Exception):
@@ -32,11 +32,13 @@ def _normalize_content(payload: dict) -> dict:
 
 
 async def parse_with_xiongmao(link: str) -> dict:
+    settings = get_settings()
+    app_id = "xxmQsyByAk"
     params = {
-        "ak": settings.xiongmao_api_key,
+        "ak": settings.douyin_api_key,
         "link": link,
     }
-    url = f"{settings.xiongmao_api_base}/waterRemoveDetail/{settings.xiongmao_app_id}"
+    url = f"{settings.douyin_api_base}/waterRemoveDetail/{app_id}"
     async with httpx.AsyncClient(timeout=20) as client:
         response = await client.get(url, params=params)
     try:

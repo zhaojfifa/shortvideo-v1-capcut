@@ -3,7 +3,7 @@ import wave
 
 import requests
 
-from gateway.app.config import settings
+from gateway.app.config import get_settings
 from gateway.app.core.workspace import (
     dubbed_audio_path,
     relative_to_workspace,
@@ -43,6 +43,7 @@ def _duration_seconds(wav_path: Path) -> float | None:
 
 
 def synthesize_voice(task_id: str, target_lang: str, voice_id: str | None = None, force: bool = False) -> dict:
+    settings = get_settings()
     translated_srt = translated_srt_path(task_id, target_lang)
     if not translated_srt.exists():
         raise DubbingError("translated subtitles not found; run /v1/subtitles first")
