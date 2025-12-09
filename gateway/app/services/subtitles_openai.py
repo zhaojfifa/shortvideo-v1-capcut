@@ -13,13 +13,14 @@ from gateway.app.core.workspace import (
     subs_dir,
     translated_srt_path,
 )
-from gateway.app.services.subtitles import SubtitleError, preview_lines
+from gateway.app.core.subtitle_utils import preview_lines
+from gateway.app.core.errors import SubtitlesError
 
 
 def _client() -> OpenAI:
     settings = get_settings()
     if not settings.openai_api_key:
-        raise SubtitleError("OPENAI_API_KEY is not configured")
+        raise SubtitlesError("OPENAI_API_KEY is not configured")
     return OpenAI(api_key=settings.openai_api_key, base_url=settings.openai_api_base)
 
 
@@ -63,7 +64,7 @@ def transcribe_with_ffmpeg(task_id: str, raw: Path, force: bool = False) -> tupl
     proc = subprocess.run(cmd, capture_output=True)
     if proc.returncode != 0:
         stderr = proc.stderr.decode("utf-8", errors="ignore")
-        raise SubtitleError(f"ffmpeg failed: {stderr.strip()}")
+        raise SubtitlesError(f"ffmpeg failed: {stderr.strip()}")
 
     client = _client()
     with wav_path.open("rb") as audio_file:
@@ -102,7 +103,7 @@ def translate(task_id: str, origin_srt: Path, target_lang: str, force: bool = Fa
     )
     translated = completion.choices[0].message.content or ""
     if not translated.strip():
-        raise SubtitleError("translation returned empty content")
+        raise SubtitlesError("translation returned empty content")
     target_srt.write_text(translated, encoding="utf-8")
     return target_srt
 
@@ -120,11 +121,11 @@ async def generate_with_openai(
 ) -> dict:
     settings = get_settings()
     if not settings.openai_api_key:
-        raise SubtitleError("OPENAI_API_KEY is not configured; subtitles backend 'openai' is disabled.")
+        raise SubtitlesError("OPENAI_API_KEY is not configured; subtitles backend 'openai' is disabled.")
 
     raw = raw_path(task_id)
     if not raw.exists():
-        raise SubtitleError("raw video not found")
+        raise SubtitlesError("raw video not found")
 
     subs_dir().mkdir(parents=True, exist_ok=True)
 

@@ -23,9 +23,10 @@ from gateway.app.providers.xiongmao import XiongmaoError, parse_with_xiongmao
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.download import DownloadError, download_raw_video
 from gateway.app.services.pack import PackError, create_capcut_pack
-from gateway.app.services.subtitles import SubtitleError, preview_lines
+from gateway.app.core.subtitle_utils import preview_lines
+from gateway.app.services.subtitles import generate_subtitles
 from gateway.app.services.gemini_subtitles import transcribe_and_translate_with_gemini
-from gateway.app.services.subtitles import generate_subtitles_with_whisper
+from gateway.app.core.errors import SubtitlesError
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 templates = Jinja2Templates(directory="gateway/app/templates")
@@ -160,36 +161,9 @@ async def pipeline_lab(request: Request):
 
 @app.post("/v1/parse")
 async def parse(request: ParseRequest):
-    if request.platform not in ("douyin", "tiktok"):
-        raise HTTPException(status_code=400, detail=f"Unknown platform: {request.platform}")
-
-    if request.platform == "tiktok":
-        raise HTTPException(status_code=400, detail="platform 'tiktok' is not supported yet")
-
-    settings = get_settings()
-    if not settings.douyin_api_base:
-        logger.error("DOUYIN_API_BASE is not configured")
-        raise HTTPException(status_code=500, detail="DOUYIN_API_BASE is not configured")
-    if not settings.douyin_api_key:
-        logger.error("DOUYIN_API_KEY is not configured")
-        raise HTTPException(status_code=500, detail="DOUYIN_API_KEY is not configured")
-
-    logger.debug(
-        "Calling Douyin parser",
-        extra={
-            "task_id": request.task_id,
-            "platform": request.platform,
-            "link": str(request.link),
-            "douyin_api_base": settings.douyin_api_base,
-        },
-    )
-
     try:
         parsed = await parse_with_xiongmao(str(request.link))
         raw_file = await download_raw_video(request.task_id, parsed.get("download_url") or "")
-    except httpx.HTTPError as exc:  # pragma: no cover - network dependent
-        logger.exception("Douyin parse failed for task %s", request.task_id)
-        raise HTTPException(status_code=502, detail=f"Douyin parse failed: {exc}") from exc
     except XiongmaoError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except DownloadError as exc:
