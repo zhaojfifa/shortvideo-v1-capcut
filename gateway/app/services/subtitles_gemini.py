@@ -11,7 +11,7 @@ from gateway.app.core.workspace import (
     translated_srt_path,
     workspace_root,
 )
-from gateway.app.services.subtitles import preview_lines
+from gateway.app.core.subtitle_utils import preview_lines
 from gateway.app.core.errors import SubtitlesError
 
 

@@ -21,7 +21,8 @@ from gateway.app.providers.xiongmao import XiongmaoError, parse_with_xiongmao
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.download import DownloadError, download_raw_video
 from gateway.app.services.pack import PackError, create_capcut_pack
-from gateway.app.services.subtitles import preview_lines, generate_subtitles
+from gateway.app.core.subtitle_utils import preview_lines
+from gateway.app.services.subtitles import generate_subtitles
 from gateway.app.services.gemini_subtitles import transcribe_and_translate_with_gemini
 from gateway.app.core.errors import SubtitlesError
 

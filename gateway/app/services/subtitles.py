@@ -61,19 +61,7 @@ def segments_to_srt(segments: List[SubtitleSegment], lang: str) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
-def preview_lines(text: str, limit: int = 5) -> list[str]:
-    lines = [line.strip("\ufeff").rstrip("\n") for line in text.splitlines()]
-    preview: list[str] = []
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            continue
-        if stripped.isdigit() or "-->" in stripped:
-            continue
-        preview.append(stripped)
-        if len(preview) >= limit:
-            break
-    return preview
+from gateway.app.core.subtitle_utils import preview_lines
 
 
 async def generate_subtitles_with_whisper(

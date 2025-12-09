@@ -13,7 +13,7 @@ from gateway.app.core.workspace import (
     subs_dir,
     translated_srt_path,
 )
-from gateway.app.services.subtitles import preview_lines
+from gateway.app.core.subtitle_utils import preview_lines
 from gateway.app.core.errors import SubtitlesError
 
 
