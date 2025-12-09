@@ -21,7 +21,7 @@ from gateway.app.providers.xiongmao import XiongmaoError, parse_with_xiongmao
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.download import DownloadError, download_raw_video
 from gateway.app.services.pack import PackError, create_capcut_pack
-from gateway.app.services.subtitles import preview_lines, generate_subtitles_with_whisper
+from gateway.app.services.subtitles import preview_lines, generate_subtitles
 from gateway.app.services.gemini_subtitles import transcribe_and_translate_with_gemini
 from gateway.app.core.errors import SubtitlesError
 
@@ -195,18 +195,16 @@ async def subtitles(
     if not raw_file.exists():
         raise HTTPException(status_code=400, detail="raw video not found")
 
-    backend = getattr(settings, "subtitles_backend", "gemini")
-    backend = (backend or "gemini").lower()
-
     try:
-        if backend == "gemini":
-            result = await _subtitles_with_gemini(request, settings)
-        elif backend == "openai":
-            result = await _subtitles_with_openai(request, settings)
-        else:
-            raise HTTPException(
-                status_code=500, detail=f"Unknown subtitles backend: {backend}"
-            )
+        result = await generate_subtitles(
+            settings,
+            raw_file,
+            request.task_id,
+            target_lang=request.target_lang,
+            force=request.force,
+            translate_enabled=request.translate,
+            use_ffmpeg_extract=USE_FFMPEG_EXTRACT,
+        )
     except HTTPException:
         raise
     except SubtitlesError as exc:
