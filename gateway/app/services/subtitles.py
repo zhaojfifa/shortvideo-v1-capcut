@@ -7,12 +7,9 @@ from typing import List, Optional
 
 from gateway.app.core.workspace import relative_to_workspace, subs_dir
 from gateway.app.services import subtitles_openai as openai_backend
+from gateway.app.core.errors import SubtitlesError
 
 logger = logging.getLogger(__name__)
-
-
-class SubtitleError(Exception):
-    """Raised when subtitle processing fails."""
 
 
 @dataclass
@@ -75,11 +72,11 @@ async def generate_subtitles_with_whisper(
     """Existing Whisper/GPT subtitle generation path."""
 
     if not settings.openai_api_key:
-        raise SubtitleError(
+        raise SubtitlesError(
             "OPENAI_API_KEY is not configured; subtitles backend 'openai' is disabled."
         )
     if not raw.exists():
-        raise SubtitleError("raw video not found")
+        raise SubtitlesError("raw video not found")
 
     subs_dir().mkdir(parents=True, exist_ok=True)
 
@@ -98,7 +95,7 @@ async def generate_subtitles_with_whisper(
                 task_id, origin_srt, target_lang, force=force
             )
     except Exception as exc:  # pragma: no cover - defensive guard
-        raise SubtitleError(str(exc)) from exc
+        raise SubtitlesError(str(exc), cause=exc) from exc
 
     origin_preview = preview_lines(origin_srt.read_text(encoding="utf-8"))
     mm_preview = (

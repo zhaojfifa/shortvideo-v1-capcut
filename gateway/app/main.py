@@ -21,9 +21,9 @@ from gateway.app.providers.xiongmao import XiongmaoError, parse_with_xiongmao
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.download import DownloadError, download_raw_video
 from gateway.app.services.pack import PackError, create_capcut_pack
-from gateway.app.services.subtitles import SubtitleError, preview_lines
+from gateway.app.services.subtitles import preview_lines, generate_subtitles_with_whisper
 from gateway.app.services.gemini_subtitles import transcribe_and_translate_with_gemini
-from gateway.app.services.subtitles import generate_subtitles_with_whisper
+from gateway.app.core.errors import SubtitlesError
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 templates = Jinja2Templates(directory="gateway/app/templates")
@@ -209,7 +209,7 @@ async def subtitles(
             )
     except HTTPException:
         raise
-    except SubtitleError as exc:
+    except SubtitlesError as exc:
         logging.exception("subtitles failed")
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except openai.BadRequestError as exc:
