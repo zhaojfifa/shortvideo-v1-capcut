@@ -26,10 +26,6 @@ class Settings(BaseSettings):
     gemini_api_key: str = Field("", env="GEMINI_API_KEY")
     gemini_model: str = Field("models/gemini-2.0-flash", env="GEMINI_MODEL")
 
-    # Subtitles backend selector: 'openai' or 'gemini'
-    # NOTE(中文注释): 这个配置决定 Step2 使用哪个字幕后端。默认使用 OpenAI Whisper。
-    subtitles_backend: str = Field("openai", env="SUBTITLES_BACKEND")
-
     # LOVO TTS
     lovo_api_key: str = Field("", env="LOVO_API_KEY")
     lovo_voice_id_mm: str = Field("mm_female_1", env="LOVO_VOICE_ID_MM")

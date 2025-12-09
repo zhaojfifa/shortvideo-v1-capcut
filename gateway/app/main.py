@@ -1,8 +1,6 @@
 import logging
 import subprocess
 
-import httpx
-
 import openai
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -19,14 +17,12 @@ from gateway.app.core.workspace import (
     subs_dir,
     translated_srt_path,
 )
-from gateway.app.providers.xiongmao import XiongmaoError, parse_with_xiongmao
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
-from gateway.app.services.download import DownloadError, download_raw_video
+from gateway.app.services.parse import parse_douyin_video
 from gateway.app.services.pack import PackError, create_capcut_pack
-from gateway.app.core.subtitle_utils import preview_lines
-from gateway.app.services.subtitles import generate_subtitles
+from gateway.app.services.subtitles import SubtitleError, preview_lines
 from gateway.app.services.gemini_subtitles import transcribe_and_translate_with_gemini
-from gateway.app.core.errors import SubtitlesError
+from gateway.app.services.subtitles import generate_subtitles_with_whisper
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 templates = Jinja2Templates(directory="gateway/app/templates")
@@ -161,26 +157,17 @@ async def pipeline_lab(request: Request):
 
 @app.post("/v1/parse")
 async def parse(request: ParseRequest):
-    try:
-        parsed = await parse_with_xiongmao(str(request.link))
-        raw_file = await download_raw_video(request.task_id, parsed.get("download_url") or "")
-    except XiongmaoError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    except DownloadError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    platform = request.platform or "douyin"
+    if platform != "douyin":
+        raise HTTPException(status_code=400, detail="Only 'douyin' is supported in V1 parse")
 
-    return {
-        "task_id": request.task_id,
-        "platform": request.platform,
-        "title": parsed.get("title"),
-        "type": parsed.get("type") or "VIDEO",
-        "download_url": parsed.get("download_url"),
-        "cover": parsed.get("cover"),
-        "origin_text": parsed.get("origin_text"),
-        "raw": parsed.get("raw"),
-        "raw_exists": raw_file.exists(),
-        "raw_path": relative_to_workspace(raw_file),
-    }
+    try:
+        return await parse_douyin_video(request.task_id, str(request.link))
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.exception("Unexpected error in /v1/parse for task %s", request.task_id)
+        raise HTTPException(status_code=500, detail=f"Unexpected server error: {exc}") from exc
 
 
 @app.get("/v1/tasks/{task_id}/raw")

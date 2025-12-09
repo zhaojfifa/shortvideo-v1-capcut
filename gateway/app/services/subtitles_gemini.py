@@ -11,8 +11,7 @@ from gateway.app.core.workspace import (
     translated_srt_path,
     workspace_root,
 )
-from gateway.app.core.subtitle_utils import preview_lines
-from gateway.app.core.errors import SubtitlesError
+from gateway.app.services.subtitles import SubtitleError, preview_lines
 
 
 def _format_timestamp(seconds: float) -> str:
@@ -47,16 +46,16 @@ async def generate_with_gemini(
 ) -> dict:
     settings = get_settings()
     if not settings.gemini_api_key:
-        raise SubtitlesError("GEMINI_API_KEY is not configured")
+        raise SubtitleError("GEMINI_API_KEY is not configured")
 
     try:
         from google import genai
     except ImportError as exc:  # pragma: no cover - import guard
-        raise SubtitlesError("google-genai is not installed") from exc
+        raise SubtitleError("google-genai is not installed") from exc
 
     raw = raw_path(task_id)
     if not raw.exists():
-        raise SubtitlesError("raw video not found")
+        raise SubtitleError("raw video not found")
 
     client = genai.Client(api_key=settings.gemini_api_key)
     model = settings.gemini_model or "gemini-2.0-flash"
@@ -79,15 +78,15 @@ async def generate_with_gemini(
                 config={"response_mime_type": "application/json"},
             )
     except Exception as exc:  # pragma: no cover - runtime guard
-        raise SubtitlesError(f"Gemini request failed: {exc}") from exc
+        raise SubtitleError(f"Gemini request failed: {exc}") from exc
 
     try:
         segments_obj = json.loads(getattr(resp, "text", "{}"))
     except json.JSONDecodeError as exc:
-        raise SubtitlesError(f"Gemini returned invalid JSON: {exc}") from exc
+        raise SubtitleError(f"Gemini returned invalid JSON: {exc}") from exc
 
     if not isinstance(segments_obj, dict):
-        raise SubtitlesError("Gemini response is not a JSON object")
+        raise SubtitleError("Gemini response is not a JSON object")
 
     segments = segments_obj.get("segments", []) if isinstance(segments_obj, dict) else []
     if not isinstance(segments, list):
