@@ -90,11 +90,11 @@ async def parse_with_xiongmao(link: str) -> Dict[str, Any]:
 
     api_base, api_key, app_id = _resolve_settings()
     if not api_base:
-        logger.error("Xiongmao/Douyin API base is not configured")
-        raise XiongmaoError("provider error: DOUYIN_API_BASE is not configured")
+        logger.error("Xiongmao API base is not configured")
+        raise XiongmaoError("provider error: XIONGMAO_API_BASE is not configured")
     if not api_key:
-        logger.error("Xiongmao/Douyin API key is not configured")
-        raise XiongmaoError("provider error: DOUYIN_API_KEY is not configured")
+        logger.error("Xiongmao API key is not configured")
+        raise XiongmaoError("provider error: XIONGMAO_API_KEY is not configured")
 
     url = f"{api_base.rstrip('/')}/waterRemoveDetail/{app_id}"
     params = {"ak": api_key, "link": link}

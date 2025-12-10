@@ -9,7 +9,15 @@ class Settings(BaseSettings):
         env="WORKSPACE_ROOT",
     )
 
-    # Douyin / TikTok parser backend
+    # Xiongmao short-video parser backend (supports Douyin/TikTok/XHS)
+    xiongmao_api_base: str = Field(
+        "https://api.guijiangpan.com",
+        env="XIONGMAO_API_BASE",
+    )
+    xiongmao_api_key: str = Field("", env="XIONGMAO_API_KEY")
+    xiongmao_app_id: str = Field("xxmQsyByAk", env="XIONGMAO_APP_ID")
+
+    # Legacy aliases (kept for backward compatibility; prefer XIONGMAO_* envs)
     douyin_api_base: str = Field(
         "https://api.guijiangpan.com",
         env="DOUYIN_API_BASE",

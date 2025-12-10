@@ -11,7 +11,6 @@ from typing import Any, Dict
 import httpx
 from fastapi import HTTPException
 
-from gateway.app.config import get_settings
 from gateway.app.core.workspace import relative_to_workspace
 from gateway.app.providers.xiongmao import XiongmaoError, parse_with_xiongmao
 from gateway.app.services.download import DownloadError, download_raw_video
@@ -22,16 +21,8 @@ logger = logging.getLogger(__name__)
 async def parse_douyin_video(task_id: str, link: str) -> Dict[str, Any]:
     """Parse a Douyin link, download the raw video, and return normalized data."""
 
-    settings = get_settings()
-    if not settings.douyin_api_base:
-        logger.error("DOUYIN_API_BASE is not configured")
-        raise HTTPException(status_code=500, detail="DOUYIN_API_BASE is not configured")
-    if not settings.douyin_api_key:
-        logger.error("DOUYIN_API_KEY is not configured")
-        raise HTTPException(status_code=500, detail="DOUYIN_API_KEY is not configured")
-
     logger.debug(
-        "Calling Douyin parser", extra={"task_id": task_id, "link": link, "douyin_api_base": settings.douyin_api_base}
+        "Calling Douyin parser", extra={"task_id": task_id, "link": link}
     )
 
     try:
