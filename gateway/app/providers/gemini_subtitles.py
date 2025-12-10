@@ -1,112 +1,203 @@
-"""Gemini-based translation and scene segmentation helpers."""
-
+# gateway/app/providers/gemini_subtitles.py
 import json
 import logging
-from typing import Iterable
+import os
+from typing import Any, Dict, List
 
-import httpx
-
-from gateway.app.config import get_settings
+import requests
 
 logger = logging.getLogger(__name__)
 
+# 配置项：优先使用 GEMINI_API_KEY，兼容 GOOGLE_API_KEY
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+GEMINI_BASE_URL = os.getenv(
+    "GEMINI_BASE_URL",
+    "https://generativelanguage.googleapis.com/v1beta",
+)
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
-def _normalize_model_name(model: str) -> str:
-    if model.startswith("models/"):
-        return model.split("models/", 1)[1]
-    return model
+
+class GeminiSubtitlesError(RuntimeError):
+    """Raised when Gemini subtitles pipeline fails."""
 
 
-def call_gemini_subtitles(prompt: str, parts_extra: Iterable[dict] | None = None) -> dict:
-    """Call Gemini generateContent for subtitles and return the full JSON response."""
+def _build_gemini_url() -> str:
+    """
+    Build full Gemini REST URL, e.g.
+    https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
+    """
+    if not GEMINI_API_KEY:
+        raise GeminiSubtitlesError("GEMINI_API_KEY is not configured")
 
-    settings = get_settings()
-    if not settings.gemini_api_key:
-        raise ValueError("GEMINI_API_KEY is not configured")
+    base = GEMINI_BASE_URL.rstrip("/")
+    return f"{base}/models/{GEMINI_MODEL}:generateContent"
 
-    base_url = (settings.gemini_base_url or "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
-    model_name = _normalize_model_name(settings.gemini_model or "gemini-2.0-flash")
-    url = f"{base_url}/models/{model_name}:generateContent?key={settings.gemini_api_key}"
 
-    parts = [{"text": prompt}]
-    if parts_extra:
-        parts.extend(parts_extra)
-
-    payload = {
-        "contents": [{"parts": parts}],
-        "generationConfig": {
-            "temperature": 0.1,
-            "response_mime_type": "application/json",
-        },
-        "response_schema": {
-            "type": "object",
-            "properties": {
-                "origin_srt": {"type": "string"},
-                "mm_srt": {"type": "string"},
-            },
-            "required": ["origin_srt", "mm_srt"],
-        },
+def _call_gemini(prompt: str, timeout: int = 60) -> Dict[str, Any]:
+    """
+    Call Gemini text model with a single text prompt and return parsed JSON response.
+    """
+    url = _build_gemini_url()
+    payload: Dict[str, Any] = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt},
+                ],
+            }
+        ]
     }
+    params = {"key": GEMINI_API_KEY}
 
-    resp = httpx.post(url, json=payload, timeout=120)
-    resp.raise_for_status()
-    resp_json = resp.json()
-    logger.info("Gemini subtitles call succeeded, usage: %s", resp_json.get("usageMetadata"))
-    return resp_json
+    logger.info("Calling Gemini subtitles model %s", GEMINI_MODEL)
+    resp = requests.post(url, params=params, json=payload, timeout=timeout)
+
+    logger.info(
+        "Gemini HTTP %s, body preview=%r",
+        resp.status_code,
+        resp.text[:300],
+    )
+
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError as exc:  # type: ignore[no-untyped-call]
+        # 输出部分 body，方便在 Render 日志里排查 4xx/5xx
+        logger.error("Gemini error body: %s", resp.text[:1000])
+        raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}") from exc
+
+    return resp.json()  # type: ignore[no-any-return]
 
 
-def translate_and_segment_with_gemini(origin_srt_text: str, target_lang: str = "my") -> dict:
+def _extract_text(resp_json: Dict[str, Any]) -> str:
     """
-    Translate and segment subtitles using Gemini.
-
-    Returns dict with keys:
-      - language: detected source language
-      - segments: list of {index, start, end, origin, mm, scene_id}
-      - scenes: list of {scene_id, start, end, title, mm_title}
+    从 Gemini JSON 响应里把所有 text part 拼出来。
+    v1beta 结构：candidates[0].content.parts[*].text
     """
+    candidates: List[Dict[str, Any]] = resp_json.get("candidates") or []
+    if not candidates:
+        raise GeminiSubtitlesError("Gemini response has no candidates")
 
+    content: Dict[str, Any] = candidates[0].get("content") or {}
+    parts: List[Dict[str, Any]] = content.get("parts") or []
+
+    texts = [p.get("text", "") for p in parts if isinstance(p, dict) and "text" in p]
+    if not texts:
+        raise GeminiSubtitlesError("Gemini response has no text parts")
+
+    return "".join(texts)
+
+
+def _strip_code_fences(text: str) -> str:
+    """
+    去掉 ```json ... ``` 或 ``` ... ``` 这样的 code fence。
+    """
+    t = text.strip()
+
+    if t.startswith("```"):
+        # 去掉前导 ```
+        t = t.lstrip("`")
+
+        # 可能是 "json" / "JSON"
+        lower = t.lower()
+        if lower.startswith("json"):
+            t = t[4:]
+
+        t = t.strip()
+
+        if t.endswith("```"):
+            t = t[:-3].strip()
+
+    return t
+
+
+def translate_and_segment_with_gemini(
+    origin_srt_text: str,
+    target_lang: str = "my",
+) -> Dict[str, Any]:
+    """
+    使用 Gemini 把 SRT 字幕翻译成缅甸语，并做场景分段。
+
+    返回结构：
+    {
+      "language": "<source_language_code>",
+      "segments": [
+        {"index": 1, "start": 0.0, "end": 2.5,
+         "origin": "original text", "mm": "Burmese text", "scene_id": 1}
+      ],
+      "scenes": [
+        {"scene_id": 1, "start": 0.0, "end": 5.0,
+         "title": "concise original scene title", "mm_title": "Burmese title"}
+      ]
+    }
+    """
     prompt = f"""
 You are a subtitle translator and scene segmenter for short social videos.
 
-Input subtitles are in SRT format (original language). Translate them to {target_lang} (Burmese) and also provide scene segmentation.
+The input subtitles are in SRT format (original language).
+Translate them to the target language "{target_lang}" (Burmese)
+and also provide scene segmentation.
 
-Return ONLY valid JSON with this shape:
+Return ONLY valid JSON with this exact shape:
+
 {{
   "language": "<source_language_code>",
   "segments": [
-    {{"index": 1, "start": 0.0, "end": 2.5, "origin": "<original text>", "mm": "<Burmese text>", "scene_id": 1}},
-    ...
+    {{
+      "index": 1,
+      "start": 0.0,
+      "end": 2.5,
+      "origin": "original text",
+      "mm": "Burmese text",
+      "scene_id": 1
+    }}
   ],
   "scenes": [
-    {{"scene_id": 1, "start": 0.0, "end": 5.0, "title": "<concise original scene title>", "mm_title": "<Burmese title>"}},
-    ...
+    {{
+      "scene_id": 1,
+      "start": 0.0,
+      "end": 5.0,
+      "title": "concise original scene title",
+      "mm_title": "Burmese title"
+    }}
   ]
 }}
 
 Rules:
-- Keep SRT timing order; timestamps are in seconds.
+- Keep segments in original SRT order; timestamps are in seconds.
 - Make timestamps monotonic and non-overlapping.
 - Keep translations concise and natural.
-- If unsure about a scene title, leave it empty string.
-- Respond with JSON only, no markdown or commentary.
+- If unsure about a scene title, keep it short or leave it empty.
+- Respond with JSON only. Do NOT add explanations, backticks, or code fences.
 
-Here is the SRT to process:
-```srt
+Here are the subtitles to process (SRT):
+
 {origin_srt_text}
-```
-"""
+""".strip()
 
-    try:
-        response_json = call_gemini_subtitles(prompt)
-    except Exception as exc:  # pragma: no cover - external request guard
-        logger.exception("Gemini translation call failed")
-        raise
+    # 1) 调用 Gemini
+    resp_json = _call_gemini(prompt)
+    raw_text = _extract_text(resp_json)
+    cleaned = _strip_code_fences(raw_text)
 
-    text = ""
+    # 2) 尝试解析 JSON
     try:
-        text = response_json.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-        return json.loads(text or "{}")
+        data = json.loads(cleaned)
     except json.JSONDecodeError as exc:
-        snippet = (text or "")[:500]
-        logger.exception("Gemini translation JSON parse failed: %s", snippet)
-        raise
+        logger.error(
+            "Gemini subtitles raw_text is not valid JSON. First 400 chars: %r",
+            cleaned[:400],
+        )
+        raise GeminiSubtitlesError(
+            "Gemini subtitles did not return valid JSON"
+        ) from exc
+
+    # 3) 做一点点 schema 校验，避免后续逻辑踩坑
+    if not isinstance(data, dict):
+        raise GeminiSubtitlesError("Gemini subtitles JSON root must be an object")
+
+    if "segments" not in data or "scenes" not in data:
+        raise GeminiSubtitlesError(
+            "Gemini subtitles JSON must contain 'segments' and 'scenes'"
+        )
+
+    return data
