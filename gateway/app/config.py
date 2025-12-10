@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # Gemini backend for subtitles / translation
     gemini_api_key: str = Field("", env="GEMINI_API_KEY")
     gemini_model: str = Field("models/gemini-2.0-flash", env="GEMINI_MODEL")
+    gemini_base_url: str = Field(
+        "https://generativelanguage.googleapis.com/v1beta", env="GEMINI_BASE_URL"
+    )
 
     # LOVO TTS
     lovo_api_key: str = Field("", env="LOVO_API_KEY")
