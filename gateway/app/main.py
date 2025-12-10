@@ -14,8 +14,8 @@ from gateway.app.core.workspace import (
     pack_zip_path,
     raw_path,
     relative_to_workspace,
-    subs_dir,
     translated_srt_path,
+    audio_wav_path,
 )
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.parse import parse_douyin_video
@@ -84,53 +84,46 @@ async def _subtitles_with_gemini(request: SubtitlesRequest, settings: Settings) 
     if not raw_mp4.exists():
         raise HTTPException(status_code=400, detail=f"raw video not found for task {task_id}")
 
-    subs_root = subs_dir()
-    subs_root.mkdir(parents=True, exist_ok=True)
-
-    wav_path = subs_root / f"{task_id}.wav"
-    origin_srt_path = subs_root / f"{task_id}_origin.srt"
-    mm_srt_path = subs_root / f"{task_id}_mm.srt"
-
-    if request.force or not wav_path.exists():
-        cmd = [
-            "ffmpeg",
-            "-y",
-            "-i",
-            str(raw_mp4),
-            "-vn",
-            "-acodec",
-            "pcm_s16le",
-            "-ar",
-            "16000",
-            "-ac",
-            "1",
-            str(wav_path),
-        ]
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-        if proc.returncode != 0:
-            raise HTTPException(status_code=500, detail=f"ffmpeg failed: {proc.stderr[:400]}")
-
     try:
-        origin_srt, mm_srt = transcribe_and_translate_with_gemini(
-            wav_path, target_lang=request.target_lang or "my"
+        whisper_result = await generate_subtitles_with_whisper(
+            settings,
+            raw_mp4,
+            task_id,
+            target_lang=request.target_lang,
+            force=request.force,
+            translate_enabled=False,
+            use_ffmpeg_extract=USE_FFMPEG_EXTRACT,
         )
-    except RuntimeError as exc:
+    except SubtitleError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:  # pragma: no cover - external dependency safety
-        logging.exception("Gemini subtitles failed")
+        logger.exception("Whisper ASR failed for Gemini backend")
+        raise HTTPException(status_code=502, detail="Whisper ASR failed") from exc
+
+    origin_path = origin_srt_path(task_id)
+    origin_text = origin_path.read_text(encoding="utf-8")
+
+    try:
+        _, mm_srt = await transcribe_and_translate_with_gemini(
+            origin_text, target_lang=request.target_lang or "my"
+        )
+    except Exception as exc:  # pragma: no cover - external dependency safety
+        logger.exception("Gemini subtitles failed")
         raise HTTPException(status_code=502, detail="Gemini subtitles failed") from exc
 
-    origin_srt_path.write_text(origin_srt, encoding="utf-8")
-    mm_srt_path.write_text(mm_srt, encoding="utf-8")
+    mm_path = translated_srt_path(task_id, "mm")
+    mm_path.write_text(mm_srt, encoding="utf-8")
 
-    origin_preview = preview_lines(origin_srt)
+    wav_path = audio_wav_path(task_id)
+
+    origin_preview = whisper_result.get("origin_preview") or preview_lines(origin_text)
     mm_preview = preview_lines(mm_srt)
 
     return {
         "task_id": task_id,
-        "origin_srt": relative_to_workspace(origin_srt_path),
-        "mm_srt": relative_to_workspace(mm_srt_path),
-        "wav": relative_to_workspace(wav_path),
+        "origin_srt": relative_to_workspace(origin_path),
+        "mm_srt": relative_to_workspace(mm_path),
+        "wav": relative_to_workspace(wav_path) if wav_path.exists() else None,
         "segments_json": None,
         "origin_preview": origin_preview,
         "mm_preview": mm_preview,

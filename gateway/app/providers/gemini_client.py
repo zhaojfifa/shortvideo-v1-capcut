@@ -1,38 +1,65 @@
 """Thin wrapper for Gemini client access."""
 
 import logging
-from functools import lru_cache
+import os
 
-from google import genai
-
-from gateway.app.config import get_settings
+import httpx
 
 logger = logging.getLogger(__name__)
 
-
-@lru_cache(maxsize=1)
-def get_gemini_client() -> genai.Client:
-    settings = get_settings()
-    if not settings.gemini_api_key:
-        raise ValueError("GEMINI_API_KEY is not configured")
-    return genai.Client(api_key=settings.gemini_api_key)
+GEMINI_BASE_URL = os.environ.get("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
 
 
-def call_gemini(prompt: str) -> str:
-    """Call Gemini with a single text prompt and return the response text."""
+class GeminiClientError(RuntimeError):
+    pass
 
-    client = get_gemini_client()
-    settings = get_settings()
+
+async def generate_text(prompt: str, *, temperature: float = 0.3, max_output_tokens: int = 2048) -> str:
+    """
+    Call Google Gemini `generateContent` and return the model text
+    (candidates[0].content.parts[0].text).
+
+    This helper is used by the subtitles service to translate SRT.
+    """
+    if not GEMINI_API_KEY:
+        raise GeminiClientError("GEMINI_API_KEY is not configured")
+
+    url = f"{GEMINI_BASE_URL}/models/{GEMINI_MODEL}:generateContent"
+
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [
+                    {"text": prompt},
+                ],
+            }
+        ],
+        "generationConfig": {
+            "temperature": temperature,
+            "topP": 0.8,
+            "maxOutputTokens": max_output_tokens,
+        },
+    }
+
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(url, params={"key": GEMINI_API_KEY}, json=payload)
+        try:
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            logger.error("Gemini HTTP error: %s", exc.response.text)
+            raise GeminiClientError(f"Gemini request failed: {exc}") from exc
+
+    data = resp.json()
     try:
-        response = client.models.generate_content(
-            model=settings.gemini_model,
-            contents=prompt,
-        )
-    except Exception as exc:  # pragma: no cover - external request guard
-        logger.exception("Gemini generate_content failed")
-        raise
+        candidates = data["candidates"]
+        first = candidates[0]
+        parts = first["content"]["parts"]
+        text = parts[0]["text"]
+    except (KeyError, IndexError, TypeError) as exc:
+        logger.error("Unexpected Gemini response structure: %r", data)
+        raise GeminiClientError("Gemini response has unexpected structure") from exc
 
-    text = getattr(response, "text", "") or ""
-    if not text.strip():
-        raise ValueError("Gemini response was empty")
-    return text
+    return text.strip()
