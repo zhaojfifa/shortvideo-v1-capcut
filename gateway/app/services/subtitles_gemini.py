@@ -11,7 +11,7 @@ from gateway.app.core.workspace import (
     translated_srt_path,
     workspace_root,
 )
-from gateway.app.services.subtitles import SubtitleError, preview_lines
+from gateway.app.services.subtitles_openai import SubtitleError, preview_lines
 
 
 def _format_timestamp(seconds: float) -> str:

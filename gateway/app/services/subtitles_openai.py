@@ -13,7 +13,25 @@ from gateway.app.core.workspace import (
     subs_dir,
     translated_srt_path,
 )
-from gateway.app.services.subtitles import SubtitleError, preview_lines
+
+
+class SubtitleError(Exception):
+    """Raised when subtitle processing fails."""
+
+
+def preview_lines(text: str, limit: int = 5) -> list[str]:
+    lines = [line.strip("\ufeff").rstrip("\n") for line in text.splitlines()]
+    preview: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.isdigit() or "-->" in stripped:
+            continue
+        preview.append(stripped)
+        if len(preview) >= limit:
+            break
+    return preview
 
 
 def _client() -> OpenAI:

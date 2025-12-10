@@ -6,13 +6,14 @@ from pathlib import Path
 from typing import List, Optional
 
 from gateway.app.core.workspace import relative_to_workspace, subs_dir
-from gateway.app.services import subtitles_openai as openai_backend
+from gateway.app.services import subtitles_gemini, subtitles_openai
 
 logger = logging.getLogger(__name__)
 
 
-class SubtitleError(Exception):
-    """Raised when subtitle processing fails."""
+openai_backend = subtitles_openai
+SubtitleError = subtitles_openai.SubtitleError
+preview_lines = subtitles_openai.preview_lines
 
 
 @dataclass
@@ -46,21 +47,6 @@ def segments_to_srt(segments: List[SubtitleSegment], lang: str) -> str:
         text = (text or "").strip()
         lines.extend([str(number), f"{start_ts} --> {end_ts}", text, ""])
     return "\n".join(lines).strip() + "\n"
-
-
-def preview_lines(text: str, limit: int = 5) -> list[str]:
-    lines = [line.strip("\ufeff").rstrip("\n") for line in text.splitlines()]
-    preview: list[str] = []
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            continue
-        if stripped.isdigit() or "-->" in stripped:
-            continue
-        preview.append(stripped)
-        if len(preview) >= limit:
-            break
-    return preview
 
 
 async def generate_subtitles_with_whisper(
