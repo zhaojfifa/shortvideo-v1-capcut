@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     gpt_model: str = Field("gpt-4o-mini", env="GPT_MODEL")
 
     # Gemini backend for subtitles / translation
-    gemini_api_key: str = Field("", env="GEMINI_API_KEY")
-    gemini_model: str = Field("models/gemini-2.0-flash", env="GEMINI_MODEL")
+    gemini_api_key: str | None = Field(None, env="GEMINI_API_KEY")
+    gemini_model: str = Field("gemini-2.0-flash", env="GEMINI_MODEL")
     gemini_base_url: str = Field(
         "https://generativelanguage.googleapis.com/v1beta", env="GEMINI_BASE_URL"
     )
@@ -49,3 +49,7 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
+
+
+# Convenient singleton-style accessor
+settings = get_settings()

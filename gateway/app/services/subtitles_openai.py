@@ -138,7 +138,7 @@ async def generate_with_openai(
 ) -> dict:
     settings = get_settings()
     if not settings.openai_api_key:
-        raise SubtitleError("OPENAI_API_KEY is not configured; subtitles backend 'openai' is disabled.")
+        raise SubtitleError("OPENAI_API_KEY is not configured for Whisper subtitles.")
 
     raw = raw_path(task_id)
     if not raw.exists():

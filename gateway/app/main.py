@@ -1,28 +1,23 @@
 import logging
 import subprocess
 
-import openai
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, HttpUrl
 
-from gateway.app.config import Settings, get_settings
+from gateway.app.config import get_settings
 from gateway.app.core.workspace import (
     dubbed_audio_path,
     origin_srt_path,
     pack_zip_path,
     raw_path,
-    relative_to_workspace,
     translated_srt_path,
-    audio_wav_path,
 )
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.parse import parse_douyin_video
 from gateway.app.services.pack import PackError, create_capcut_pack
-from gateway.app.services.subtitles import SubtitleError, preview_lines
-from gateway.app.services.gemini_subtitles import transcribe_and_translate_with_gemini
-from gateway.app.services.subtitles import generate_subtitles_with_whisper
+from gateway.app.services.subtitles import generate_subtitles
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 templates = Jinja2Templates(directory="gateway/app/templates")
@@ -55,82 +50,6 @@ class PackRequest(BaseModel):
     task_id: str
 
 
-async def _subtitles_with_openai(request: SubtitlesRequest, settings: Settings) -> dict:
-    result = await generate_subtitles_with_whisper(
-        settings,
-        raw_path(request.task_id),
-        request.task_id,
-        target_lang=request.target_lang,
-        force=request.force,
-        translate_enabled=request.translate,
-        use_ffmpeg_extract=USE_FFMPEG_EXTRACT,
-    )
-
-    return {
-        "task_id": request.task_id,
-        "origin_srt": result.get("origin_srt"),
-        "mm_srt": result.get("mm_srt"),
-        "wav": result.get("wav"),
-        "segments_json": result.get("segments_json"),
-        "origin_preview": result.get("origin_preview") or [],
-        "mm_preview": result.get("mm_preview") or [],
-        "scenes_preview": result.get("scenes_preview") or [],
-    }
-
-
-async def _subtitles_with_gemini(request: SubtitlesRequest, settings: Settings) -> dict:
-    task_id = request.task_id
-    raw_mp4 = raw_path(task_id)
-    if not raw_mp4.exists():
-        raise HTTPException(status_code=400, detail=f"raw video not found for task {task_id}")
-
-    try:
-        whisper_result = await generate_subtitles_with_whisper(
-            settings,
-            raw_mp4,
-            task_id,
-            target_lang=request.target_lang,
-            force=request.force,
-            translate_enabled=False,
-            use_ffmpeg_extract=USE_FFMPEG_EXTRACT,
-        )
-    except SubtitleError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:  # pragma: no cover - external dependency safety
-        logger.exception("Whisper ASR failed for Gemini backend")
-        raise HTTPException(status_code=502, detail="Whisper ASR failed") from exc
-
-    origin_path = origin_srt_path(task_id)
-    origin_text = origin_path.read_text(encoding="utf-8")
-
-    try:
-        _, mm_srt = await transcribe_and_translate_with_gemini(
-            origin_text, target_lang=request.target_lang or "my"
-        )
-    except Exception as exc:  # pragma: no cover - external dependency safety
-        logger.exception("Gemini subtitles failed")
-        raise HTTPException(status_code=502, detail="Gemini subtitles failed") from exc
-
-    mm_path = translated_srt_path(task_id, "mm")
-    mm_path.write_text(mm_srt, encoding="utf-8")
-
-    wav_path = audio_wav_path(task_id)
-
-    origin_preview = whisper_result.get("origin_preview") or preview_lines(origin_text)
-    mm_preview = preview_lines(mm_srt)
-
-    return {
-        "task_id": task_id,
-        "origin_srt": relative_to_workspace(origin_path),
-        "mm_srt": relative_to_workspace(mm_path),
-        "wav": relative_to_workspace(wav_path) if wav_path.exists() else None,
-        "segments_json": None,
-        "origin_preview": origin_preview,
-        "mm_preview": mm_preview,
-        "scenes_preview": [],
-    }
-
-
 @app.get("/ui", response_class=HTMLResponse)
 async def pipeline_lab(request: Request):
     settings = get_settings()
@@ -139,8 +58,8 @@ async def pipeline_lab(request: Request):
         "douyin_api_base": getattr(settings, "douyin_api_base", ""),
         "whisper_model": getattr(settings, "whisper_model", ""),
         "gpt_model": getattr(settings, "gpt_model", ""),
-        "asr_backend": getattr(settings, "asr_backend", "whisper"),
-        "subtitles_backend": getattr(settings, "subtitles_backend", "gemini"),
+        "asr_backend": "whisper",
+        "subtitles_backend": "gemini",
         "gemini_model": getattr(settings, "gemini_model", ""),
     }
     return templates.TemplateResponse(
@@ -172,35 +91,17 @@ async def get_raw(task_id: str):
 
 
 @app.post("/v1/subtitles")
-async def subtitles(
-    request: SubtitlesRequest, settings: Settings = Depends(get_settings)
-):
-    raw_file = raw_path(request.task_id)
-    if not raw_file.exists():
-        raise HTTPException(status_code=400, detail="raw video not found")
-
-    backend = getattr(settings, "subtitles_backend", "gemini")
-    backend = (backend or "gemini").lower()
-
+async def subtitles(request: SubtitlesRequest):
     try:
-        if backend == "gemini":
-            result = await _subtitles_with_gemini(request, settings)
-        elif backend == "openai":
-            result = await _subtitles_with_openai(request, settings)
-        else:
-            raise HTTPException(
-                status_code=500, detail=f"Unknown subtitles backend: {backend}"
-            )
+        result = await generate_subtitles(
+            task_id=request.task_id,
+            target_lang=request.target_lang,
+            force=request.force,
+            translate_enabled=request.translate,
+            use_ffmpeg_extract=USE_FFMPEG_EXTRACT,
+        )
     except HTTPException:
         raise
-    except SubtitleError as exc:
-        logging.exception("subtitles failed")
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except openai.BadRequestError as exc:
-        logging.exception("OpenAI error in /v1/subtitles")
-        raise HTTPException(
-            status_code=402, detail="OpenAI Whisper quota or billing error"
-        ) from exc
     except Exception as exc:  # pragma: no cover - defensive logging for runtime issues
         logging.exception("Unexpected error in /v1/subtitles")
         raise HTTPException(status_code=500, detail="internal error") from exc

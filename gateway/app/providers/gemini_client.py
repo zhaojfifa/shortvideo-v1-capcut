@@ -1,15 +1,18 @@
 """Thin wrapper for Gemini client access."""
 
 import logging
-import os
 
 import httpx
 
+from gateway.app.config import get_settings
+
 logger = logging.getLogger(__name__)
 
-GEMINI_BASE_URL = os.environ.get("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+settings = get_settings()
+
+GEMINI_BASE_URL = settings.gemini_base_url
+GEMINI_API_KEY = settings.gemini_api_key
+GEMINI_MODEL = settings.gemini_model
 
 
 class GeminiClientError(RuntimeError):
