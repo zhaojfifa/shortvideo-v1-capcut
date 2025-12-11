@@ -1,4 +1,3 @@
-# gateway/app/providers/gemini_subtitles.py
 import base64
 import json
 import logging
@@ -37,12 +36,13 @@ def _build_gemini_url() -> str:
 
 def _call_gemini(prompt: str, timeout: int = 60) -> Dict[str, Any]:
     """
-    Call Gemini text model with a single text prompt and return parsed JSON response.
+    Call Gemini text model with a single text prompt and return raw JSON response.
     """
     url = _build_gemini_url()
     payload: Dict[str, Any] = {
         "contents": [
             {
+                "role": "user",
                 "parts": [
                     {"text": prompt},
                 ],
@@ -65,7 +65,35 @@ def _call_gemini(prompt: str, timeout: int = 60) -> Dict[str, Any]:
     except requests.HTTPError as exc:  # type: ignore[no-untyped-call]
         # 输出部分 body，方便在 Render 日志里排查 4xx/5xx
         logger.error("Gemini error body: %s", resp.text[:1000])
-        raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}") from exc
+        raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}: {resp.text[:200]}") from exc
+
+    return resp.json()  # type: ignore[no-any-return]
+
+
+def _call_gemini_with_payload(
+    payload: Dict[str, Any],
+    timeout: int = 120,
+) -> Dict[str, Any]:
+    """
+    通用的 Gemini 调用封装，主要用于多模态（视频）场景。
+    """
+    url = _build_gemini_url()
+    params = {"key": GEMINI_API_KEY}
+
+    logger.info("Calling Gemini subtitles model %s", GEMINI_MODEL)
+    resp = requests.post(url, params=params, json=payload, timeout=timeout)
+
+    logger.info(
+        "Gemini HTTP %s, body preview=%r",
+        resp.status_code,
+        resp.text[:300],
+    )
+
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError as exc:  # type: ignore[no-untyped-call]
+        logger.error("Gemini error body: %s", resp.text[:1000])
+        raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}: {resp.text[:200]}") from exc
 
     return resp.json()  # type: ignore[no-any-return]
 
@@ -119,17 +147,15 @@ def _strip_code_fences(text: str) -> str:
 
     if t.startswith("```"):
         # 去掉前导 ```
-        t = t.lstrip("`")
+        t = t[3:]
+        t = t.lstrip()
 
-        # 可能是 "json" / "JSON"
         lower = t.lower()
         if lower.startswith("json"):
-            t = t[4:]
-
-        t = t.strip()
+            t = t[4:].lstrip()
 
         if t.endswith("```"):
-            t = t[:-3].strip()
+            t = t[:-3].rstrip()
 
     return t
 
@@ -144,14 +170,8 @@ def translate_and_segment_with_gemini(
     返回结构：
     {
       "language": "<source_language_code>",
-      "segments": [
-        {"index": 1, "start": 0.0, "end": 2.5,
-         "origin": "original text", "mm": "Burmese text", "scene_id": 1}
-      ],
-      "scenes": [
-        {"scene_id": 1, "start": 0.0, "end": 5.0,
-         "title": "concise original scene title", "mm_title": "Burmese title"}
-      ]
+      "segments": [...],
+      "scenes": [...]
     }
     """
     prompt = f"""
@@ -228,19 +248,26 @@ Here are the subtitles to process (SRT):
 
 
 def transcribe_translate_and_segment_with_gemini(
-    video_path: Path, target_lang: str = "my"
+    video_path: Path,
+    target_lang: str = "my",
 ) -> Dict[str, Any]:
     """
     使用 Gemini 2.0 Flash 对原始视频做转写 + 翻译 + 场景切分。
 
-    返回结构与 translate_and_segment_with_gemini 尽量一致，期望包含
-    origin_srt / mm_srt / segments / scenes。
+    期望返回结构：
+    {
+      "origin_srt": "...",
+      "mm_srt": "...",
+      "segments": [...],
+      "scenes": [...]
+    }
     """
-
     if not video_path.exists():
         raise GeminiSubtitlesError(f"Raw video not found: {video_path}")
 
+    # 注意：这里使用 inline_data，而不是 file_data.data
     encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
+
     prompt = f"""
 You are a subtitle transcriber, translator, and scene segmenter for short social videos.
 
@@ -272,7 +299,7 @@ Rules:
                 "role": "user",
                 "parts": [
                     {
-                        "file_data": {
+                        "inline_data": {
                             "mime_type": "video/mp4",
                             "data": encoded,
                         }

@@ -118,7 +118,9 @@ async def generate_subtitles(
                 origin_srt_text = gemini_result.get("origin_srt") or origin_srt_text
         except GeminiSubtitlesError as exc:
             logger.exception("Gemini subtitles failed for %s", task_id)
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
+            detail = str(exc)
+            status_code = 400 if "HTTP 400" in detail else 502
+            raise HTTPException(status_code=status_code, detail=detail) from exc
 
         workspace.write_segments_json(gemini_result)
 
