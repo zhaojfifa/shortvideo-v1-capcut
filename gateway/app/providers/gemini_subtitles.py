@@ -98,6 +98,28 @@ def _call_gemini_with_payload(
     return resp.json()  # type: ignore[no-any-return]
 
 
+def _call_gemini_with_payload(payload: Dict[str, Any], timeout: int = 120) -> Dict[str, Any]:
+    url = _build_gemini_url()
+    params = {"key": GEMINI_API_KEY}
+
+    logger.info("Calling Gemini subtitles model %s", GEMINI_MODEL)
+    resp = requests.post(url, params=params, json=payload, timeout=timeout)
+
+    logger.info(
+        "Gemini HTTP %s, body preview=%r",
+        resp.status_code,
+        resp.text[:300],
+    )
+
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError as exc:  # type: ignore[no-untyped-call]
+        logger.error("Gemini error body: %s", resp.text[:1000])
+        raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}") from exc
+
+    return resp.json()  # type: ignore[no-any-return]
+
+
 def _extract_text(resp_json: Dict[str, Any]) -> str:
     """
     从 Gemini JSON 响应里把所有 text part 拼出来。
