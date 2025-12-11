@@ -31,7 +31,9 @@ class Settings(BaseSettings):
     gpt_model: str = Field("gpt-4o-mini", env="GPT_MODEL")
     asr_backend: str = Field("whisper", env="ASR_BACKEND")
     subtitles_backend: str = Field("gemini", env="SUBTITLES_BACKEND")
-    # 当 SUBTITLES_BACKEND == "gemini" 且已有 origin.srt 时，可跳过 ASR。
+    # 当 SUBTITLES_BACKEND == "gemini" 时：
+    # - 如果已有 origin.srt，直接翻译+场景切分；
+    # - 如果没有，则使用 raw/<task_id>.mp4 让 Gemini 直接转写+翻译，完全不依赖 OPENAI_API_KEY。
 
     # Gemini backend for subtitles / translation
     gemini_api_key: str | None = Field(None, env="GEMINI_API_KEY")

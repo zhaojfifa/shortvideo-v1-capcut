@@ -13,6 +13,7 @@ from gateway.app.core.workspace import Workspace
 from gateway.app.providers.gemini_subtitles import (
     GeminiSubtitlesError,
     translate_and_segment_with_gemini,
+    transcribe_translate_and_segment_with_gemini,
 )
 from gateway.app.services import subtitles_openai
 
@@ -85,30 +86,58 @@ async def generate_subtitles(
     )
 
     workspace = Workspace(task_id)
-    origin_srt_text = workspace.read_origin_srt_text()
-    if not origin_srt_text:
-        raise HTTPException(
-            status_code=400,
-            detail="origin.srt is missing, please run /v1/parse first",
-        )
-
     target_lang = target_lang or "my"
 
     if backend == "gemini":
-        logger.info("Using Gemini subtitles backend", extra={"task_id": task_id})
+        origin_srt_text = workspace.read_origin_srt_text()
+        logger.info(
+            "Using Gemini subtitles backend",
+            extra={
+                "task_id": task_id,
+                "raw_exists": workspace.raw_video_exists(),
+                "origin_srt_exists": bool(origin_srt_text),
+            },
+        )
         try:
-            gemini_result = translate_and_segment_with_gemini(
-                origin_srt_text=origin_srt_text,
-                target_lang=target_lang,
-            )
+            if origin_srt_text:
+                gemini_result = translate_and_segment_with_gemini(
+                    origin_srt_text=origin_srt_text,
+                    target_lang=target_lang,
+                )
+            else:
+                if not workspace.raw_video_exists():
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Neither origin.srt nor raw video found, please run /v1/parse first",
+                    )
+
+                gemini_result = transcribe_translate_and_segment_with_gemini(
+                    video_path=workspace.raw_video_path,
+                    target_lang=target_lang,
+                )
+                origin_srt_text = gemini_result.get("origin_srt") or origin_srt_text
         except GeminiSubtitlesError as exc:
             logger.exception("Gemini subtitles failed for %s", task_id)
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
         workspace.write_segments_json(gemini_result)
-        origin_text, mm_text = build_srt_from_result(origin_srt_text, gemini_result, target_lang)
-        workspace.write_origin_srt(origin_text)
-        workspace.write_mm_srt(mm_text)
+
+        origin_text = origin_srt_text or gemini_result.get("origin_srt") or ""
+        mm_text = gemini_result.get("mm_srt") or ""
+
+        if not origin_text or not mm_text:
+            built_origin, built_mm = build_srt_from_result(
+                origin_text or "",
+                gemini_result,
+                target_lang,
+            )
+            origin_text = origin_text or built_origin
+            mm_text = mm_text or built_mm
+
+        if origin_text:
+            workspace.write_origin_srt(origin_text)
+        if mm_text:
+            workspace.write_mm_srt(mm_text)
 
         logger.info("Gemini subtitles done for %s", task_id)
         return {
