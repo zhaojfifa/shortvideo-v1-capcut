@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     openai_api_base: str = Field("https://api.openai.com/v1", env="OPENAI_API_BASE")
     whisper_model: str = Field("whisper-1", env="WHISPER_MODEL")
     gpt_model: str = Field("gpt-4o-mini", env="GPT_MODEL")
+    asr_backend: str = Field("whisper", env="ASR_BACKEND")
+    subtitles_backend: str = Field("gemini", env="SUBTITLES_BACKEND")
+    # 当 SUBTITLES_BACKEND == "gemini" 且已有 origin.srt 时，可跳过 ASR。
 
     # Gemini backend for subtitles / translation
     gemini_api_key: str | None = Field(None, env="GEMINI_API_KEY")
