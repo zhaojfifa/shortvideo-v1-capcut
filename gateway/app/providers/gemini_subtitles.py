@@ -183,7 +183,7 @@ Here are the subtitles to process (SRT):
     try:
         data = json.loads(cleaned)
     except json.JSONDecodeError as exc:
-        logger.error(
+        logger.exception(
             "Gemini subtitles raw_text is not valid JSON. First 400 chars: %r",
             cleaned[:400],
         )
