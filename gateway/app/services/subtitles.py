@@ -1,69 +1,68 @@
-"""Gemini-only subtitles dispatcher used by /v1/subtitles."""
-"""Gemini-only subtitles dispatcher used by /v1/subtitles."""
+"""Subtitles dispatcher for /v1/subtitles with Gemini as default backend."""
+
+from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Optional
+from typing import Iterable
 
 from fastapi import HTTPException
 
 from gateway.app.config import get_settings
-from gateway.app.core.workspace import (
-    audio_wav_path,
-    origin_srt_path,
-    raw_path,
-    relative_to_workspace,
-    subs_dir,
-    translated_srt_path,
+from gateway.app.core.subtitle_utils import preview_lines
+from gateway.app.core.workspace import Workspace
+from gateway.app.providers.gemini_subtitles import (
+    GeminiSubtitlesError,
+    translate_and_segment_with_gemini,
+    transcribe_translate_and_segment_with_gemini,
 )
-from gateway.app.services.gemini_subtitles import transcribe_and_translate_with_gemini
 from gateway.app.services import subtitles_openai
 
 logger = logging.getLogger(__name__)
 
-SubtitleError = subtitles_openai.SubtitleError
-preview_lines = subtitles_openai.preview_lines
+
+def _format_timestamp(seconds: float) -> str:
+    milliseconds = max(int(round(seconds * 1000)), 0)
+    hours, remainder = divmod(milliseconds, 3_600_000)
+    minutes, remainder = divmod(remainder, 60_000)
+    secs, millis = divmod(remainder, 1000)
+    return f"{hours:02}:{minutes:02}:{secs:02},{millis:03}"
 
 
-async def generate_subtitles_with_whisper(
-    raw: Path,
-    task_id: str,
-    target_lang: str = "my",
-    force: bool = False,
-    use_ffmpeg_extract: bool = True,
-) -> dict:
-    """Run Whisper ASR (OpenAI) to produce origin subtitles and optional wav."""
+def _build_srt_lines(segments: Iterable[dict]) -> tuple[str, str]:
+    origin_lines: list[str] = []
+    mm_lines: list[str] = []
 
-    settings = get_settings()
-    if not settings.openai_api_key:
-        raise SubtitleError("OPENAI_API_KEY is not configured for Whisper ASR")
-    if not raw.exists():
-        raise SubtitleError("raw video not found")
+    for idx, segment in enumerate(segments, start=1):
+        seg_index = int(segment.get("index", idx))
+        start = float(segment.get("start", 0))
+        end = float(segment.get("end", start))
+        origin_text = (segment.get("origin") or "").strip()
+        mm_text = (segment.get("mm") or origin_text).strip()
 
-    subs_dir().mkdir(parents=True, exist_ok=True)
+        timestamp = f"{_format_timestamp(start)} --> {_format_timestamp(end)}"
+        origin_lines.extend([str(seg_index), timestamp, origin_text, ""])
+        mm_lines.extend([str(seg_index), timestamp, mm_text, ""])
 
-    audio_path: Optional[Path] = None
-    try:
-        if use_ffmpeg_extract:
-            origin_srt, audio_path = subtitles_openai.transcribe_with_ffmpeg(
-                task_id, raw, force=force
-            )
-        else:
-            origin_srt = subtitles_openai.transcribe(task_id, raw, force=force)
-    except Exception as exc:  # pragma: no cover - defensive
-        raise SubtitleError(str(exc)) from exc
+    origin_srt_text = "\n".join(origin_lines).strip() + "\n"
+    mm_srt_text = "\n".join(mm_lines).strip() + "\n"
+    return origin_srt_text, mm_srt_text
 
-    origin_preview = preview_lines(origin_srt.read_text(encoding="utf-8"))
 
-    return {
-        "task_id": task_id,
-        "origin_srt": relative_to_workspace(origin_srt),
-        "mm_srt": None,
-        "segments_json": None,
-        "wav": relative_to_workspace(audio_path) if audio_path else None,
-        "origin_preview": origin_preview,
-        "mm_preview": [],
-    }
+def build_srt_from_result(
+    origin_srt_text: str, result: dict, target_lang: str = "my"
+) -> tuple[str, str]:
+    segments = result.get("segments") if isinstance(result, dict) else None
+    if segments:
+        return _build_srt_lines(segments)
+
+    # 如果 Gemini 返回结构中缺少分段，则保底返回原文，并将译文置为空字符串
+    return origin_srt_text, ""
+
+
+def build_preview(text: str | None) -> list[str]:
+    if not text:
+        return []
+    return preview_lines(text)
 
 
 async def generate_subtitles(
@@ -73,62 +72,99 @@ async def generate_subtitles(
     translate_enabled: bool = True,
     use_ffmpeg_extract: bool = True,
 ) -> dict:
-    """Unified Gemini subtitles entry point used by the FastAPI route."""
+    """Unified subtitles entry point used by the FastAPI route."""
 
     settings = get_settings()
-    if not settings.gemini_api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="GEMINI_API_KEY is not configured; subtitles backend 'gemini' is disabled.",
+    backend = (settings.subtitles_backend or "").lower()
+    logger.info(
+        "Subtitles request started",
+        extra={
+            "task_id": task_id,
+            "asr_backend": settings.asr_backend,
+            "subtitles_backend": backend,
+        },
+    )
+
+    workspace = Workspace(task_id)
+    target_lang = target_lang or "my"
+
+    if backend == "gemini":
+        origin_srt_text = workspace.read_origin_srt_text()
+        logger.info(
+            "Using Gemini subtitles backend",
+            extra={
+                "task_id": task_id,
+                "raw_exists": workspace.raw_video_exists(),
+                "origin_srt_exists": bool(origin_srt_text),
+            },
         )
-
-    raw_file = raw_path(task_id)
-    if not raw_file.exists():
-        raise HTTPException(status_code=400, detail="raw video not found")
-
-    try:
-        whisper_result = await generate_subtitles_with_whisper(
-            raw_file,
-            task_id,
-            target_lang=target_lang,
-            force=force,
-            use_ffmpeg_extract=use_ffmpeg_extract,
-        )
-    except SubtitleError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    origin_path = origin_srt_path(task_id)
-    origin_text = origin_path.read_text(encoding="utf-8")
-
-    mm_path = translated_srt_path(task_id, "mm")
-
-    origin_result = origin_text
-    mm_result: Optional[str] = None
-    if translate_enabled:
         try:
-            origin_result, mm_result = await transcribe_and_translate_with_gemini(
-                origin_text, target_lang=target_lang or "my"
+            if origin_srt_text:
+                gemini_result = translate_and_segment_with_gemini(
+                    origin_srt_text=origin_srt_text,
+                    target_lang=target_lang,
+                )
+            else:
+                if not workspace.raw_video_exists():
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Neither origin.srt nor raw video found, please run /v1/parse first",
+                    )
+
+                gemini_result = transcribe_translate_and_segment_with_gemini(
+                    video_path=workspace.raw_video_path,
+                    target_lang=target_lang,
+                )
+                origin_srt_text = gemini_result.get("origin_srt") or origin_srt_text
+        except GeminiSubtitlesError as exc:
+            logger.exception("Gemini subtitles failed for %s", task_id)
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+        workspace.write_segments_json(gemini_result)
+
+        origin_text = origin_srt_text or gemini_result.get("origin_srt") or ""
+        mm_text = gemini_result.get("mm_srt") or ""
+
+        if not origin_text or not mm_text:
+            built_origin, built_mm = build_srt_from_result(
+                origin_text or "",
+                gemini_result,
+                target_lang,
             )
-        except HTTPException:
-            raise
-        except Exception as exc:  # pragma: no cover - defensive external call
-            logger.exception("Gemini subtitles failed")
-            raise HTTPException(status_code=502, detail="Gemini subtitles failed") from exc
+            origin_text = origin_text or built_origin
+            mm_text = mm_text or built_mm
 
-        mm_result = (mm_result or "").strip()
-        mm_path.write_text(mm_result, encoding="utf-8")
+        if origin_text:
+            workspace.write_origin_srt(origin_text)
+        if mm_text:
+            workspace.write_mm_srt(mm_text)
 
-    wav_path = audio_wav_path(task_id)
+        logger.info("Gemini subtitles done for %s", task_id)
+        return {
+            "task_id": task_id,
+            "origin_srt": origin_text,
+            "mm_srt": mm_text,
+            "segments_json": gemini_result,
+            "origin_preview": build_preview(origin_text),
+            "mm_preview": build_preview(mm_text),
+        }
 
-    return {
-        "task_id": task_id,
-        "origin_srt": relative_to_workspace(origin_path),
-        "mm_srt": relative_to_workspace(mm_path) if mm_result else None,
-        "wav": relative_to_workspace(wav_path) if wav_path.exists() else None,
-        "segments_json": None,
-        "origin_preview": whisper_result.get("origin_preview") or preview_lines(
-            origin_result
-        ),
-        "mm_preview": preview_lines(mm_result) if mm_result else [],
-        "scenes_preview": [],
-    }
+    if backend == "openai":
+        if not settings.openai_api_key:
+            raise HTTPException(
+                status_code=400,
+                detail="OPENAI_API_KEY is not configured for Whisper ASR",
+            )
+
+        try:
+            return await subtitles_openai.generate_with_openai(
+                task_id=task_id,
+                target_lang=target_lang,
+                force=force,
+                translate_enabled=translate_enabled,
+                use_ffmpeg_extract=use_ffmpeg_extract,
+            )
+        except subtitles_openai.SubtitleError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    raise HTTPException(status_code=400, detail=f"Unsupported SUBTITLES_BACKEND: {settings.subtitles_backend}")

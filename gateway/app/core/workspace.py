@@ -1,6 +1,85 @@
+import json
 from pathlib import Path
 
 from gateway.app.config import get_settings
+
+
+class Workspace:
+    """Workspace helper for resolving per-task subtitle artifacts."""
+
+    def __init__(self, task_id: str):
+        self.task_id = task_id
+
+    @property
+    def base_dir(self) -> Path:
+        return workspace_root()
+
+    # Paths
+    @property
+    def raw(self) -> Path:
+        return raw_path(self.task_id)
+
+    @property
+    def raw_video_path(self) -> Path:
+        return self.raw
+
+    def raw_video_exists(self) -> bool:
+        return self.raw_video_path.exists()
+
+    @property
+    def origin_srt(self) -> Path:
+        return origin_srt_path(self.task_id)
+
+    @property
+    def origin_srt_path(self) -> Path:
+        return origin_srt_path(self.task_id)
+
+    @property
+    def mm_srt(self) -> Path:
+        return translated_srt_path(self.task_id, "mm")
+
+    @property
+    def mm_srt_path(self) -> Path:
+        return translated_srt_path(self.task_id, "mm")
+
+    @property
+    def subtitles_dir(self) -> Path:
+        return subs_dir()
+
+    @property
+    def segments_json(self) -> Path:
+        return segments_json_path(self.task_id)
+
+    @property
+    def scenes_json(self) -> Path:
+        return scenes_json_path(self.task_id)
+
+    # IO helpers
+    def read_origin_srt_text(self) -> str | None:
+        if not self.origin_srt_path.exists():
+            return None
+        return self.origin_srt_path.read_text(encoding="utf-8")
+
+    def write_origin_srt(self, text: str) -> Path:
+        self.subtitles_dir.mkdir(parents=True, exist_ok=True)
+        self.origin_srt_path.write_text(text, encoding="utf-8")
+        return self.origin_srt_path
+
+    def write_mm_srt(self, text: str) -> Path:
+        self.subtitles_dir.mkdir(parents=True, exist_ok=True)
+        self.mm_srt_path.write_text(text, encoding="utf-8")
+        return self.mm_srt_path
+
+    def write_segments_json(self, data: dict) -> None:
+        self.segments_json.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        # scenes 文件用于向后兼容（如果下游读取该名称）。
+        scenes = {"scenes": data.get("scenes", [])}
+        self.scenes_json.write_text(
+            json.dumps(scenes, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
 
 
 def workspace_root() -> Path:
