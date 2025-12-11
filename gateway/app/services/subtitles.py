@@ -117,10 +117,22 @@ async def generate_subtitles(
                 )
                 origin_srt_text = gemini_result.get("origin_srt") or origin_srt_text
         except GeminiSubtitlesError as exc:
-            logger.exception("Gemini subtitles failed for %s", task_id)
-            detail = str(exc)
-            status_code = 400 if "HTTP 400" in detail else 502
-            raise HTTPException(status_code=status_code, detail=detail) from exc
+            msg = str(exc)
+            logger.exception("Gemini subtitles failed for %s: %s", task_id, msg)
+
+            if "HTTP 400" in msg or "status_code=400" in msg:
+                status_code = 400
+            elif "HTTP 429" in msg or "RESOURCE_EXHAUSTED" in msg:
+                status_code = 429
+                msg = (
+                    "Gemini quota / rate limit exceeded. "
+                    "Please wait a moment or check your Google/Vertex AI quotas. "
+                    f"Raw error: {msg}"
+                )
+            else:
+                status_code = 502
+
+            raise HTTPException(status_code=status_code, detail=msg) from exc
 
         workspace.write_segments_json(gemini_result)
 
