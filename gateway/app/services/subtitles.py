@@ -154,9 +154,9 @@ async def generate_subtitles(
         segments_field = gemini_result.get("segments") if isinstance(gemini_result, dict) else None
         segments_count = len(segments_field) if isinstance(segments_field, list) else 0
         logger.info(
-            "Gemini subtitles done for %s",
-            task_id,
+            "Gemini subtitles summary",
             extra={
+                "task_id": task_id,
                 "origin_srt_len": len(origin_text or ""),
                 "mm_srt_len": len(mm_text or ""),
                 "segments_count": segments_count,

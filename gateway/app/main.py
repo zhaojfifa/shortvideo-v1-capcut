@@ -140,6 +140,7 @@ async def dub(request: DubRequest):
             "task_id": request.task_id,
             "origin_srt_exists": origin_exists,
             "mm_srt_exists": mm_exists,
+            "mm_srt_path": str(workspace.mm_srt_path),
         },
     )
 

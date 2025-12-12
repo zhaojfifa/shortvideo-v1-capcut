@@ -40,14 +40,24 @@ class Workspace:
 
     @property
     def mm_srt_path(self) -> Path:
+        """Canonical path for translated (Burmese) subtitles.
+
+        Historically stored via translated_srt_path; prefer the mm suffix but
+        fall back to my for backward compatibility.
+        """
+
         primary = translated_srt_path(self.task_id, "mm")
         alternate = translated_srt_path(self.task_id, "my")
+
         if not primary.exists() and alternate.exists():
             return alternate
+
         return primary
 
     def mm_srt_exists(self) -> bool:
-        return self.mm_srt_path.exists()
+        primary = translated_srt_path(self.task_id, "mm")
+        alternate = translated_srt_path(self.task_id, "my")
+        return primary.exists() or alternate.exists()
 
     def read_mm_srt_text(self) -> str | None:
         path = self.mm_srt_path
