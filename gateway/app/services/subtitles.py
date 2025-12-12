@@ -148,12 +148,20 @@ async def generate_subtitles(
             origin_text = origin_text or built_origin
             mm_text = mm_text or built_mm
 
-        if origin_text:
-            workspace.write_origin_srt(origin_text)
-        if mm_text:
-            workspace.write_mm_srt(mm_text)
+        workspace.write_origin_srt(origin_text or "")
+        workspace.write_mm_srt(mm_text or "")
 
-        logger.info("Gemini subtitles done for %s", task_id)
+        segments_field = gemini_result.get("segments") if isinstance(gemini_result, dict) else None
+        segments_count = len(segments_field) if isinstance(segments_field, list) else 0
+        logger.info(
+            "Gemini subtitles done for %s",
+            task_id,
+            extra={
+                "origin_srt_len": len(origin_text or ""),
+                "mm_srt_len": len(mm_text or ""),
+                "segments_count": segments_count,
+            },
+        )
         return {
             "task_id": task_id,
             "origin_srt": origin_text,

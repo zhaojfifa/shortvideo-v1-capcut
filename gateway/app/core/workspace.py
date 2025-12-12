@@ -36,11 +36,24 @@ class Workspace:
 
     @property
     def mm_srt(self) -> Path:
-        return translated_srt_path(self.task_id, "mm")
+        return self.mm_srt_path
 
     @property
     def mm_srt_path(self) -> Path:
-        return translated_srt_path(self.task_id, "mm")
+        primary = translated_srt_path(self.task_id, "mm")
+        alternate = translated_srt_path(self.task_id, "my")
+        if not primary.exists() and alternate.exists():
+            return alternate
+        return primary
+
+    def mm_srt_exists(self) -> bool:
+        return self.mm_srt_path.exists()
+
+    def read_mm_srt_text(self) -> str | None:
+        path = self.mm_srt_path
+        if not path.exists():
+            return None
+        return path.read_text(encoding="utf-8")
 
     @property
     def subtitles_dir(self) -> Path:
@@ -67,8 +80,9 @@ class Workspace:
 
     def write_mm_srt(self, text: str) -> Path:
         self.subtitles_dir.mkdir(parents=True, exist_ok=True)
-        self.mm_srt_path.write_text(text, encoding="utf-8")
-        return self.mm_srt_path
+        path = translated_srt_path(self.task_id, "mm")
+        path.write_text(text, encoding="utf-8")
+        return path
 
     def write_segments_json(self, data: dict) -> None:
         self.segments_json.write_text(
