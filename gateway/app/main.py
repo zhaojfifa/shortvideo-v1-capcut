@@ -8,6 +8,7 @@ from pydantic import BaseModel, HttpUrl
 
 from gateway.app.config import get_settings
 from gateway.app.core.workspace import (
+    Workspace,
     dubbed_audio_path,
     origin_srt_path,
     pack_zip_path,
@@ -129,12 +130,41 @@ async def get_mm_subs(task_id: str):
 
 @app.post("/v1/dub")
 async def dub(request: DubRequest):
+    workspace = Workspace(request.task_id)
+    origin_exists = workspace.origin_srt_path.exists()
+    mm_exists = workspace.mm_srt_exists()
+
+    logger.info(
+        "Dub request",
+        extra={
+            "task_id": request.task_id,
+            "origin_srt_exists": origin_exists,
+            "mm_srt_exists": mm_exists,
+            "mm_srt_path": str(workspace.mm_srt_path),
+        },
+    )
+
+    if not mm_exists:
+        raise HTTPException(
+            status_code=400,
+            detail="translated subtitles not found; run /v1/subtitles first",
+        )
+
+    mm_text = workspace.read_mm_srt_text() or ""
+    if not mm_text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="translated subtitles file is empty; please rerun /v1/subtitles",
+        )
+
     try:
         result = synthesize_voice(
             task_id=request.task_id,
             target_lang=request.target_lang,
             voice_id=request.voice_id,
             force=request.force,
+            mm_srt_text=mm_text,
+            workspace=workspace,
         )
     except DubbingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

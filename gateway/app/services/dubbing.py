@@ -4,20 +4,19 @@ import wave
 import requests
 
 from gateway.app.config import get_settings
-from gateway.app.core.workspace import (
-    dubbed_audio_path,
-    relative_to_workspace,
-    subs_dir,
-    translated_srt_path,
-)
+from gateway.app.core.workspace import Workspace, dubbed_audio_path, relative_to_workspace
 
 
 class DubbingError(Exception):
     """Raised when dubbing fails."""
 
 
-def _combine_srt_text(srt_path: Path) -> str:
-    lines = srt_path.read_text(encoding="utf-8").splitlines()
+def _combine_srt_text(srt_source: Path | str) -> str:
+    lines = (
+        srt_source.read_text(encoding="utf-8")
+        if isinstance(srt_source, Path)
+        else str(srt_source)
+    ).splitlines()
     text_parts: list[str] = []
     for line in lines:
         if line.strip().isdigit():
@@ -42,10 +41,18 @@ def _duration_seconds(wav_path: Path) -> float | None:
         return None
 
 
-def synthesize_voice(task_id: str, target_lang: str, voice_id: str | None = None, force: bool = False) -> dict:
+def synthesize_voice(
+    task_id: str,
+    target_lang: str,
+    voice_id: str | None = None,
+    force: bool = False,
+    mm_srt_text: str | None = None,
+    workspace: Workspace | None = None,
+) -> dict:
     settings = get_settings()
-    translated_srt = translated_srt_path(task_id, target_lang)
-    if not translated_srt.exists():
+    ws = workspace or Workspace(task_id)
+
+    if not ws.mm_srt_exists():
         raise DubbingError("translated subtitles not found; run /v1/subtitles first")
 
     out_path = dubbed_audio_path(task_id)
@@ -56,7 +63,11 @@ def synthesize_voice(task_id: str, target_lang: str, voice_id: str | None = None
     if not settings.lovo_api_key:
         raise DubbingError("LOVO_API_KEY is not configured")
 
-    text = _combine_srt_text(translated_srt)
+    srt_text = mm_srt_text if mm_srt_text is not None else (ws.read_mm_srt_text() or "")
+    if not srt_text.strip():
+        raise DubbingError("translated subtitles are empty; please rerun /v1/subtitles")
+
+    text = _combine_srt_text(srt_text)
     payload = {
         "text": text,
         "voice_id": voice_id or settings.lovo_voice_id_mm,
