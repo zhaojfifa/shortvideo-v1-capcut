@@ -94,6 +94,38 @@ class Workspace:
         path.write_text(text, encoding="utf-8")
         return path
 
+    # Audio helpers
+    @property
+    def mm_audio_primary_path(self) -> Path:
+        return audio_dir() / f"{self.task_id}_mm.wav"
+
+    @property
+    def mm_audio_legacy_path(self) -> Path:
+        return dubbed_audio_path(self.task_id)
+
+    @property
+    def mm_audio_path(self) -> Path:
+        primary = self.mm_audio_primary_path
+        if primary.exists():
+            return primary
+        return self.mm_audio_legacy_path
+
+    def mm_audio_exists(self) -> bool:
+        return self.mm_audio_primary_path.exists() or self.mm_audio_legacy_path.exists()
+
+    def write_mm_audio(self, content: bytes, suffix: str = "wav") -> Path:
+        audio_dir().mkdir(parents=True, exist_ok=True)
+        suffix = suffix.lstrip(".") or "wav"
+        path = audio_dir() / f"{self.task_id}_mm.{suffix}"
+        path.write_bytes(content)
+        return path
+
+    def mm_audio_media_type(self) -> str:
+        ext = self.mm_audio_path.suffix.lower()
+        if ext == ".mp3":
+            return "audio/mpeg"
+        return "audio/wav"
+
     def write_segments_json(self, data: dict) -> None:
         self.segments_json.write_text(
             json.dumps(data, ensure_ascii=False, indent=2),

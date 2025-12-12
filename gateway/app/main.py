@@ -9,7 +9,6 @@ from pydantic import BaseModel, HttpUrl
 from gateway.app.config import get_settings
 from gateway.app.core.workspace import (
     Workspace,
-    dubbed_audio_path,
     origin_srt_path,
     pack_zip_path,
     raw_path,
@@ -169,26 +168,29 @@ async def dub(request: DubRequest):
     except DubbingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    audio_url = f"/v1/tasks/{request.task_id}/audio_mm"
     return {
         "task_id": request.task_id,
         "voice_id": request.voice_id,
-        "audio_path": result.get("audio_path"),
+        "audio_mm_url": audio_url,
         "duration_sec": result.get("duration_sec"),
     }
 
 
 @app.get("/v1/tasks/{task_id}/audio_mm")
 async def get_audio(task_id: str):
-    audio = dubbed_audio_path(task_id)
+    workspace = Workspace(task_id)
+    audio = workspace.mm_audio_path
     if not audio.exists():
         raise HTTPException(status_code=404, detail="dubbed audio not found")
-    return FileResponse(audio, media_type="audio/wav", filename=audio.name)
+    return FileResponse(audio, media_type=workspace.mm_audio_media_type(), filename=audio.name)
 
 
 @app.post("/v1/pack")
 async def pack(request: PackRequest):
     raw_file = raw_path(request.task_id)
-    audio_file = dubbed_audio_path(request.task_id)
+    workspace = Workspace(request.task_id)
+    audio_file = workspace.mm_audio_path
     subs_file = translated_srt_path(request.task_id, "my")
     if not subs_file.exists():
         subs_file = translated_srt_path(request.task_id, "mm")

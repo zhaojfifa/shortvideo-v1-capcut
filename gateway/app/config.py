@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     )
 
     # LOVO TTS
+    lovo_base_url: str = Field(
+        "https://api.genny.lovo.ai/api/v1",
+        env="LOVO_BASE_URL",
+    )
     lovo_api_key: str = Field("", env="LOVO_API_KEY")
     lovo_voice_id_mm: str = Field("mm_female_1", env="LOVO_VOICE_ID_MM")
 
