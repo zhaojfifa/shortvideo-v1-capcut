@@ -8,7 +8,7 @@ from pydantic import BaseModel, HttpUrl
 
 from gateway.app.config import get_settings
 from gateway.app.core.workspace import (
-    dubbed_audio_path,
+    Workspace,
     origin_srt_path,
     pack_zip_path,
     raw_path,
@@ -129,36 +129,68 @@ async def get_mm_subs(task_id: str):
 
 @app.post("/v1/dub")
 async def dub(request: DubRequest):
+    workspace = Workspace(request.task_id)
+    origin_exists = workspace.origin_srt_path.exists()
+    mm_exists = workspace.mm_srt_exists()
+
+    logger.info(
+        "Dub request",
+        extra={
+            "task_id": request.task_id,
+            "origin_srt_exists": origin_exists,
+            "mm_srt_exists": mm_exists,
+            "mm_srt_path": str(workspace.mm_srt_path),
+        },
+    )
+
+    if not mm_exists:
+        raise HTTPException(
+            status_code=400,
+            detail="translated subtitles not found; run /v1/subtitles first",
+        )
+
+    mm_text = workspace.read_mm_srt_text() or ""
+    if not mm_text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="translated subtitles file is empty; please rerun /v1/subtitles",
+        )
+
     try:
         result = synthesize_voice(
             task_id=request.task_id,
             target_lang=request.target_lang,
             voice_id=request.voice_id,
             force=request.force,
+            mm_srt_text=mm_text,
+            workspace=workspace,
         )
     except DubbingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    audio_url = f"/v1/tasks/{request.task_id}/audio_mm"
     return {
         "task_id": request.task_id,
         "voice_id": request.voice_id,
-        "audio_path": result.get("audio_path"),
+        "audio_mm_url": audio_url,
         "duration_sec": result.get("duration_sec"),
     }
 
 
 @app.get("/v1/tasks/{task_id}/audio_mm")
 async def get_audio(task_id: str):
-    audio = dubbed_audio_path(task_id)
+    workspace = Workspace(task_id)
+    audio = workspace.mm_audio_path
     if not audio.exists():
         raise HTTPException(status_code=404, detail="dubbed audio not found")
-    return FileResponse(audio, media_type="audio/wav", filename=audio.name)
+    return FileResponse(audio, media_type=workspace.mm_audio_media_type(), filename=audio.name)
 
 
 @app.post("/v1/pack")
 async def pack(request: PackRequest):
     raw_file = raw_path(request.task_id)
-    audio_file = dubbed_audio_path(request.task_id)
+    workspace = Workspace(request.task_id)
+    audio_file = workspace.mm_audio_path
     subs_file = translated_srt_path(request.task_id, "my")
     if not subs_file.exists():
         subs_file = translated_srt_path(request.task_id, "mm")
