@@ -1,7 +1,10 @@
-# gateway/app/providers/gemini_subtitles.py
+import base64
 import json
 import logging
 import os
+import re
+from json import JSONDecodeError
+from pathlib import Path
 from typing import Any, Dict, List
 
 import requests
@@ -35,17 +38,22 @@ def _build_gemini_url() -> str:
 
 def _call_gemini(prompt: str, timeout: int = 60) -> Dict[str, Any]:
     """
-    Call Gemini text model with a single text prompt and return parsed JSON response.
+    Call Gemini text model with a single text prompt and return raw JSON response.
     """
     url = _build_gemini_url()
     payload: Dict[str, Any] = {
         "contents": [
             {
+                "role": "user",
                 "parts": [
                     {"text": prompt},
                 ],
             }
-        ]
+        ],
+        "generationConfig": {
+            # Ask Gemini to respond with strict JSON
+            "response_mime_type": "application/json",
+        },
     }
     params = {"key": GEMINI_API_KEY}
 
@@ -63,7 +71,40 @@ def _call_gemini(prompt: str, timeout: int = 60) -> Dict[str, Any]:
     except requests.HTTPError as exc:  # type: ignore[no-untyped-call]
         # 输出部分 body，方便在 Render 日志里排查 4xx/5xx
         logger.error("Gemini error body: %s", resp.text[:1000])
-        raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}") from exc
+        raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}: {resp.text[:200]}") from exc
+
+    return resp.json()  # type: ignore[no-any-return]
+
+
+def _call_gemini_with_payload(
+    payload: Dict[str, Any],
+    timeout: int = 120,
+) -> Dict[str, Any]:
+    """
+    通用的 Gemini 调用封装，主要用于多模态（视频）场景。
+    """
+    url = _build_gemini_url()
+    params = {"key": GEMINI_API_KEY}
+
+    # Ensure we always request JSON output from the model
+    gen_cfg = payload.setdefault("generationConfig", {})
+    if "response_mime_type" not in gen_cfg:
+        gen_cfg["response_mime_type"] = "application/json"
+
+    logger.info("Calling Gemini subtitles model %s", GEMINI_MODEL)
+    resp = requests.post(url, params=params, json=payload, timeout=timeout)
+
+    logger.info(
+        "Gemini HTTP %s, body preview=%r",
+        resp.status_code,
+        resp.text[:300],
+    )
+
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError as exc:  # type: ignore[no-untyped-call]
+        logger.error("Gemini error body: %s", resp.text[:1000])
+        raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}: {resp.text[:200]}") from exc
 
     return resp.json()  # type: ignore[no-any-return]
 
@@ -95,19 +136,55 @@ def _strip_code_fences(text: str) -> str:
 
     if t.startswith("```"):
         # 去掉前导 ```
-        t = t.lstrip("`")
+        t = t[3:]
+        t = t.lstrip()
 
-        # 可能是 "json" / "JSON"
         lower = t.lower()
         if lower.startswith("json"):
-            t = t[4:]
-
-        t = t.strip()
+            t = t[4:].lstrip()
 
         if t.endswith("```"):
-            t = t[:-3].strip()
+            t = t[:-3].rstrip()
 
     return t
+
+
+def _decode_gemini_json(raw_text: str) -> Dict[str, Any]:
+    """
+    Decode Gemini response text into JSON dict:
+    - strip ``` / ```json fences
+    - first try direct json.loads
+    - then, if needed, extract the first {...} block and try again
+    - on failure, log a snippet and raise GeminiSubtitlesError
+    """
+    cleaned = _strip_code_fences(raw_text)
+
+    # 1) direct parse
+    try:
+        return json.loads(cleaned)
+    except JSONDecodeError as exc1:
+        # 2) try to parse only the first JSON object in the text
+        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if match:
+            snippet = match.group(0)
+            try:
+                return json.loads(snippet)
+            except JSONDecodeError as exc2:
+                logger.warning(
+                    "Second JSON parse attempt for Gemini subtitles failed: %s; snippet head=%r",
+                    exc2,
+                    snippet[:200],
+                )
+
+        # 3) give up, log and raise
+        snippet = cleaned[:400]
+        logger.exception(
+            "Gemini subtitles raw_text is not valid JSON. First 400 chars: %r",
+            snippet,
+        )
+        raise GeminiSubtitlesError(
+            f"Gemini subtitles did not return valid JSON. Snippet: {snippet!r}"
+        ) from exc1
 
 
 def translate_and_segment_with_gemini(
@@ -120,14 +197,8 @@ def translate_and_segment_with_gemini(
     返回结构：
     {
       "language": "<source_language_code>",
-      "segments": [
-        {"index": 1, "start": 0.0, "end": 2.5,
-         "origin": "original text", "mm": "Burmese text", "scene_id": 1}
-      ],
-      "scenes": [
-        {"scene_id": 1, "start": 0.0, "end": 5.0,
-         "title": "concise original scene title", "mm_title": "Burmese title"}
-      ]
+      "segments": [...],
+      "scenes": [...]
     }
     """
     prompt = f"""
@@ -167,9 +238,12 @@ Rules:
 - Make timestamps monotonic and non-overlapping.
 - Keep translations concise and natural.
 - If unsure about a scene title, keep it short or leave it empty.
+- All property names must be in double quotes; response must be strict JSON.
+- Do not include trailing commas or comments.
+- The response must be valid JSON that Python json.loads can parse.
 - Respond with JSON only. Do NOT add explanations, backticks, or code fences.
 
-Here are the subtitles to process (SRT):
+    Here are the subtitles to process (SRT):
 
 {origin_srt_text}
 """.strip()
@@ -177,21 +251,95 @@ Here are the subtitles to process (SRT):
     # 1) 调用 Gemini
     resp_json = _call_gemini(prompt)
     raw_text = _extract_text(resp_json)
-    cleaned = _strip_code_fences(raw_text)
-
-    # 2) 尝试解析 JSON
-    try:
-        data = json.loads(cleaned)
-    except json.JSONDecodeError as exc:
-        logger.error(
-            "Gemini subtitles raw_text is not valid JSON. First 400 chars: %r",
-            cleaned[:400],
-        )
-        raise GeminiSubtitlesError(
-            "Gemini subtitles did not return valid JSON"
-        ) from exc
+    data = _decode_gemini_json(raw_text)
 
     # 3) 做一点点 schema 校验，避免后续逻辑踩坑
+    if not isinstance(data, dict):
+        raise GeminiSubtitlesError("Gemini subtitles JSON root must be an object")
+
+    if "segments" not in data or "scenes" not in data:
+        raise GeminiSubtitlesError(
+            "Gemini subtitles JSON must contain 'segments' and 'scenes'"
+        )
+
+    return data
+
+
+def transcribe_translate_and_segment_with_gemini(
+    video_path: Path,
+    target_lang: str = "my",
+) -> Dict[str, Any]:
+    """
+    使用 Gemini 2.0 Flash 对原始视频做转写 + 翻译 + 场景切分。
+
+    返回结构与 translate_and_segment_with_gemini 对齐：
+    {
+      "language": "<source_language_code>",
+      "segments": [...],
+      "scenes": [...]
+    }
+    """
+    if not video_path.exists():
+        raise GeminiSubtitlesError(f"Raw video not found: {video_path}")
+
+    # 注意：这里使用 inline_data，而不是 file_data.data
+    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
+
+    prompt = f"""
+You are a subtitle transcriber, translator, and scene segmenter for short social videos.
+
+Tasks:
+1) Transcribe the spoken Chinese in the provided MP4 video into subtitles.
+2) Translate the subtitles into Burmese.
+3) Provide scene segmentation that aligns with the subtitles.
+
+Return ONLY valid JSON with this shape:
+{{
+  "language": "<source_language_code>",
+  "segments": [
+    {{"index": 1, "start": 0.0, "end": 2.5, "origin": "Chinese text", "mm": "Burmese text", "scene_id": 1}}
+  ],
+  "scenes": [
+    {{"scene_id": 1, "start": 0.0, "end": 5.0, "title": "concise original scene title", "mm_title": "Burmese title"}}
+  ]
+}}
+
+Rules:
+- Keep timestamps in seconds, monotonic, and aligned between origin/mm.
+- All property names must be in double quotes; response must be strict JSON.
+- Do not include trailing commas or comments.
+- The response must be valid JSON that Python json.loads can parse.
+- Respond with JSON only. Do NOT add explanations or code fences.
+""".strip()
+
+    payload: Dict[str, Any] = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [
+                    {
+                        "inline_data": {
+                            "mime_type": "video/mp4",
+                            "data": encoded,
+                        }
+                    },
+                    {"text": prompt},
+                ],
+            }
+        ]
+    }
+
+    resp_json = _call_gemini_with_payload(payload)
+    raw_text = _extract_text(resp_json)
+    cleaned = _strip_code_fences(raw_text)
+
+    try:
+        data = json.loads(cleaned)
+    except JSONDecodeError as exc:
+        logger.error("Gemini subtitles raw snippet: %r", cleaned[:400])
+        logger.exception("Gemini subtitles raw_text is not valid JSON.")
+        raise GeminiSubtitlesError("Gemini subtitles did not return valid JSON") from exc
+
     if not isinstance(data, dict):
         raise GeminiSubtitlesError("Gemini subtitles JSON root must be an object")
 
