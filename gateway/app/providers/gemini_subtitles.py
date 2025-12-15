@@ -272,10 +272,9 @@ def transcribe_translate_and_segment_with_gemini(
     """
     使用 Gemini 2.0 Flash 对原始视频做转写 + 翻译 + 场景切分。
 
-    期望返回结构：
+    返回结构与 translate_and_segment_with_gemini 对齐：
     {
-      "origin_srt": "...",
-      "mm_srt": "...",
+      "language": "<source_language_code>",
       "segments": [...],
       "scenes": [...]
     }
@@ -290,19 +289,18 @@ def transcribe_translate_and_segment_with_gemini(
 You are a subtitle transcriber, translator, and scene segmenter for short social videos.
 
 Tasks:
-1) Transcribe the spoken Chinese in the provided MP4 video into SRT subtitles (origin_srt).
-2) Translate the subtitles into Burmese (mm_srt).
+1) Transcribe the spoken Chinese in the provided MP4 video into subtitles.
+2) Translate the subtitles into Burmese.
 3) Provide scene segmentation that aligns with the subtitles.
 
 Return ONLY valid JSON with this shape:
 {{
-  "origin_srt": "<full SRT string in source language>",
-  "mm_srt": "<full SRT string translated to {target_lang}>",
+  "language": "<source_language_code>",
   "segments": [
-    {{"index": 1, "start": 0.0, "end": 2.5, "origin": "text", "mm": "translation", "scene_id": 1}}
+    {{"index": 1, "start": 0.0, "end": 2.5, "origin": "Chinese text", "mm": "Burmese text", "scene_id": 1}}
   ],
   "scenes": [
-    {{"scene_id": 1, "start": 0.0, "end": 5.0, "title": "scene title", "mm_title": "translated title"}}
+    {{"scene_id": 1, "start": 0.0, "end": 5.0, "title": "concise original scene title", "mm_title": "Burmese title"}}
   ]
 }}
 
@@ -333,7 +331,14 @@ Rules:
 
     resp_json = _call_gemini_with_payload(payload)
     raw_text = _extract_text(resp_json)
-    data = _decode_gemini_json(raw_text)
+    cleaned = _strip_code_fences(raw_text)
+
+    try:
+        data = json.loads(cleaned)
+    except JSONDecodeError as exc:
+        logger.error("Gemini subtitles raw snippet: %r", cleaned[:400])
+        logger.exception("Gemini subtitles raw_text is not valid JSON.")
+        raise GeminiSubtitlesError("Gemini subtitles did not return valid JSON") from exc
 
     if not isinstance(data, dict):
         raise GeminiSubtitlesError("Gemini subtitles JSON root must be an object")
