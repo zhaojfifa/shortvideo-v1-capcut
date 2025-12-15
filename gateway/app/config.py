@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     openai_api_base: str = Field("https://api.openai.com/v1", env="OPENAI_API_BASE")
     whisper_model: str = Field("whisper-1", env="WHISPER_MODEL")
     gpt_model: str = Field("gpt-4o-mini", env="GPT_MODEL")
+    asr_backend: str = Field("whisper", env="ASR_BACKEND")
+    subtitles_backend: str = Field("gemini", env="SUBTITLES_BACKEND")
+    # 当 SUBTITLES_BACKEND == "gemini" 时：
+    # - 如果已有 origin.srt，直接翻译+场景切分；
+    # - 如果没有，则使用 raw/<task_id>.mp4 让 Gemini 直接转写+翻译，完全不依赖 OPENAI_API_KEY。
 
     # Gemini backend for subtitles / translation
     gemini_api_key: str | None = Field(None, env="GEMINI_API_KEY")
@@ -38,8 +43,20 @@ class Settings(BaseSettings):
     )
 
     # LOVO TTS
+    lovo_base_url: str = Field(
+        "https://api.genny.lovo.ai/api/v1",
+        env="LOVO_BASE_URL",
+    )
     lovo_api_key: str = Field("", env="LOVO_API_KEY")
     lovo_voice_id_mm: str = Field("mm_female_1", env="LOVO_VOICE_ID_MM")
+    lovo_speaker_mm_female_1: str | None = Field(
+        None,
+        env="LOVO_SPEAKER_MM_FEMALE_1",
+    )
+    lovo_speaker_style_mm_female_1: str | None = Field(
+        None,
+        env="LOVO_SPEAKER_STYLE_MM_FEMALE_1",
+    )
 
     class Config:
         env_file = ".env"
