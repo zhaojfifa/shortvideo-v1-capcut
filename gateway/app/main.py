@@ -157,7 +157,7 @@ async def dub(request: DubRequest):
         )
 
     try:
-        result = synthesize_voice(
+        result = await synthesize_voice(
             task_id=request.task_id,
             target_lang=request.target_lang,
             voice_id=request.voice_id,

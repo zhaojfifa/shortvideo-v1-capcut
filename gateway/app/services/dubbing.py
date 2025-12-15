@@ -6,6 +6,7 @@ import wave
 from gateway.app.config import get_settings
 from gateway.app.core.workspace import Workspace, relative_to_workspace
 from gateway.app.providers import lovo_tts
+from gateway.app.providers.edge_tts import EdgeTTSError, EdgeTTSProvider
 
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,40 @@ def build_lovo_script_from_segments(segments: list[dict]) -> str:
     return _truncate_lovo_script(full_script)
 
 
+def _collect_mm_lines(segments: list[dict], srt_text: str) -> list[str]:
+    """Extract Burmese lines from segments or fallback to SRT text."""
+
+    lines: list[str] = []
+    for seg in segments:
+        if not isinstance(seg, dict):
+            continue
+        mm_val = (
+            seg.get("mm_text")
+            or seg.get("mm")
+            or seg.get("target_text")
+            or seg.get("target")
+            or ""
+        )
+        if isinstance(mm_val, dict):
+            mm_val = mm_val.get("text") or mm_val.get("content") or ""
+        if not isinstance(mm_val, str):
+            mm_val = str(mm_val)
+        mm_val = mm_val.strip()
+        if mm_val:
+            lines.append(mm_val)
+
+    if lines:
+        return lines
+
+    for line in (srt_text or "").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.isdigit() or "-->" in stripped:
+            continue
+        lines.append(stripped)
+
+    return lines
+
+
 def _duration_seconds(wav_path: Path) -> float | None:
     try:
         with wave.open(str(wav_path), "rb") as wf:
@@ -100,7 +135,7 @@ def _duration_seconds(wav_path: Path) -> float | None:
         return None
 
 
-def synthesize_voice(
+async def synthesize_voice(
     task_id: str,
     target_lang: str,
     voice_id: str | None = None,
@@ -139,6 +174,29 @@ def synthesize_voice(
                 segments = raw
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning("Failed to load segments JSON for %s: %s", task_id, exc)
+
+    mm_lines = _collect_mm_lines(segments, srt_text)
+
+    backend = (settings.dub_provider or "edge-tts").lower()
+    logger.info(
+        "Using %s backend for dubbing task=%s", backend, task_id
+    )
+
+    if backend == "edge-tts":
+        provider = EdgeTTSProvider(ws)
+        try:
+            out_path = await provider.synthesize_mm(
+                task_id=task_id, voice_id=voice_id, lines=mm_lines
+            )
+        except EdgeTTSError as exc:
+            logger.exception("Edge-TTS dubbing failed for %s", task_id)
+            raise DubbingError(f"Edge-TTS dubbing failed: {exc}") from exc
+        duration = _duration_seconds(out_path)
+        return {
+            "audio_path": relative_to_workspace(out_path),
+            "duration_sec": duration,
+            "path": out_path,
+        }
 
     script = build_lovo_script_from_segments(segments) if segments else ""
     if not script:

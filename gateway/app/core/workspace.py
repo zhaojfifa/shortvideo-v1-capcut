@@ -100,18 +100,29 @@ class Workspace:
         return audio_dir() / f"{self.task_id}_mm.wav"
 
     @property
+    def mm_audio_mp3_path(self) -> Path:
+        return audio_dir() / f"{self.task_id}_mm.mp3"
+
+    @property
     def mm_audio_legacy_path(self) -> Path:
         return dubbed_audio_path(self.task_id)
 
     @property
     def mm_audio_path(self) -> Path:
         primary = self.mm_audio_primary_path
+        mp3_path = self.mm_audio_mp3_path
         if primary.exists():
             return primary
+        if mp3_path.exists():
+            return mp3_path
         return self.mm_audio_legacy_path
 
     def mm_audio_exists(self) -> bool:
-        return self.mm_audio_primary_path.exists() or self.mm_audio_legacy_path.exists()
+        return (
+            self.mm_audio_primary_path.exists()
+            or self.mm_audio_mp3_path.exists()
+            or self.mm_audio_legacy_path.exists()
+        )
 
     def write_mm_audio(self, content: bytes, suffix: str = "wav") -> Path:
         audio_dir().mkdir(parents=True, exist_ok=True)

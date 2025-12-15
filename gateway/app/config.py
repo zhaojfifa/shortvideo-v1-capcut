@@ -1,4 +1,6 @@
 from functools import lru_cache
+from typing import Dict
+
 from pydantic import BaseSettings, Field
 
 
@@ -57,6 +59,19 @@ class Settings(BaseSettings):
         None,
         env="LOVO_SPEAKER_STYLE_MM_FEMALE_1",
     )
+
+    # Edge-TTS
+    edge_tts_voice_map: Dict[str, str] = Field(
+        default_factory=lambda: {
+            "mm_female_1": "my-MM-NilarNeural",
+            "mm_male_1": "my-MM-ThihaNeural",
+        }
+    )
+    edge_tts_rate: str = Field("+0%", env="EDGE_TTS_RATE")
+    edge_tts_volume: str = Field("+0%", env="EDGE_TTS_VOLUME")
+
+    # Dubbing provider selection
+    dub_provider: str = Field("edge-tts", env="DUB_PROVIDER")
 
     class Config:
         env_file = ".env"
