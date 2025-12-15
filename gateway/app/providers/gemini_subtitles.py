@@ -2,6 +2,8 @@ import base64
 import json
 import logging
 import os
+import re
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -138,6 +140,43 @@ def _strip_code_fences(text: str) -> str:
     return t
 
 
+def _decode_gemini_json(raw_text: str) -> Dict[str, Any]:
+    """
+    Decode Gemini response text into JSON dict:
+    - strip ``` / ```json fences
+    - first try direct json.loads
+    - then, if needed, extract the first {...} block and try again
+    - on failure, log a snippet and raise GeminiSubtitlesError
+    """
+    cleaned = _strip_code_fences(raw_text)
+
+    # 1) direct parse
+    try:
+        return json.loads(cleaned)
+    except JSONDecodeError as exc1:
+        # 2) try to parse only the first JSON object in the text
+        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if match:
+            snippet = match.group(0)
+            try:
+                return json.loads(snippet)
+            except JSONDecodeError as exc2:
+                logger.warning(
+                    "Second JSON parse attempt for Gemini subtitles failed: %s; snippet head=%r",
+                    exc2,
+                    snippet[:200],
+                )
+
+        # 3) give up, log and raise
+        logger.exception(
+            "Gemini subtitles raw_text is not valid JSON. First 400 chars: %r",
+            cleaned[:400],
+        )
+        raise GeminiSubtitlesError(
+            "Gemini subtitles did not return valid JSON"
+        ) from exc1
+
+
 def translate_and_segment_with_gemini(
     origin_srt_text: str,
     target_lang: str = "my",
@@ -191,7 +230,7 @@ Rules:
 - If unsure about a scene title, keep it short or leave it empty.
 - Respond with JSON only. Do NOT add explanations, backticks, or code fences.
 
-Here are the subtitles to process (SRT):
+    Here are the subtitles to process (SRT):
 
 {origin_srt_text}
 """.strip()
@@ -199,21 +238,87 @@ Here are the subtitles to process (SRT):
     # 1) 调用 Gemini
     resp_json = _call_gemini(prompt)
     raw_text = _extract_text(resp_json)
-    cleaned = _strip_code_fences(raw_text)
-
-    # 2) 尝试解析 JSON
-    try:
-        data = json.loads(cleaned)
-    except json.JSONDecodeError as exc:
-        logger.exception(
-            "Gemini subtitles raw_text is not valid JSON. First 400 chars: %r",
-            cleaned[:400],
-        )
-        raise GeminiSubtitlesError(
-            "Gemini subtitles did not return valid JSON"
-        ) from exc
+    data = _decode_gemini_json(raw_text)
 
     # 3) 做一点点 schema 校验，避免后续逻辑踩坑
+    if not isinstance(data, dict):
+        raise GeminiSubtitlesError("Gemini subtitles JSON root must be an object")
+
+    if "segments" not in data or "scenes" not in data:
+        raise GeminiSubtitlesError(
+            "Gemini subtitles JSON must contain 'segments' and 'scenes'"
+        )
+
+    return data
+
+
+def transcribe_translate_and_segment_with_gemini(
+    video_path: Path,
+    target_lang: str = "my",
+) -> Dict[str, Any]:
+    """
+    使用 Gemini 2.0 Flash 对原始视频做转写 + 翻译 + 场景切分。
+
+    期望返回结构：
+    {
+      "origin_srt": "...",
+      "mm_srt": "...",
+      "segments": [...],
+      "scenes": [...]
+    }
+    """
+    if not video_path.exists():
+        raise GeminiSubtitlesError(f"Raw video not found: {video_path}")
+
+    # 注意：这里使用 inline_data，而不是 file_data.data
+    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
+
+    prompt = f"""
+You are a subtitle transcriber, translator, and scene segmenter for short social videos.
+
+Tasks:
+1) Transcribe the spoken Chinese in the provided MP4 video into SRT subtitles (origin_srt).
+2) Translate the subtitles into Burmese (mm_srt).
+3) Provide scene segmentation that aligns with the subtitles.
+
+Return ONLY valid JSON with this shape:
+{{
+  "origin_srt": "<full SRT string in source language>",
+  "mm_srt": "<full SRT string translated to {target_lang}>",
+  "segments": [
+    {{"index": 1, "start": 0.0, "end": 2.5, "origin": "text", "mm": "translation", "scene_id": 1}}
+  ],
+  "scenes": [
+    {{"scene_id": 1, "start": 0.0, "end": 5.0, "title": "scene title", "mm_title": "translated title"}}
+  ]
+}}
+
+Rules:
+- Keep timestamps in seconds, monotonic, and aligned between origin/mm.
+- Respond with JSON only. Do NOT add explanations or code fences.
+""".strip()
+
+    payload: Dict[str, Any] = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [
+                    {
+                        "inline_data": {
+                            "mime_type": "video/mp4",
+                            "data": encoded,
+                        }
+                    },
+                    {"text": prompt},
+                ],
+            }
+        ]
+    }
+
+    resp_json = _call_gemini_with_payload(payload)
+    raw_text = _extract_text(resp_json)
+    data = _decode_gemini_json(raw_text)
+
     if not isinstance(data, dict):
         raise GeminiSubtitlesError("Gemini subtitles JSON root must be an object")
 
