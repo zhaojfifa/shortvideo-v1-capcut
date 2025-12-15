@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     )
     lovo_api_key: str = Field("", env="LOVO_API_KEY")
     lovo_voice_id_mm: str = Field("mm_female_1", env="LOVO_VOICE_ID_MM")
+    lovo_speaker_mm_female_1: str | None = Field(
+        None,
+        env="LOVO_SPEAKER_MM_FEMALE_1",
+    )
+    lovo_speaker_style_mm_female_1: str | None = Field(
+        None,
+        env="LOVO_SPEAKER_STYLE_MM_FEMALE_1",
+    )
 
     class Config:
         env_file = ".env"

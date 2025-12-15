@@ -2,10 +2,21 @@ import logging
 from typing import Any, Dict, Optional, Tuple
 
 import requests
+from fastapi import HTTPException
 
 from gateway.app.config import get_settings
+from gateway.app.settings import settings as app_settings
 
 logger = logging.getLogger(__name__)
+
+
+VOICE_ID_TO_SPEAKER: dict[str, str | None] = {
+    "mm_female_1": app_settings.lovo_speaker_mm_female_1,
+}
+
+VOICE_ID_TO_SPEAKER_STYLE: dict[str, str | None] = {
+    "mm_female_1": app_settings.lovo_speaker_style_mm_female_1,
+}
 
 
 class LovoTTSError(RuntimeError):
@@ -20,10 +31,26 @@ def _build_url() -> str:
     return f"{base}/tts/sync"
 
 
+def resolve_lovo_speaker(voice_id: str | None) -> tuple[str, str | None]:
+    """Map UI voice_id to LOVO speaker and style IDs."""
+
+    key = voice_id or "mm_female_1"
+    speaker = VOICE_ID_TO_SPEAKER.get(key)
+    style = VOICE_ID_TO_SPEAKER_STYLE.get(key)
+
+    if not speaker:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown or unconfigured LOVO voice_id: {key}",
+        )
+
+    return speaker, style
+
+
 def synthesize_sync(
     *,
     text: str,
-    voice_id: str,
+    voice_id: str | None,
     output_format: str = "wav",
     speed: float = 1.0,
     timeout: int = 120,
@@ -38,18 +65,30 @@ def synthesize_sync(
         raise LovoTTSError("LOVO_API_KEY is not configured")
 
     url = _build_url()
+    speaker, speaker_style = resolve_lovo_speaker(voice_id)
+
     payload: Dict[str, Any] = {
         "text": text,
-        "speaker": voice_id,
+        "speaker": speaker,
         "speed": speed,
         "format": output_format,
     }
+    if speaker_style:
+        payload["speakerStyle"] = speaker_style
     headers = {
         "Content-Type": "application/json",
         "X-API-KEY": settings.lovo_api_key,
     }
 
-    logger.info("Calling LOVO TTS", extra={"url": url, "voice_id": voice_id, "format": output_format})
+    logger.info(
+        "Calling LOVO TTS",
+        extra={
+            "url": url,
+            "voice_id": voice_id,
+            "speaker": speaker,
+            "format": output_format,
+        },
+    )
     response = requests.post(url, json=payload, headers=headers, timeout=timeout)
     logger.info("LOVO HTTP %s, preview=%r", response.status_code, response.text[:200])
 

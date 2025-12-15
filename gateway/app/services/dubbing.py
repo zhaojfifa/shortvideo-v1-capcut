@@ -151,6 +151,7 @@ def synthesize_voice(
             output_format="wav",
         )
     except lovo_tts.LovoTTSError as exc:
+        logger.exception("LOVO synthesize failed for %s", task_id)
         raise DubbingError(f"LOVO synthesize failed: {exc}") from exc
 
     out_path = ws.write_mm_audio(audio_bytes, suffix=ext or "wav")
