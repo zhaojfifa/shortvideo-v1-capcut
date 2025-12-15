@@ -1,9 +1,17 @@
+import json
+import logging
 from pathlib import Path
 import wave
 
 from gateway.app.config import get_settings
 from gateway.app.core.workspace import Workspace, relative_to_workspace
 from gateway.app.providers import lovo_tts
+
+
+logger = logging.getLogger(__name__)
+
+
+LOVO_MAX_CHARS = 480  # stay safely below LOVO's 500-char per-block limit
 
 
 class DubbingError(Exception):
@@ -26,6 +34,58 @@ def _combine_srt_text(srt_source: Path | str) -> str:
         if stripped:
             text_parts.append(stripped)
     return " \n".join(text_parts)
+
+
+def _truncate_lovo_script(text: str) -> str:
+    """Ensure text fits within LOVO's 500-character block limit."""
+
+    full_script = text.strip()
+    if len(full_script) <= LOVO_MAX_CHARS:
+        return full_script
+
+    cut = full_script.rfind("။", 0, LOVO_MAX_CHARS)
+    if cut == -1:
+        cut = full_script.rfind(".", 0, LOVO_MAX_CHARS)
+    if cut == -1:
+        cut = LOVO_MAX_CHARS
+
+    truncated = full_script[:cut].rstrip()
+    logger.warning(
+        "Truncating LOVO dubbing script from %d to %d chars due to LOVO limit",
+        len(full_script),
+        len(truncated),
+    )
+    return truncated
+
+
+def build_lovo_script_from_segments(segments: list[dict]) -> str:
+    """
+    Build a dubbing script from translated segments and enforce LOVO's length cap.
+
+    For now we concatenate the target-language strings and trim to a single
+    block suitable for LOVO /tts/sync.
+    """
+
+    parts: list[str] = []
+    for seg in segments:
+        if not isinstance(seg, dict):
+            continue
+        text = (
+            seg.get("target_text")
+            or seg.get("mm_text")
+            or seg.get("mm")
+            or seg.get("target")
+            or ""
+        ).strip()
+        if not text:
+            continue
+        parts.append(text)
+
+    full_script = " ".join(parts).strip()
+    if not full_script:
+        return ""
+
+    return _truncate_lovo_script(full_script)
 
 
 def _duration_seconds(wav_path: Path) -> float | None:
@@ -67,15 +127,31 @@ def synthesize_voice(
     if not srt_text.strip():
         raise DubbingError("translated subtitles are empty; please rerun /v1/subtitles")
 
-    text = _combine_srt_text(srt_text)
+    segments: list[dict] = []
+    if ws.segments_json.exists():
+        try:
+            raw = json.loads(ws.segments_json.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                segments = raw.get("segments") or raw.get("data") or []
+                if isinstance(segments, dict):
+                    segments = segments.get("segments", [])
+            elif isinstance(raw, list):
+                segments = raw
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Failed to load segments JSON for %s: %s", task_id, exc)
+
+    script = build_lovo_script_from_segments(segments) if segments else ""
+    if not script:
+        script = _truncate_lovo_script(_combine_srt_text(srt_text))
+
     try:
         audio_bytes, ext, _content_type = lovo_tts.synthesize_sync(
-            text=text,
+            text=script,
             voice_id=voice_id or settings.lovo_voice_id_mm,
             output_format="wav",
         )
     except lovo_tts.LovoTTSError as exc:
-        raise DubbingError(str(exc)) from exc
+        raise DubbingError(f"LOVO synthesize failed: {exc}") from exc
 
     out_path = ws.write_mm_audio(audio_bytes, suffix=ext or "wav")
     duration = _duration_seconds(out_path)

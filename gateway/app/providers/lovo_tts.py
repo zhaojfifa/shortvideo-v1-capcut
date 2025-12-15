@@ -54,7 +54,15 @@ def synthesize_sync(
     logger.info("LOVO HTTP %s, preview=%r", response.status_code, response.text[:200])
 
     if response.status_code >= 400:
-        raise LovoTTSError(f"LOVO synthesize failed: HTTP {response.status_code}: {response.text[:200]}")
+        err_msg = response.text[:200]
+        try:
+            data = response.json()
+            if isinstance(data, dict):
+                err_msg = data.get("message") or data.get("error") or err_msg
+        except Exception:  # pragma: no cover - defensive
+            pass
+        logger.error("LOVO synthesize failed HTTP %s: %s", response.status_code, err_msg)
+        raise LovoTTSError(f"HTTP {response.status_code}: {err_msg}")
 
     content_type = response.headers.get("Content-Type")
     # Binary audio response
@@ -78,8 +86,13 @@ def synthesize_sync(
         raise LovoTTSError("LOVO synthesize failed: download error") from exc
 
     if download.status_code >= 400:
+        logger.error(
+            "LOVO synthesize download failed HTTP %s: %s",
+            download.status_code,
+            download.text[:200],
+        )
         raise LovoTTSError(
-            f"LOVO synthesize failed: download HTTP {download.status_code}: {download.text[:200]}"
+            f"HTTP {download.status_code}: {download.text[:200]}"
         )
 
     dl_type = download.headers.get("Content-Type") or content_type
