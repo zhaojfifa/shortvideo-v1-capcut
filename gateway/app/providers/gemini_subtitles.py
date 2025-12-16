@@ -187,6 +187,44 @@ def _decode_gemini_json(raw_text: str) -> Dict[str, Any]:
         ) from exc1
 
 
+def extract_json_block(raw: str) -> str:
+    """
+    Extract the most relevant JSON block from Gemini responses.
+
+    - If a ```json ... ``` fenced block exists, return its inner content.
+    - Otherwise, return the substring between the first '{' and the last '}'.
+    - Raise ValueError if no JSON block is found.
+    """
+
+    fenced_match = re.search(r"```json\s*(.*?)```", raw, re.DOTALL | re.IGNORECASE)
+    if fenced_match:
+        return fenced_match.group(1)
+
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return raw[start : end + 1]
+
+    raise ValueError("No JSON block found in Gemini response")
+
+
+def parse_gemini_json(raw: str) -> Any:
+    """
+    Parse Gemini text output that may include extra prose around the JSON.
+
+    Raises ValueError with a descriptive snippet when parsing fails.
+    """
+
+    candidate = extract_json_block(raw)
+    try:
+        return json.loads(candidate)
+    except JSONDecodeError as exc:
+        snippet = candidate[:4000]
+        raise ValueError(
+            f"Gemini subtitles did not return valid JSON. Snippet: {snippet}"
+        ) from exc
+
+
 def translate_and_segment_with_gemini(
     origin_srt_text: str,
     target_lang: str = "my",
@@ -331,14 +369,12 @@ Rules:
 
     resp_json = _call_gemini_with_payload(payload)
     raw_text = _extract_text(resp_json)
-    cleaned = _strip_code_fences(raw_text)
 
     try:
-        data = json.loads(cleaned)
-    except JSONDecodeError as exc:
-        logger.error("Gemini subtitles raw snippet: %r", cleaned[:400])
-        logger.exception("Gemini subtitles raw_text is not valid JSON.")
-        raise GeminiSubtitlesError("Gemini subtitles did not return valid JSON") from exc
+        data = parse_gemini_json(raw_text)
+    except ValueError as exc:
+        logger.error("%s", exc)
+        raise GeminiSubtitlesError(str(exc)) from exc
 
     if not isinstance(data, dict):
         raise GeminiSubtitlesError("Gemini subtitles JSON root must be an object")
