@@ -1,10 +1,11 @@
 import logging
+import re
 import subprocess
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, validator
 
 from gateway.app.config import get_settings
 from gateway.app.core.workspace import (
@@ -15,7 +16,7 @@ from gateway.app.core.workspace import (
     translated_srt_path,
 )
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
-from gateway.app.services.parse import parse_douyin_video
+from gateway.app.services.parse import detect_platform, parse_douyin_video
 from gateway.app.services.pack import PackError, create_capcut_pack
 from gateway.app.services.subtitles import generate_subtitles
 
@@ -25,10 +26,25 @@ USE_FFMPEG_EXTRACT = True  # toggle to False only if ffmpeg is unavailable
 logger = logging.getLogger(__name__)
 
 
+_URL_RE = re.compile(r"(https?://[^\s]+)")
+
+
 class ParseRequest(BaseModel):
     task_id: str
     platform: str | None = None
-    link: HttpUrl
+    link: str
+
+    @validator("link")
+    def extract_first_url(cls, v: str) -> str:
+        """
+        Allow a full paste from social apps and keep only the first http/https URL.
+        """
+
+        m = _URL_RE.search(v)
+        if not m:
+            raise ValueError("No http/https URL found in link")
+        url = m.group(1).rstrip("，。,.）)\"' ")
+        return url
 
 
 class SubtitlesRequest(BaseModel):
@@ -69,12 +85,18 @@ async def pipeline_lab(request: Request):
 
 @app.post("/v1/parse")
 async def parse(request: ParseRequest):
-    platform = request.platform or "douyin"
+    try:
+        platform = detect_platform(request.link, request.platform)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     if platform != "douyin":
-        raise HTTPException(status_code=400, detail="Only 'douyin' is supported in V1 parse")
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported platform for V1 parse: {platform}"
+        )
 
     try:
-        return await parse_douyin_video(request.task_id, str(request.link))
+        return await parse_douyin_video(request.task_id, request.link)
     except HTTPException:
         raise
     except Exception as exc:  # pragma: no cover - defensive logging
