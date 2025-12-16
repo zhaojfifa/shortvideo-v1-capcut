@@ -1,9 +1,9 @@
+import ast
 import base64
 import json
 import logging
 import os
 import re
-from json import JSONDecodeError
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -112,20 +112,24 @@ def _call_gemini_with_payload(
 def _extract_text(resp_json: Dict[str, Any]) -> str:
     """
     从 Gemini JSON 响应里把所有 text part 拼出来。
-    v1beta 结构：candidates[0].content.parts[*].text
+    v1beta 结构：candidates[*].content.parts[*].text
     """
     candidates: List[Dict[str, Any]] = resp_json.get("candidates") or []
     if not candidates:
         raise GeminiSubtitlesError("Gemini response has no candidates")
 
-    content: Dict[str, Any] = candidates[0].get("content") or {}
-    parts: List[Dict[str, Any]] = content.get("parts") or []
+    texts: List[str] = []
+    for cand in candidates:
+        content: Dict[str, Any] = cand.get("content") or {}
+        parts: List[Dict[str, Any]] = content.get("parts") or []
+        for part in parts:
+            if isinstance(part, dict) and "text" in part:
+                texts.append(part.get("text", ""))
 
-    texts = [p.get("text", "") for p in parts if isinstance(p, dict) and "text" in p]
     if not texts:
         raise GeminiSubtitlesError("Gemini response has no text parts")
 
-    return "".join(texts)
+    return "".join(texts).strip()
 
 
 def _strip_code_fences(text: str) -> str:
@@ -149,44 +153,6 @@ def _strip_code_fences(text: str) -> str:
     return t
 
 
-def _decode_gemini_json(raw_text: str) -> Dict[str, Any]:
-    """
-    Decode Gemini response text into JSON dict:
-    - strip ``` / ```json fences
-    - first try direct json.loads
-    - then, if needed, extract the first {...} block and try again
-    - on failure, log a snippet and raise GeminiSubtitlesError
-    """
-    cleaned = _strip_code_fences(raw_text)
-
-    # 1) direct parse
-    try:
-        return json.loads(cleaned)
-    except JSONDecodeError as exc1:
-        # 2) try to parse only the first JSON object in the text
-        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-        if match:
-            snippet = match.group(0)
-            try:
-                return json.loads(snippet)
-            except JSONDecodeError as exc2:
-                logger.warning(
-                    "Second JSON parse attempt for Gemini subtitles failed: %s; snippet head=%r",
-                    exc2,
-                    snippet[:200],
-                )
-
-        # 3) give up, log and raise
-        snippet = cleaned[:400]
-        logger.exception(
-            "Gemini subtitles raw_text is not valid JSON. First 400 chars: %r",
-            snippet,
-        )
-        raise GeminiSubtitlesError(
-            f"Gemini subtitles did not return valid JSON. Snippet: {snippet!r}"
-        ) from exc1
-
-
 def extract_json_block(raw: str) -> str:
     """
     Extract the most relevant JSON block from Gemini responses.
@@ -196,7 +162,9 @@ def extract_json_block(raw: str) -> str:
     - Raise ValueError if no JSON block is found.
     """
 
-    fenced_match = re.search(r"```json\s*(.*?)```", raw, re.DOTALL | re.IGNORECASE)
+    raw = raw.strip()
+
+    fenced_match = re.search(r"```(?:json)?\s*(.*?)```", raw, re.DOTALL | re.IGNORECASE)
     if fenced_match:
         return fenced_match.group(1)
 
@@ -208,21 +176,57 @@ def extract_json_block(raw: str) -> str:
     raise ValueError("No JSON block found in Gemini response")
 
 
-def parse_gemini_json(raw: str) -> Any:
+def parse_gemini_subtitle_payload(raw_text: str) -> Any:
     """
-    Parse Gemini text output that may include extra prose around the JSON.
+    Fault-tolerant parser for Gemini subtitle outputs.
 
-    Raises ValueError with a descriptive snippet when parsing fails.
+    Attempts strict JSON first, then Python literal parsing, then a heuristic
+    fix for single-quoted keys/values before failing with a descriptive error.
     """
 
-    candidate = extract_json_block(raw)
+    snippet = (raw_text or "")[:500].replace("\n", "\\n")
+    text = (raw_text or "").strip()
+
     try:
-        return json.loads(candidate)
-    except JSONDecodeError as exc:
-        snippet = candidate[:4000]
+        payload_text = extract_json_block(text)
+    except ValueError:
+        payload_text = text
+
+    # Strategy 1: strict JSON
+    try:
+        return json.loads(payload_text)
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 2: Python literal (to handle single quotes/trailing commas)
+    try:
+        data = ast.literal_eval(payload_text)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+
+    # Strategy 3: heuristic fix for single-quoted keys/values
+    fixed = re.sub(
+        r"(?P<q>')(?P<key>[a-zA-Z_][a-zA-Z0-9_]*)'(?=\s*:)",
+        r'"\g<key>"',
+        payload_text,
+    )
+    fixed = re.sub(
+        r"':\s*'([^']*)'",
+        lambda m: '": "{}"'.format(m.group(1).replace('"', '\\"')),
+        fixed,
+    )
+    try:
+        return json.loads(fixed)
+    except Exception:
+        logger.warning(
+            "Gemini subtitles did not return valid JSON. Snippet: %s",
+            snippet,
+        )
         raise ValueError(
             f"Gemini subtitles did not return valid JSON. Snippet: {snippet}"
-        ) from exc
+        )
 
 
 def translate_and_segment_with_gemini(
@@ -289,11 +293,15 @@ Rules:
     # 1) 调用 Gemini
     resp_json = _call_gemini(prompt)
     raw_text = _extract_text(resp_json)
-    data = _decode_gemini_json(raw_text)
+    data = parse_gemini_subtitle_payload(raw_text)
 
     # 3) 做一点点 schema 校验，避免后续逻辑踩坑
     if not isinstance(data, dict):
         raise GeminiSubtitlesError("Gemini subtitles JSON root must be an object")
+
+    language = data.get("language")
+    if not isinstance(language, str):
+        raise GeminiSubtitlesError("Gemini subtitles JSON must include a language code")
 
     if "segments" not in data or "scenes" not in data:
         raise GeminiSubtitlesError(
@@ -371,13 +379,17 @@ Rules:
     raw_text = _extract_text(resp_json)
 
     try:
-        data = parse_gemini_json(raw_text)
+        data = parse_gemini_subtitle_payload(raw_text)
     except ValueError as exc:
         logger.error("%s", exc)
         raise GeminiSubtitlesError(str(exc)) from exc
 
     if not isinstance(data, dict):
         raise GeminiSubtitlesError("Gemini subtitles JSON root must be an object")
+
+    language = data.get("language")
+    if not isinstance(language, str):
+        raise GeminiSubtitlesError("Gemini subtitles JSON must include a language code")
 
     if "segments" not in data or "scenes" not in data:
         raise GeminiSubtitlesError(
