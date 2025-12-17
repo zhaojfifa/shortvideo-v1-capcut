@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -25,6 +26,7 @@ from gateway.app.services.steps_v1 import (
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 templates = Jinja2Templates(directory="gateway/app/templates")
 logger = logging.getLogger(__name__)
+tasks_html_path = Path(__file__).resolve().parent / "static" / "tasks.html"
 
 
 @app.on_event("startup")
@@ -52,6 +54,13 @@ async def pipeline_lab(request: Request):
     return templates.TemplateResponse(
         "pipeline_lab.html", {"request": request, "env_summary": env_summary}
     )
+
+
+@app.get("/tasks", response_class=HTMLResponse)
+async def tasks_page() -> FileResponse:
+    """Serve a minimal operator task list page backed by /api/tasks."""
+
+    return FileResponse(tasks_html_path, media_type="text/html")
 
 
 @app.post("/v1/parse")
