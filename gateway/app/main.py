@@ -1,21 +1,24 @@
 import logging
+import re
 import subprocess
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, validator
 
 from gateway.app.config import get_settings
 from gateway.app.core.workspace import (
-    dubbed_audio_path,
+    Workspace,
     origin_srt_path,
     pack_zip_path,
     raw_path,
     translated_srt_path,
 )
+from gateway.app.db import Base, engine
+from gateway.app.routers import tasks as tasks_router
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
-from gateway.app.services.parse import parse_douyin_video
+from gateway.app.services.parse import detect_platform, parse_douyin_video
 from gateway.app.services.pack import PackError, create_capcut_pack
 from gateway.app.services.subtitles import generate_subtitles
 
@@ -25,10 +28,35 @@ USE_FFMPEG_EXTRACT = True  # toggle to False only if ffmpeg is unavailable
 logger = logging.getLogger(__name__)
 
 
+@app.on_event("startup")
+def on_startup() -> None:
+    """Ensure database schema exists before serving traffic."""
+
+    Base.metadata.create_all(bind=engine)
+
+
+app.include_router(tasks_router.router)
+
+
+_URL_RE = re.compile(r"(https?://[^\s]+)")
+
+
 class ParseRequest(BaseModel):
     task_id: str
     platform: str | None = None
-    link: HttpUrl
+    link: str
+
+    @validator("link")
+    def extract_first_url(cls, v: str) -> str:
+        """
+        Allow a full paste from social apps and keep only the first http/https URL.
+        """
+
+        m = _URL_RE.search(v)
+        if not m:
+            raise ValueError("No http/https URL found in link")
+        url = m.group(1).rstrip("，。,.）)\"' ")
+        return url
 
 
 class SubtitlesRequest(BaseModel):
@@ -69,12 +97,18 @@ async def pipeline_lab(request: Request):
 
 @app.post("/v1/parse")
 async def parse(request: ParseRequest):
-    platform = request.platform or "douyin"
+    try:
+        platform = detect_platform(request.link, request.platform)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     if platform != "douyin":
-        raise HTTPException(status_code=400, detail="Only 'douyin' is supported in V1 parse")
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported platform for V1 parse: {platform}"
+        )
 
     try:
-        return await parse_douyin_video(request.task_id, str(request.link))
+        return await parse_douyin_video(request.task_id, request.link)
     except HTTPException:
         raise
     except Exception as exc:  # pragma: no cover - defensive logging
@@ -129,36 +163,68 @@ async def get_mm_subs(task_id: str):
 
 @app.post("/v1/dub")
 async def dub(request: DubRequest):
+    workspace = Workspace(request.task_id)
+    origin_exists = workspace.origin_srt_path.exists()
+    mm_exists = workspace.mm_srt_exists()
+
+    logger.info(
+        "Dub request",
+        extra={
+            "task_id": request.task_id,
+            "origin_srt_exists": origin_exists,
+            "mm_srt_exists": mm_exists,
+            "mm_srt_path": str(workspace.mm_srt_path),
+        },
+    )
+
+    if not mm_exists:
+        raise HTTPException(
+            status_code=400,
+            detail="translated subtitles not found; run /v1/subtitles first",
+        )
+
+    mm_text = workspace.read_mm_srt_text() or ""
+    if not mm_text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="translated subtitles file is empty; please rerun /v1/subtitles",
+        )
+
     try:
-        result = synthesize_voice(
+        result = await synthesize_voice(
             task_id=request.task_id,
             target_lang=request.target_lang,
             voice_id=request.voice_id,
             force=request.force,
+            mm_srt_text=mm_text,
+            workspace=workspace,
         )
     except DubbingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    audio_url = f"/v1/tasks/{request.task_id}/audio_mm"
     return {
         "task_id": request.task_id,
         "voice_id": request.voice_id,
-        "audio_path": result.get("audio_path"),
+        "audio_mm_url": audio_url,
         "duration_sec": result.get("duration_sec"),
     }
 
 
 @app.get("/v1/tasks/{task_id}/audio_mm")
 async def get_audio(task_id: str):
-    audio = dubbed_audio_path(task_id)
+    workspace = Workspace(task_id)
+    audio = workspace.mm_audio_path
     if not audio.exists():
         raise HTTPException(status_code=404, detail="dubbed audio not found")
-    return FileResponse(audio, media_type="audio/wav", filename=audio.name)
+    return FileResponse(audio, media_type=workspace.mm_audio_media_type(), filename=audio.name)
 
 
 @app.post("/v1/pack")
 async def pack(request: PackRequest):
     raw_file = raw_path(request.task_id)
-    audio_file = dubbed_audio_path(request.task_id)
+    workspace = Workspace(request.task_id)
+    audio_file = workspace.mm_audio_path
     subs_file = translated_srt_path(request.task_id, "my")
     if not subs_file.exists():
         subs_file = translated_srt_path(request.task_id, "mm")
