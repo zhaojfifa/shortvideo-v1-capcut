@@ -15,6 +15,8 @@ from gateway.app.core.workspace import (
     raw_path,
     translated_srt_path,
 )
+from gateway.app.db import Base, engine
+from gateway.app.routers import tasks as tasks_router
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.parse import detect_platform, parse_douyin_video
 from gateway.app.services.pack import PackError, create_capcut_pack
@@ -24,6 +26,16 @@ app = FastAPI(title="ShortVideo Gateway", version="v1")
 templates = Jinja2Templates(directory="gateway/app/templates")
 USE_FFMPEG_EXTRACT = True  # toggle to False only if ffmpeg is unavailable
 logger = logging.getLogger(__name__)
+
+
+@app.on_event("startup")
+def on_startup() -> None:
+    """Ensure database schema exists before serving traffic."""
+
+    Base.metadata.create_all(bind=engine)
+
+
+app.include_router(tasks_router.router)
 
 
 _URL_RE = re.compile(r"(https?://[^\s]+)")
