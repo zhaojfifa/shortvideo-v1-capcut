@@ -1,12 +1,13 @@
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from .. import models
 from ..db import get_db
 from ..schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary
+from ..services.pipeline_v1 import run_pipeline_background
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -25,9 +26,11 @@ def _infer_platform_from_url(url: str) -> Optional[str]:
 
 
 @router.post("", response_model=TaskDetail)
-def create_task(payload: TaskCreate, db: Session = Depends(get_db)):
+def create_task(
+    payload: TaskCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+):
     """
-    Create a Task record. Status defaults to pending; pipeline integration is handled later.
+    Create a Task record and kick off the V1 pipeline asynchronously.
     """
 
     platform = payload.platform or _infer_platform_from_url(str(payload.source_url))
@@ -47,6 +50,8 @@ def create_task(payload: TaskCreate, db: Session = Depends(get_db)):
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
+
+    background_tasks.add_task(run_pipeline_background, db_task.id)
 
     return TaskDetail(
         task_id=db_task.id,

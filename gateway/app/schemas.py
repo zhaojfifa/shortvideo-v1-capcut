@@ -1,7 +1,45 @@
 from datetime import datetime
+import re
 from typing import Optional
 
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, validator
+
+_URL_RE = re.compile(r"(https?://[^\s]+)")
+
+
+class ParseRequest(BaseModel):
+    task_id: str
+    platform: str | None = None
+    link: str
+
+    @validator("link")
+    def extract_first_url(cls, v: str) -> str:
+        """Allow a full paste from social apps and keep only the first http/https URL."""
+
+        m = _URL_RE.search(v)
+        if not m:
+            raise ValueError("No http/https URL found in link")
+        url = m.group(1).rstrip("，。,.）)\"' ")
+        return url
+
+
+class SubtitlesRequest(BaseModel):
+    task_id: str
+    target_lang: str = "my"
+    force: bool = False
+    translate: bool = True
+    with_scenes: bool = True
+
+
+class DubRequest(BaseModel):
+    task_id: str
+    voice_id: str | None = None
+    target_lang: str = "my"
+    force: bool = False
+
+
+class PackRequest(BaseModel):
+    task_id: str
 
 
 class TaskCreate(BaseModel):
