@@ -42,7 +42,19 @@ async def run_pipeline_for_task(task_id: str, db: Session):
         logger.error("Task %s not found, abort pipeline", task_id)
         return
 
-    logger.info("Starting pipeline for task %s", task_id)
+    logger.info(
+        "Starting pipeline for task %s",
+        task_id,
+    )
+    logger.info(
+        "Pipeline context task=%s category=%s content_lang=%s ui_lang=%s video_type=%s face_swap_enabled=%s",
+        task_id,
+        getattr(task, "category_key", None),
+        getattr(task, "content_lang", None),
+        getattr(task, "ui_lang", None),
+        getattr(task, "video_type", None),
+        getattr(task, "face_swap_enabled", None),
+    )
     task.status = "processing"
     db.commit()
 

@@ -52,6 +52,12 @@ class TaskCreate(BaseModel):
     title: Optional[str] = None
     note: Optional[str] = None
 
+    category_key: Optional[str] = "beauty"
+    content_lang: Optional[str] = "my"
+    ui_lang: Optional[str] = "en"
+    style_preset: Optional[str] = None
+    face_swap_enabled: Optional[bool] = False
+
 
 class TaskSummary(BaseModel):
     task_id: str
@@ -61,6 +67,11 @@ class TaskSummary(BaseModel):
     account_name: Optional[str] = None
     video_type: Optional[str] = None
     template: Optional[str] = None
+    category_key: str
+    content_lang: str
+    ui_lang: str
+    style_preset: Optional[str] = None
+    face_swap_enabled: bool
     status: str
     duration_sec: Optional[int] = None
     thumb_url: Optional[str] = None

@@ -1,6 +1,6 @@
 import datetime as dt
 
-from sqlalchemy import Column, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
 
 from .db import Base
 
@@ -18,6 +18,12 @@ class Task(Base):
 
     video_type = Column(String(64), nullable=True)
     template = Column(String(64), nullable=True)
+
+    category_key = Column(String(50), nullable=False, default="beauty")
+    content_lang = Column(String(10), nullable=False, default="my")
+    ui_lang = Column(String(10), nullable=False, default="en")
+    style_preset = Column(String(50), nullable=True)
+    face_swap_enabled = Column(Boolean, nullable=False, default=False)
 
     status = Column(String(32), nullable=False, default="pending")
     duration_sec = Column(Integer, nullable=True)

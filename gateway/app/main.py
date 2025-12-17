@@ -13,7 +13,7 @@ from gateway.app.core.workspace import (
     raw_path,
     translated_srt_path,
 )
-from gateway.app.db import Base, engine
+from gateway.app.db import Base, engine, ensure_task_extra_columns
 from gateway.app.routers import tasks as tasks_router
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
 from gateway.app.services.steps_v1 import (
@@ -34,6 +34,7 @@ def on_startup() -> None:
     """Ensure database schema exists before serving traffic."""
 
     Base.metadata.create_all(bind=engine)
+    ensure_task_extra_columns(engine)
 
 
 app.include_router(tasks_router.router)
