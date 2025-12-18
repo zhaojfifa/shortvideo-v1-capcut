@@ -1,14 +1,12 @@
+"""Task API and HTML routers for the gateway application."""
+
+from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-
-# Reuse the HTML pages router defined for task views under gateway.routes.tasks
-# so /tasks and related pages remain available when this module is included.
-try:  # pragma: no cover - defensive import for runtime wiring
-    from gateway.routes import tasks as routes_tasks
-except Exception:  # pragma: no cover
-    routes_tasks = None
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from .. import models
@@ -16,13 +14,12 @@ from ..db import get_db
 from ..schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary
 from ..services.pipeline_v1 import run_pipeline_background
 
-router = APIRouter(prefix="/api/tasks", tags=["tasks"])
-# If the routes.tasks module is available, expose its pages_router to satisfy
-# `app.include_router(tasks_router.pages_router)` wiring in the main app.
-if routes_tasks and hasattr(routes_tasks, "pages_router"):
-    pages_router = routes_tasks.pages_router
-else:  # Fallback to an empty APIRouter to avoid attribute errors at startup.
-    pages_router = APIRouter()
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+pages_router = APIRouter()
+api_router = APIRouter(prefix="/api", tags=["tasks"])
 
 
 def _infer_platform_from_url(url: str) -> Optional[str]:
@@ -38,13 +35,54 @@ def _infer_platform_from_url(url: str) -> Optional[str]:
     return None
 
 
-@router.post("", response_model=TaskDetail)
+@pages_router.get("/tasks", response_class=HTMLResponse)
+async def tasks_page(
+    request: Request, db: Session = Depends(get_db), limit: int = Query(50, ge=1, le=500)
+):
+    """Render the task board HTML page."""
+
+    db_tasks = (
+        db.query(models.Task).order_by(models.Task.created_at.desc()).limit(limit).all()
+    )
+
+    rows: list[dict] = []
+    for t in db_tasks:
+        rows.append(
+            {
+                "task_id": t.id,
+                "platform": t.platform,
+                "source_url": t.source_url,
+                "title": t.title or "",
+                "category_key": t.category_key or "",
+                "content_lang": t.content_lang or "",
+                "status": t.status or "pending",
+                "created_at": t.created_at.isoformat() if t.created_at else "",
+                "pack_path": str(t.pack_path) if t.pack_path else None,
+                "ui_lang": t.ui_lang or "",
+            }
+        )
+
+    return templates.TemplateResponse(
+        "tasks.html",
+        {"request": request, "tasks": rows},
+    )
+
+
+@pages_router.get("/tasks/new", response_class=HTMLResponse)
+async def tasks_new(request: Request) -> HTMLResponse:
+    """Render suitcase quick-create page."""
+
+    return templates.TemplateResponse(
+        "tasks_new.html",
+        {"request": request},
+    )
+
+
+@api_router.post("/tasks", response_model=TaskDetail)
 def create_task(
     payload: TaskCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ):
-    """
-    Create a Task record and kick off the V1 pipeline asynchronously.
-    """
+    """Create a Task record and kick off the V1 pipeline asynchronously."""
 
     platform = payload.platform or _infer_platform_from_url(str(payload.source_url))
     task_id = uuid4().hex[:12]
@@ -99,17 +137,15 @@ def create_task(
     )
 
 
-@router.get("", response_model=TaskListResponse)
+@api_router.get("/tasks", response_model=TaskListResponse)
 def list_tasks(
     db: Session = Depends(get_db),
     account_id: Optional[str] = Query(default=None),
     status: Optional[str] = Query(default=None),
     page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=1, le=100),
+    page_size: int = Query(default=20, ge=1, le=500, alias="limit"),
 ):
-    """
-    List tasks with optional filtering by account or status.
-    """
+    """List tasks with optional filtering by account or status."""
 
     query = db.query(models.Task)
 
@@ -146,6 +182,7 @@ def list_tasks(
                 last_step=t.last_step,
                 duration_sec=t.duration_sec,
                 thumb_url=t.thumb_url,
+                pack_path=t.pack_path,
                 created_at=t.created_at,
                 error_message=t.error_message,
                 error_reason=t.error_reason,
@@ -155,11 +192,9 @@ def list_tasks(
     return TaskListResponse(items=summaries, page=page, page_size=page_size, total=total)
 
 
-@router.get("/{task_id}", response_model=TaskDetail)
+@api_router.get("/tasks/{task_id}", response_model=TaskDetail)
 def get_task(task_id: str, db: Session = Depends(get_db)):
-    """
-    Retrieve a single task by id.
-    """
+    """Retrieve a single task by id."""
 
     t = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not t:
@@ -189,3 +224,9 @@ def get_task(task_id: str, db: Session = Depends(get_db)):
         error_message=t.error_message,
         error_reason=t.error_reason,
     )
+
+
+# Backwards-compatible export for existing imports
+router = api_router
+
+__all__ = ["api_router", "pages_router", "router"]
