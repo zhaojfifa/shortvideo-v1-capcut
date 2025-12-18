@@ -2,6 +2,13 @@ from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+
+# Reuse the HTML pages router defined for task views under gateway.routes.tasks
+# so /tasks and related pages remain available when this module is included.
+try:  # pragma: no cover - defensive import for runtime wiring
+    from gateway.routes import tasks as routes_tasks
+except Exception:  # pragma: no cover
+    routes_tasks = None
 from sqlalchemy.orm import Session
 
 from .. import models
@@ -10,6 +17,12 @@ from ..schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary
 from ..services.pipeline_v1 import run_pipeline_background
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
+# If the routes.tasks module is available, expose its pages_router to satisfy
+# `app.include_router(tasks_router.pages_router)` wiring in the main app.
+if routes_tasks and hasattr(routes_tasks, "pages_router"):
+    pages_router = routes_tasks.pages_router
+else:  # Fallback to an empty APIRouter to avoid attribute errors at startup.
+    pages_router = APIRouter()
 
 
 def _infer_platform_from_url(url: str) -> Optional[str]:
