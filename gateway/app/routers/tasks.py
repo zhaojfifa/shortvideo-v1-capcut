@@ -9,10 +9,18 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from .. import models
 from ..db import get_db
 from ..schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary
 from ..services.pipeline_v1 import run_pipeline_background
+from ..core.workspace import (
+    Workspace,
+    origin_srt_path,
+    pack_zip_path,
+    relative_to_workspace,
+    translated_srt_path,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -78,6 +86,116 @@ async def tasks_new(request: Request) -> HTMLResponse:
     )
 
 
+def _resolve_paths(task: models.Task) -> dict[str, Optional[str]]:
+    workspace = Workspace(task.id)
+
+    # Prefer stored DB paths; otherwise expose workspace-relative paths if files exist.
+    raw_video = task.raw_path or None
+    if not raw_video and workspace.raw.exists():
+        raw_video = relative_to_workspace(workspace.raw)
+
+    origin_srt = translated_srt = None
+    if hasattr(task, "origin_srt_path"):
+        origin_srt = task.origin_srt_path
+    if hasattr(task, "mm_srt_path"):
+        translated_srt = task.mm_srt_path
+
+    # Fall back to workspace artifacts when present.
+    if not origin_srt:
+        path = origin_srt_path(task.id)
+        if path.exists():
+            origin_srt = relative_to_workspace(path)
+    if not translated_srt:
+        path = workspace.mm_srt_path
+        if path.exists():
+            translated_srt = relative_to_workspace(path)
+
+    mm_audio = getattr(task, "mm_audio_path", None) or None
+    if not mm_audio and workspace.mm_audio_exists():
+        mm_audio = relative_to_workspace(workspace.mm_audio_path)
+
+    pack_path = task.pack_path or None
+    if not pack_path:
+        pack = pack_zip_path(task.id)
+        if pack.exists():
+            pack_path = relative_to_workspace(pack)
+
+    return {
+        "raw_path": raw_video,
+        "origin_srt_path": origin_srt,
+        "mm_srt_path": translated_srt,
+        "mm_audio_path": mm_audio,
+        "pack_path": pack_path,
+    }
+
+
+def _task_to_detail(task: models.Task) -> TaskDetail:
+    paths = _resolve_paths(task)
+
+    return TaskDetail(
+        task_id=task.id,
+        title=task.title,
+        source_url=str(task.source_url) if task.source_url else None,
+        platform=task.platform,
+        account_id=task.account_id,
+        account_name=task.account_name,
+        video_type=task.video_type,
+        template=task.template,
+        category_key=task.category_key or "beauty",
+        content_lang=task.content_lang or "my",
+        ui_lang=task.ui_lang or "en",
+        style_preset=task.style_preset,
+        face_swap_enabled=bool(task.face_swap_enabled),
+        status=task.status,
+        last_step=task.last_step,
+        duration_sec=task.duration_sec,
+        thumb_url=task.thumb_url,
+        raw_path=paths["raw_path"],
+        origin_srt_path=paths["origin_srt_path"],
+        mm_srt_path=paths["mm_srt_path"],
+        mm_audio_path=paths["mm_audio_path"],
+        pack_path=paths["pack_path"],
+        created_at=task.created_at,
+        error_message=task.error_message,
+        error_reason=task.error_reason,
+    )
+
+
+@pages_router.get("/tasks/{task_id}", response_class=HTMLResponse)
+async def task_workbench_page(
+    request: Request, task_id: str, db: Session = Depends(get_db)
+) -> HTMLResponse:
+    """Render the per-task workbench page."""
+
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        return templates.TemplateResponse(
+            "task_not_found.html",
+            {"request": request, "task_id": task_id},
+            status_code=404,
+        )
+
+    app_settings = get_settings()
+    env_summary = {
+        "workspace_root": app_settings.workspace_root,
+        "douyin_api_base": getattr(app_settings, "douyin_api_base", ""),
+        "whisper_model": getattr(app_settings, "whisper_model", ""),
+        "gpt_model": getattr(app_settings, "gpt_model", ""),
+        "asr_backend": getattr(app_settings, "asr_backend", None) or "whisper",
+        "subtitles_backend": getattr(app_settings, "subtitles_backend", "gemini"),
+        "gemini_model": getattr(app_settings, "gemini_model", ""),
+    }
+
+    return templates.TemplateResponse(
+        "task_workbench.html",
+        {
+            "request": request,
+            "task": _task_to_detail(task),
+            "env_summary": env_summary,
+        },
+    )
+
+
 @api_router.post("/tasks", response_model=TaskDetail)
 def create_task(
     payload: TaskCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
@@ -111,30 +229,7 @@ def create_task(
 
     background_tasks.add_task(run_pipeline_background, db_task.id)
 
-    return TaskDetail(
-        task_id=db_task.id,
-        title=db_task.title,
-        platform=db_task.platform,
-        account_id=db_task.account_id,
-        account_name=db_task.account_name,
-        video_type=db_task.video_type,
-        template=db_task.template,
-        category_key=db_task.category_key or "beauty",
-        content_lang=db_task.content_lang or "my",
-        ui_lang=db_task.ui_lang or "en",
-        style_preset=db_task.style_preset,
-        face_swap_enabled=bool(db_task.face_swap_enabled),
-        status=db_task.status,
-        last_step=db_task.last_step,
-        duration_sec=db_task.duration_sec,
-        thumb_url=db_task.thumb_url,
-        raw_path=db_task.raw_path,
-        mm_audio_path=db_task.mm_audio_path,
-        pack_path=db_task.pack_path,
-        created_at=db_task.created_at,
-        error_message=db_task.error_message,
-        error_reason=db_task.error_reason,
-    )
+    return _task_to_detail(db_task)
 
 
 @api_router.get("/tasks", response_model=TaskListResponse)
@@ -168,6 +263,7 @@ def list_tasks(
             TaskSummary(
                 task_id=t.id,
                 title=t.title,
+                source_url=str(t.source_url) if t.source_url else None,
                 platform=t.platform,
                 account_id=t.account_id,
                 account_name=t.account_name,
@@ -200,30 +296,7 @@ def get_task(task_id: str, db: Session = Depends(get_db)):
     if not t:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    return TaskDetail(
-        task_id=t.id,
-        title=t.title,
-        platform=t.platform,
-        account_id=t.account_id,
-        account_name=t.account_name,
-        video_type=t.video_type,
-        template=t.template,
-        category_key=t.category_key or "beauty",
-        content_lang=t.content_lang or "my",
-        ui_lang=t.ui_lang or "en",
-        style_preset=t.style_preset,
-        face_swap_enabled=bool(t.face_swap_enabled),
-        status=t.status,
-        last_step=t.last_step,
-        duration_sec=t.duration_sec,
-        thumb_url=t.thumb_url,
-        raw_path=t.raw_path,
-        mm_audio_path=t.mm_audio_path,
-        pack_path=t.pack_path,
-        created_at=t.created_at,
-        error_message=t.error_message,
-        error_reason=t.error_reason,
-    )
+    return _task_to_detail(t)
 
 
 # Backwards-compatible export for existing imports
