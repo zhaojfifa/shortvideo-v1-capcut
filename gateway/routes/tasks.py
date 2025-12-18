@@ -231,3 +231,4 @@ def get_task(task_id: str, db: Session = Depends(get_db)):
 
 # Backward-compatible default router reference for main include
 router = api_router
+__all__ = ["router", "pages_router", "api_router"]
