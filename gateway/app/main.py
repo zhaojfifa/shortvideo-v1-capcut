@@ -26,6 +26,7 @@ from gateway.app.services.steps_v1 import (
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 templates = Jinja2Templates(directory="gateway/app/templates")
 logger = logging.getLogger(__name__)
+tasks_html_path = Path(__file__).resolve().parent / "static" / "tasks.html"
 
 
 @app.on_event("startup")
