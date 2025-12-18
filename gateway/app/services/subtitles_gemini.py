@@ -92,7 +92,7 @@ async def generate_with_gemini(
     if not isinstance(segments, list):
         segments = []
 
-    subs_dir().mkdir(parents=True, exist_ok=True)
+    subs_dir(task_id).mkdir(parents=True, exist_ok=True)
 
     origin_path = origin_srt_path(task_id)
     mm_path = translated_srt_path(task_id, "mm")

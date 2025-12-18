@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Task Board · ShortVideo</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #f3f4f6;
+      color: #0f172a;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page { max-width: 1200px; margin: 0 auto; }
+    .card {
+      background: #ffffff;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      padding: 16px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    h1 { margin: 0; font-size: 1.5rem; font-weight: 700; color: #0f172a; }
+    .subhead { margin: 4px 0 0; color: #6b7280; font-size: 0.95rem; }
+    .btn-primary {
+      background: #2563eb;
+      color: #ffffff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 0.95rem;
+      display: inline-block;
+    }
+    .btn-primary:hover { background: #1d4ed8; }
+    .table-wrapper { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    thead { background: #f9fafb; color: #475569; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+    th { font-weight: 700; font-size: 0.9rem; }
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .muted { color: #6b7280; font-size: 0.95rem; }
+    .badge { padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; display: inline-block; }
+    .badge-ready { background: #dcfce7; color: #15803d; }
+    .badge-processing { background: #fef3c7; color: #b45309; }
+    .badge-error { background: #fee2e2; color: #b91c1c; }
+    .badge-unknown { background: #e5e7eb; color: #374151; }
+    .truncate { max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .empty { padding: 12px 0; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <div class="header">
+        <div>
+          <h1>Task Board</h1>
+          <p class="subhead">Loaded {{ tasks | length }} task{{ "s" if (tasks | length) != 1 else "" }}.</p>
+        </div>
+        <a class="btn-primary" href="/tasks/new">New suitcase task</a>
+      </div>
+
+      {% if not tasks %}
+        <div class="empty muted">No tasks yet.</div>
+      {% else %}
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Platform</th>
+                <th>Source</th>
+                <th>Title</th>
+                <th>Category</th>
+                <th>Lang</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Pack</th>
+                <th>Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in tasks %}
+                {% set status = t.status or "unknown" %}
+                {% if status == "ready" %}
+                  {% set badge = "badge badge-ready" %}
+                {% elif status == "processing" %}
+                  {% set badge = "badge badge-processing" %}
+                {% elif status == "error" %}
+                  {% set badge = "badge badge-error" %}
+                {% else %}
+                  {% set badge = "badge badge-unknown" %}
+                {% endif %}
+
+                {% set cat_key = t.category_key or "-" %}
+                {% if cat_key == "suitcase" %}
+                  {% set cat_label = "Suitcase" %}
+                {% elif cat_key == "beauty" %}
+                  {% set cat_label = "Beauty" %}
+                {% else %}
+                  {% set cat_label = cat_key %}
+                {% endif %}
+
+                {% set lang_key = t.content_lang or "-" %}
+                {% if lang_key == "mm" %}
+                  {% set lang_label = "MM" %}
+                {% elif lang_key == "en" %}
+                  {% set lang_label = "EN" %}
+                {% elif lang_key == "zh" %}
+                  {% set lang_label = "ZH" %}
+                {% else %}
+                  {% set lang_label = lang_key %}
+                {% endif %}
+
+                <tr>
+                  <td class="truncate" title="{{ t.task_id }}">{{ t.task_id }}</td>
+                  <td>{{ t.platform or "" }}</td>
+                  <td class="truncate" title="{{ t.source_url }}">
+                    {% if t.source_url %}
+                      <a href="{{ t.source_url }}" target="_blank" rel="noopener">{{ t.source_url }}</a>
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                  <td class="truncate" title="{{ t.title }}">{{ t.title or "" }}</td>
+                  <td>{{ cat_label or "-" }}</td>
+                  <td>{{ lang_label or "-" }}</td>
+                  <td><span class="{{ badge }}">{{ status }}</span></td>
+                  <td>{{ t.created_at }}</td>
+                  <td>
+                    {% if t.pack_path and (t.ui_lang != "zh") %}
+                      <a href="/v1/tasks/{{ t.task_id }}/pack" target="_blank" rel="noopener">Download</a>
+                    {% else %}
+                      –
+                    {% endif %}
+                  </td>
+                  <td><a href="/api/tasks/{{ t.task_id }}" target="_blank" rel="noopener">JSON</a></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>
