@@ -37,6 +37,10 @@ tasks_html_path = Path(__file__).resolve().parent / "static" / "tasks.html"
 def on_startup() -> None:
     """Ensure database schema exists before serving traffic."""
 
+@app.on_event("startup")
+def on_startup() -> None:
+    """Ensure database schema exists before serving traffic."""
+
     Base.metadata.create_all(bind=engine)
     ensure_task_extra_columns(engine)
 
