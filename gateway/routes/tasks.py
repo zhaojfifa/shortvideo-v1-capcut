@@ -1,8 +1,6 @@
-"""Tasks API router and simple HTML task list."""
+"""Task API router and simple HTML task board page."""
 
-from typing import Optional
-from uuid import uuid4
-
+from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 
@@ -18,7 +16,9 @@ from gateway.app.services.pipeline_v1 import run_pipeline_background
 
 api_router = APIRouter(prefix="/tasks")
 pages_router = APIRouter()
-templates = Jinja2Templates(directory="gateway/templates")
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 
 
 def _infer_platform_from_url(url: str) -> Optional[str]:
@@ -35,21 +35,22 @@ def _infer_platform_from_url(url: str) -> Optional[str]:
 
 
 @pages_router.get("/tasks", response_class=HTMLResponse)
-def tasks_page(request: Request, db: Session = Depends(get_db)):
-    items = (
-        db.query(models.Task)
-        .order_by(models.Task.created_at.desc())
-        .limit(100)
-        .all()
+async def tasks_board_page(request: Request):
+    """Render the task board HTML; data will be fetched client-side from /api/tasks."""
+
+    return templates.TemplateResponse(
+        "tasks_board.html",
+        {"request": request},
     )
-    return templates.TemplateResponse("tasks_list.html", {"request": request, "tasks": items})
 
 
 @api_router.post("", response_model=TaskDetail)
 def create_task(
     payload: TaskCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ):
-    """Create a Task record and kick off the V1 pipeline asynchronously."""
+    """
+    Create a Task record and kick off the V1 pipeline asynchronously.
+    """
 
     platform = payload.platform or _infer_platform_from_url(str(payload.source_url))
     task_id = uuid4().hex[:12]
@@ -69,6 +70,8 @@ def create_task(
         style_preset=payload.style_preset,
         face_swap_enabled=bool(payload.face_swap_enabled),
         status="pending",
+        last_step=None,
+        error_message=None,
     )
     db.add(db_task)
     db.commit()
@@ -90,13 +93,15 @@ def create_task(
         style_preset=db_task.style_preset,
         face_swap_enabled=bool(db_task.face_swap_enabled),
         status=db_task.status,
+        last_step=db_task.last_step,
         duration_sec=db_task.duration_sec,
         thumb_url=db_task.thumb_url,
         raw_path=db_task.raw_path,
         mm_audio_path=db_task.mm_audio_path,
         pack_path=db_task.pack_path,
         created_at=db_task.created_at,
-        error_reason=getattr(db_task, "error_reason", None),
+        error_message=db_task.error_message,
+        error_reason=db_task.error_reason,
     )
 
 
@@ -106,9 +111,11 @@ def list_tasks(
     account_id: Optional[str] = Query(default=None),
     status: Optional[str] = Query(default=None),
     page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=1, le=100),
+    limit: int = Query(default=50, ge=1, le=500),
 ):
-    """List tasks with optional filtering by account or status."""
+    """
+    List tasks ordered by creation time (newest first) with an adjustable limit.
+    """
 
     query = db.query(models.Task)
 
@@ -120,8 +127,8 @@ def list_tasks(
     total = query.count()
     items = (
         query.order_by(models.Task.created_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
+        .offset((page - 1) * limit)
+        .limit(limit)
         .all()
     )
 
@@ -142,14 +149,16 @@ def list_tasks(
                 style_preset=t.style_preset,
                 face_swap_enabled=bool(t.face_swap_enabled),
                 status=t.status,
+                last_step=t.last_step,
                 duration_sec=t.duration_sec,
                 thumb_url=t.thumb_url,
                 created_at=t.created_at,
-                error_reason=getattr(t, "error_reason", None),
+                error_message=t.error_message,
+                error_reason=t.error_reason,
             )
         )
 
-    return TaskListResponse(items=summaries, page=page, page_size=page_size, total=total)
+    return TaskListResponse(items=summaries, page=page, page_size=limit, total=total)
 
 
 @api_router.get("/{task_id}", response_model=TaskDetail)
@@ -174,13 +183,15 @@ def get_task(task_id: str, db: Session = Depends(get_db)):
         style_preset=t.style_preset,
         face_swap_enabled=bool(t.face_swap_enabled),
         status=t.status,
+        last_step=t.last_step,
         duration_sec=t.duration_sec,
         thumb_url=t.thumb_url,
         raw_path=t.raw_path,
         mm_audio_path=t.mm_audio_path,
         pack_path=t.pack_path,
         created_at=t.created_at,
-        error_reason=getattr(t, "error_reason", None),
+        error_message=t.error_message,
+        error_reason=t.error_reason,
     )
 
 

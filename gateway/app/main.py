@@ -37,19 +37,17 @@ tasks_html_path = Path(__file__).resolve().parent / "static" / "tasks.html"
 def on_startup() -> None:
     """Ensure database schema exists before serving traffic."""
 
+    Base.metadata.create_all(bind=engine)
+    ensure_task_extra_columns(engine)
+
 @app.on_event("startup")
 def on_startup() -> None:
     """Ensure database schema exists before serving traffic."""
 
-    Base.metadata.create_all(bind=engine)
-    ensure_task_extra_columns(engine)
-
-    Base.metadata.create_all(bind=engine)
-    ensure_task_extra_columns(engine)
-
 app.include_router(tasks_router.router)
 
-app.include_router(tasks_router.router)
+    Base.metadata.create_all(bind=engine)
+    ensure_task_extra_columns(engine)
 
 @app.get("/ui", response_class=HTMLResponse)
 async def pipeline_lab():
