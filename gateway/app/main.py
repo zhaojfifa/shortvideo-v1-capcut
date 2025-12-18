@@ -1,11 +1,10 @@
 import logging
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
-from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 
-from gateway.app.config import get_settings
 from gateway.app.core.workspace import (
     Workspace,
     origin_srt_path,
@@ -23,8 +22,13 @@ from gateway.app.services.steps_v1 import (
     run_subtitles_step,
 )
 
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+ui_html_path = STATIC_DIR / "ui.html"
+tasks_html_path = STATIC_DIR / "tasks.html"
+
 app = FastAPI(title="ShortVideo Gateway", version="v1")
-templates = Jinja2Templates(directory="gateway/app/templates")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 logger = logging.getLogger(__name__)
 tasks_html_path = Path(__file__).resolve().parent / "static" / "tasks.html"
 
@@ -39,22 +43,21 @@ def on_startup() -> None:
 
 app.include_router(tasks_router.router)
 
+    Base.metadata.create_all(bind=engine)
+    ensure_task_extra_columns(engine)
 
 @app.get("/ui", response_class=HTMLResponse)
-async def pipeline_lab(request: Request):
-    settings = get_settings()
-    env_summary = {
-        "workspace_root": settings.workspace_root,
-        "douyin_api_base": getattr(settings, "douyin_api_base", ""),
-        "whisper_model": getattr(settings, "whisper_model", ""),
-        "gpt_model": getattr(settings, "gpt_model", ""),
-        "asr_backend": "whisper",
-        "subtitles_backend": "gemini",
-        "gemini_model": getattr(settings, "gemini_model", ""),
-    }
-    return templates.TemplateResponse(
-        "pipeline_lab.html", {"request": request, "env_summary": env_summary}
-    )
+async def pipeline_lab():
+    """Serve the dark pipeline lab page."""
+
+    return FileResponse(ui_html_path, media_type="text/html")
+
+
+@app.get("/tasks", response_class=HTMLResponse)
+async def tasks_page():
+    """Serve a minimal operator task list page backed by /api/tasks."""
+
+    return FileResponse(tasks_html_path, media_type="text/html")
 
 
 @app.get("/tasks", response_class=HTMLResponse)

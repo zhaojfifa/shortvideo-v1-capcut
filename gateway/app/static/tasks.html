@@ -3,95 +3,94 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>Task List · ShortVideo V1</title>
-  <style>
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f3f4f6; margin: 0; padding: 1rem; }
-    h1 { font-size: 1.25rem; margin-bottom: 1rem; }
-    .table-wrapper { overflow-x: auto; background: #ffffff; border-radius: 0.5rem; padding: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-    th, td { padding: 0.5rem; border-bottom: 1px solid #e5e7eb; text-align: left; }
-    th { background: #f9fafb; font-weight: 600; }
-    .status-badge { padding: 0.15rem 0.45rem; border-radius: 999px; font-size: 0.75rem; color: #111827; display: inline-block; }
-    .status-pending { background: #fef3c7; }
-    .status-processing { background: #e5e7eb; }
-    .status-ready { background: #d1fae5; }
-    .status-error { background: #fee2e2; }
-    .small { font-size: 0.75rem; color: #6b7280; }
-    a { color: #2563eb; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-  </style>
+  <title>Task Board · ShortVideo V1</title>
+  <link rel="stylesheet" href="/static/app.css" />
 </head>
 <body>
-  <h1>Task List</h1>
-  <div id="message" class="small">Loading tasks…</div>
-  <div class="table-wrapper">
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Platform</th>
-          <th>Source</th>
-          <th>Title</th>
-          <th>Status</th>
-          <th>Created</th>
-          <th>Detail</th>
-        </tr>
-      </thead>
-      <tbody id="task-tbody">
-        <!-- rows injected here -->
-      </tbody>
-    </table>
+  <div class="page">
+    <main class="card">
+      <h1 style="margin-top:0;">Task Board</h1>
+      <div id="message" class="small" style="margin-bottom:8px;">Loading tasks…</div>
+      <div class="table-wrapper">
+        <table class="table-dark">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Platform</th>
+              <th>Source</th>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Pack</th>
+              <th>Detail</th>
+            </tr>
+          </thead>
+          <tbody id="task-tbody"></tbody>
+        </table>
+      </div>
+    </main>
   </div>
 
   <script>
-    async function loadTasks() {
-      const messageEl = document.getElementById("message");
+    function statusClass(status) {
+      return {
+        "pending": "status-pending",
+        "processing": "status-processing",
+        "ready": "status-ready",
+        "error": "status-error",
+      }[status] || "status-pending";
+    }
+
+    function shortText(text, limit = 48) {
+      if (!text) return "";
+      return text.length > limit ? text.slice(0, limit - 1) + "…" : text;
+    }
+
+    function renderTasks(tasks) {
       const tbody = document.getElementById("task-tbody");
       tbody.innerHTML = "";
+
+      for (const task of tasks) {
+        const tr = document.createElement("tr");
+        const status = task.status || "pending";
+        const packLink = status === "ready"
+          ? `<a class="small" href="/v1/tasks/${encodeURIComponent(task.task_id || "")}/pack">Download</a>`
+          : "–";
+
+        tr.innerHTML = `
+          <td>${task.task_id || ""}</td>
+          <td>${task.platform || ""}</td>
+          <td title="${task.source_url || ""}">${shortText(task.source_url)}</td>
+          <td>${shortText(task.title, 32)}</td>
+          <td><span class="status-badge ${statusClass(status)}">${status}</span></td>
+          <td><span class="small">${task.created_at || ""}</span></td>
+          <td>${packLink}</td>
+          <td><a class="small" href="/api/tasks/${encodeURIComponent(task.task_id || "")}" target="_blank">JSON</a></td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    async function loadTasks() {
+      const messageEl = document.getElementById("message");
       messageEl.textContent = "Loading tasks…";
 
       try {
         const res = await fetch("/api/tasks");
         if (!res.ok) {
-          throw new Error("HTTP " + res.status);
+          throw new Error(`HTTP ${res.status}`);
         }
         const data = await res.json();
         const tasks = Array.isArray(data) ? data : (data.items || []);
 
         if (!tasks.length) {
           messageEl.textContent = "No tasks yet.";
+          renderTasks([]);
           return;
         }
 
         messageEl.textContent = `Loaded ${tasks.length} task${tasks.length > 1 ? "s" : ""}.`;
-
-        for (const task of tasks) {
-          const tr = document.createElement("tr");
-          const shortSource = (task.source_url || "").length > 40
-            ? task.source_url.slice(0, 37) + "…"
-            : (task.source_url || "");
-
-          const status = task.status || "pending";
-          const statusClass = {
-            "pending": "status-pending",
-            "processing": "status-processing",
-            "ready": "status-ready",
-            "error": "status-error",
-          }[status] || "status-pending";
-
-          const createdAt = task.created_at || "";
-
-          tr.innerHTML = `
-            <td>${task.task_id || ""}</td>
-            <td>${task.platform || ""}</td>
-            <td title="${task.source_url || ""}">${shortSource}</td>
-            <td>${task.title || ""}</td>
-            <td><span class="status-badge ${statusClass}">${status}</span></td>
-            <td><span class="small">${createdAt}</span></td>
-            <td><a class="small" href="/api/tasks/${encodeURIComponent(task.task_id || "")}" target="_blank">JSON</a></td>
-          `;
-          tbody.appendChild(tr);
-        }
+        renderTasks(tasks);
       } catch (err) {
         console.error(err);
         messageEl.textContent = "Failed to load tasks: " + err.message;
