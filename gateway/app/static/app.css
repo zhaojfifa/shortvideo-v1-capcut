@@ -1,0 +1,112 @@
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background-color: #0B1120;
+    color: #E5E7EB;
+}
+
+.page {
+    min-height: 100vh;
+    background: radial-gradient(circle at top, #1F2937 0, #020617 60%);
+    padding: 24px 16px 40px;
+}
+
+.card {
+    background-color: rgba(15, 23, 42, 0.9);
+    border-radius: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    padding: 16px;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.table-dark {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.table-dark th,
+.table-dark td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.table-dark th {
+    background: rgba(255, 255, 255, 0.04);
+    text-align: left;
+}
+
+.small {
+    font-size: 0.8rem;
+    color: #9CA3AF;
+}
+
+.status-badge {
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    color: #0B1120;
+    display: inline-block;
+}
+
+.status-pending { background: #fef3c7; }
+.status-processing { background: #e5e7eb; }
+.status-ready { background: #d1fae5; }
+.status-error { background: #fee2e2; }
+
+.button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+button {
+    background: linear-gradient(135deg, #1D4ED8, #2563EB);
+    color: #fff;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    box-shadow: 0 10px 20px rgba(37, 99, 235, 0.35);
+}
+
+button:hover {
+    background: linear-gradient(135deg, #2563EB, #1D4ED8);
+}
+
+input, select, textarea {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: #E5E7EB;
+    border-radius: 10px;
+    padding: 8px 10px;
+}
+
+label { color: #E5E7EB; }
+
+a { color: #93C5FD; }
+a:hover { color: #BFDBFE; }
+
+pre {
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 12px;
+    padding: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    color: #E5E7EB;
+}
+
+.section-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+}
