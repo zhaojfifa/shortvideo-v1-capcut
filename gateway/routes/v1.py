@@ -1,6 +1,6 @@
-import logging
+"""V1 routes exposing parse/subtitles/dub/pack and related assets."""
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -12,8 +12,6 @@ from gateway.app.core.workspace import (
     raw_path,
     translated_srt_path,
 )
-from gateway.app.db import Base, engine, ensure_task_extra_columns
-from gateway.app.routers import tasks as tasks_router
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
 from gateway.app.services.steps_v1 import (
     run_dub_step,
@@ -22,23 +20,11 @@ from gateway.app.services.steps_v1 import (
     run_subtitles_step,
 )
 
-app = FastAPI(title="ShortVideo Gateway", version="v1")
+router = APIRouter()
 templates = Jinja2Templates(directory="gateway/app/templates")
-logger = logging.getLogger(__name__)
 
 
-@app.on_event("startup")
-def on_startup() -> None:
-    """Ensure database schema exists before serving traffic."""
-
-    Base.metadata.create_all(bind=engine)
-    ensure_task_extra_columns(engine)
-
-
-app.include_router(tasks_router.router)
-
-
-@app.get("/ui", response_class=HTMLResponse)
+@router.get("/ui", response_class=HTMLResponse)
 async def pipeline_lab(request: Request):
     settings = get_settings()
     env_summary = {
@@ -46,8 +32,9 @@ async def pipeline_lab(request: Request):
         "douyin_api_base": getattr(settings, "douyin_api_base", ""),
         "whisper_model": getattr(settings, "whisper_model", ""),
         "gpt_model": getattr(settings, "gpt_model", ""),
-        "asr_backend": "whisper",
-        "subtitles_backend": "gemini",
+        "asr_backend": getattr(settings, "asr_backend", None) or "whisper",
+        "subtitles_backend": getattr(settings, "subtitles_backend", None)
+        or "gemini",
         "gemini_model": getattr(settings, "gemini_model", ""),
     }
     return templates.TemplateResponse(
@@ -55,19 +42,12 @@ async def pipeline_lab(request: Request):
     )
 
 
-@app.get("/tasks", response_class=HTMLResponse)
-async def tasks_page(request: Request):
-    """Serve a minimal operator task list page backed by /api/tasks."""
-
-    return templates.TemplateResponse("tasks.html", {"request": request})
-
-
-@app.post("/v1/parse")
+@router.post("/parse")
 async def parse(request: ParseRequest):
     return await run_parse_step(request)
 
 
-@app.get("/v1/tasks/{task_id}/raw")
+@router.get("/tasks/{task_id}/raw")
 async def get_raw(task_id: str):
     path = raw_path(task_id)
     if not path.exists():
@@ -75,12 +55,12 @@ async def get_raw(task_id: str):
     return FileResponse(path, media_type="video/mp4", filename=f"{task_id}.mp4")
 
 
-@app.post("/v1/subtitles")
+@router.post("/subtitles")
 async def subtitles(request: SubtitlesRequest):
     return await run_subtitles_step(request)
 
 
-@app.get("/v1/tasks/{task_id}/subs_origin")
+@router.get("/tasks/{task_id}/subs_origin")
 async def get_origin_subs(task_id: str):
     origin = origin_srt_path(task_id)
     if not origin.exists():
@@ -88,7 +68,7 @@ async def get_origin_subs(task_id: str):
     return FileResponse(origin, media_type="text/plain", filename=f"{task_id}_origin.srt")
 
 
-@app.get("/v1/tasks/{task_id}/subs_mm")
+@router.get("/tasks/{task_id}/subs_mm")
 async def get_mm_subs(task_id: str):
     subs = translated_srt_path(task_id, "my")
     if not subs.exists():
@@ -98,12 +78,12 @@ async def get_mm_subs(task_id: str):
     return FileResponse(subs, media_type="text/plain", filename=subs.name)
 
 
-@app.post("/v1/dub")
+@router.post("/dub")
 async def dub(request: DubRequest):
     return await run_dub_step(request)
 
 
-@app.get("/v1/tasks/{task_id}/audio_mm")
+@router.get("/tasks/{task_id}/audio_mm")
 async def get_audio(task_id: str):
     workspace = Workspace(task_id)
     audio = workspace.mm_audio_path
@@ -112,12 +92,12 @@ async def get_audio(task_id: str):
     return FileResponse(audio, media_type=workspace.mm_audio_media_type(), filename=audio.name)
 
 
-@app.post("/v1/pack")
+@router.post("/pack")
 async def pack(request: PackRequest):
     return await run_pack_step(request)
 
 
-@app.get("/v1/tasks/{task_id}/pack")
+@router.get("/tasks/{task_id}/pack")
 async def download_pack(task_id: str):
     pack_file = pack_zip_path(task_id)
     if not pack_file.exists():

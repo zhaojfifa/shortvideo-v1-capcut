@@ -1,0 +1,188 @@
+"""Tasks API router and simple HTML task list."""
+
+from typing import Optional
+from uuid import uuid4
+
+from typing import Optional
+from uuid import uuid4
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
+
+from gateway.app import models
+from gateway.app.db import get_db
+from gateway.app.schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary
+from gateway.app.services.pipeline_v1 import run_pipeline_background
+
+api_router = APIRouter(prefix="/tasks")
+pages_router = APIRouter()
+templates = Jinja2Templates(directory="gateway/templates")
+
+
+def _infer_platform_from_url(url: str) -> Optional[str]:
+    url_lower = url.lower()
+    if "douyin.com" in url_lower:
+        return "douyin"
+    if "tiktok.com" in url_lower:
+        return "tiktok"
+    if "xiaohongshu.com" in url_lower or "xhslink.com" in url_lower:
+        return "xhs"
+    if "facebook.com" in url_lower or "fb.watch" in url_lower:
+        return "facebook"
+    return None
+
+
+@pages_router.get("/tasks", response_class=HTMLResponse)
+def tasks_page(request: Request, db: Session = Depends(get_db)):
+    items = (
+        db.query(models.Task)
+        .order_by(models.Task.created_at.desc())
+        .limit(100)
+        .all()
+    )
+    return templates.TemplateResponse("tasks_list.html", {"request": request, "tasks": items})
+
+
+@api_router.post("", response_model=TaskDetail)
+def create_task(
+    payload: TaskCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+):
+    """Create a Task record and kick off the V1 pipeline asynchronously."""
+
+    platform = payload.platform or _infer_platform_from_url(str(payload.source_url))
+    task_id = uuid4().hex[:12]
+
+    db_task = models.Task(
+        id=task_id,
+        title=payload.title,
+        source_url=str(payload.source_url),
+        platform=platform,
+        account_id=payload.account_id,
+        account_name=payload.account_name,
+        video_type=payload.video_type,
+        template=payload.template,
+        category_key=payload.category_key or "beauty",
+        content_lang=payload.content_lang or "my",
+        ui_lang=payload.ui_lang or "en",
+        style_preset=payload.style_preset,
+        face_swap_enabled=bool(payload.face_swap_enabled),
+        status="pending",
+    )
+    db.add(db_task)
+    db.commit()
+    db.refresh(db_task)
+
+    background_tasks.add_task(run_pipeline_background, db_task.id)
+
+    return TaskDetail(
+        task_id=db_task.id,
+        title=db_task.title,
+        platform=db_task.platform,
+        account_id=db_task.account_id,
+        account_name=db_task.account_name,
+        video_type=db_task.video_type,
+        template=db_task.template,
+        category_key=db_task.category_key or "beauty",
+        content_lang=db_task.content_lang or "my",
+        ui_lang=db_task.ui_lang or "en",
+        style_preset=db_task.style_preset,
+        face_swap_enabled=bool(db_task.face_swap_enabled),
+        status=db_task.status,
+        duration_sec=db_task.duration_sec,
+        thumb_url=db_task.thumb_url,
+        raw_path=db_task.raw_path,
+        mm_audio_path=db_task.mm_audio_path,
+        pack_path=db_task.pack_path,
+        created_at=db_task.created_at,
+        error_reason=getattr(db_task, "error_reason", None),
+    )
+
+
+@api_router.get("", response_model=TaskListResponse)
+def list_tasks(
+    db: Session = Depends(get_db),
+    account_id: Optional[str] = Query(default=None),
+    status: Optional[str] = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+):
+    """List tasks with optional filtering by account or status."""
+
+    query = db.query(models.Task)
+
+    if account_id:
+        query = query.filter(models.Task.account_id == account_id)
+    if status:
+        query = query.filter(models.Task.status == status)
+
+    total = query.count()
+    items = (
+        query.order_by(models.Task.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    summaries: list[TaskSummary] = []
+    for t in items:
+        summaries.append(
+            TaskSummary(
+                task_id=t.id,
+                title=t.title,
+                platform=t.platform,
+                account_id=t.account_id,
+                account_name=t.account_name,
+                video_type=t.video_type,
+                template=t.template,
+                category_key=t.category_key or "beauty",
+                content_lang=t.content_lang or "my",
+                ui_lang=t.ui_lang or "en",
+                style_preset=t.style_preset,
+                face_swap_enabled=bool(t.face_swap_enabled),
+                status=t.status,
+                duration_sec=t.duration_sec,
+                thumb_url=t.thumb_url,
+                created_at=t.created_at,
+                error_reason=getattr(t, "error_reason", None),
+            )
+        )
+
+    return TaskListResponse(items=summaries, page=page, page_size=page_size, total=total)
+
+
+@api_router.get("/{task_id}", response_model=TaskDetail)
+def get_task(task_id: str, db: Session = Depends(get_db)):
+    """Retrieve a single task by id."""
+
+    t = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return TaskDetail(
+        task_id=t.id,
+        title=t.title,
+        platform=t.platform,
+        account_id=t.account_id,
+        account_name=t.account_name,
+        video_type=t.video_type,
+        template=t.template,
+        category_key=t.category_key or "beauty",
+        content_lang=t.content_lang or "my",
+        ui_lang=t.ui_lang or "en",
+        style_preset=t.style_preset,
+        face_swap_enabled=bool(t.face_swap_enabled),
+        status=t.status,
+        duration_sec=t.duration_sec,
+        thumb_url=t.thumb_url,
+        raw_path=t.raw_path,
+        mm_audio_path=t.mm_audio_path,
+        pack_path=t.pack_path,
+        created_at=t.created_at,
+        error_reason=getattr(t, "error_reason", None),
+    )
+
+
+# Backward-compatible default router reference for main include
+router = api_router

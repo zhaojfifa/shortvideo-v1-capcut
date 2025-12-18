@@ -6,7 +6,9 @@ and saves the raw video into the workspace.
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import HTTPException
@@ -18,15 +20,41 @@ from gateway.app.services.download import DownloadError, download_raw_video
 logger = logging.getLogger(__name__)
 
 
+def _validate_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError(f"Invalid video URL: {url}")
+    return url
+
+
+def detect_platform(url: str, explicit: Optional[str] = None) -> str:
+    if explicit and explicit != "auto":
+        return explicit
+
+    lowered = url.lower()
+    if "douyin.com" in lowered:
+        return "douyin"
+    if "xiaohongshu.com" in lowered or "xhslink.com" in lowered:
+        return "xhs"
+
+    raise ValueError(f"Cannot detect platform from url: {url}")
+
+
 async def parse_douyin_video(task_id: str, link: str) -> Dict[str, Any]:
     """Parse a Douyin link, download the raw video, and return normalized data."""
 
+    try:
+        normalized_link = _validate_url(link)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     logger.debug(
-        "Calling Douyin parser", extra={"task_id": task_id, "link": link}
+        "Calling Douyin parser",
+        extra={"task_id": task_id, "link": normalized_link},
     )
 
     try:
-        parsed = await parse_with_xiongmao(link)
+        parsed = await parse_with_xiongmao(normalized_link)
     except httpx.HTTPError as exc:  # pragma: no cover - network dependent
         logger.exception("Douyin parse failed for %s", link)
         raise HTTPException(status_code=502, detail=f"Douyin parse failed: {exc}") from exc
