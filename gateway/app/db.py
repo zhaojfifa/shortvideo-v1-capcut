@@ -43,6 +43,12 @@ def ensure_task_extra_columns(engine) -> None:
         alter_statements.append(
             "ALTER TABLE tasks ADD COLUMN face_swap_enabled BOOLEAN DEFAULT 0"
         )
+    if "last_step" not in columns:
+        alter_statements.append(
+            "ALTER TABLE tasks ADD COLUMN last_step VARCHAR(32)"
+        )
+    if "error_message" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN error_message TEXT")
     if "error_reason" not in columns:
         alter_statements.append(
             "ALTER TABLE tasks ADD COLUMN error_reason TEXT"

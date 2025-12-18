@@ -51,6 +51,8 @@ def create_task(
         style_preset=payload.style_preset,
         face_swap_enabled=bool(payload.face_swap_enabled),
         status="pending",
+        last_step=None,
+        error_message=None,
     )
     db.add(db_task)
     db.commit()
@@ -72,12 +74,15 @@ def create_task(
         style_preset=db_task.style_preset,
         face_swap_enabled=bool(db_task.face_swap_enabled),
         status=db_task.status,
+        last_step=db_task.last_step,
         duration_sec=db_task.duration_sec,
         thumb_url=db_task.thumb_url,
         raw_path=db_task.raw_path,
         mm_audio_path=db_task.mm_audio_path,
         pack_path=db_task.pack_path,
         created_at=db_task.created_at,
+        error_message=db_task.error_message,
+        error_reason=db_task.error_reason,
     )
 
 
@@ -125,9 +130,12 @@ def list_tasks(
                 style_preset=t.style_preset,
                 face_swap_enabled=bool(t.face_swap_enabled),
                 status=t.status,
+                last_step=t.last_step,
                 duration_sec=t.duration_sec,
                 thumb_url=t.thumb_url,
                 created_at=t.created_at,
+                error_message=t.error_message,
+                error_reason=t.error_reason,
             )
         )
 
@@ -158,10 +166,13 @@ def get_task(task_id: str, db: Session = Depends(get_db)):
         style_preset=t.style_preset,
         face_swap_enabled=bool(t.face_swap_enabled),
         status=t.status,
+        last_step=t.last_step,
         duration_sec=t.duration_sec,
         thumb_url=t.thumb_url,
         raw_path=t.raw_path,
         mm_audio_path=t.mm_audio_path,
         pack_path=t.pack_path,
         created_at=t.created_at,
+        error_message=t.error_message,
+        error_reason=t.error_reason,
     )

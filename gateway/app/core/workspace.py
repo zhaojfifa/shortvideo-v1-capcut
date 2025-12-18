@@ -4,6 +4,32 @@ from pathlib import Path
 from gateway.app.config import get_settings
 
 
+def task_base_dir(task_id: str) -> Path:
+    """Return the base directory for a specific task under workspace_root/tasks/<task_id>."""
+
+    base = workspace_root() / "tasks" / task_id
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def get_task_workspace(task_id: str) -> dict[str, Path]:
+    """Materialize and return common per-task workspace paths."""
+
+    base = task_base_dir(task_id)
+    paths = {
+        "base": base,
+        "raw": base / "raw",
+        "subs": base / "subs",
+        "audio": base / "audio",
+        "pack": base / "pack",
+    }
+
+    for p in paths.values():
+        p.mkdir(parents=True, exist_ok=True)
+
+    return paths
+
+
 class Workspace:
     """Workspace helper for resolving per-task subtitle artifacts."""
 
@@ -12,7 +38,7 @@ class Workspace:
 
     @property
     def base_dir(self) -> Path:
-        return workspace_root()
+        return task_base_dir(self.task_id)
 
     # Paths
     @property
@@ -67,7 +93,7 @@ class Workspace:
 
     @property
     def subtitles_dir(self) -> Path:
-        return subs_dir()
+        return subs_dir(self.task_id)
 
     @property
     def segments_json(self) -> Path:
@@ -97,11 +123,11 @@ class Workspace:
     # Audio helpers
     @property
     def mm_audio_primary_path(self) -> Path:
-        return audio_dir() / f"{self.task_id}_mm.wav"
+        return audio_dir(self.task_id) / f"{self.task_id}_mm.wav"
 
     @property
     def mm_audio_mp3_path(self) -> Path:
-        return audio_dir() / f"{self.task_id}_mm.mp3"
+        return audio_dir(self.task_id) / f"{self.task_id}_mm.mp3"
 
     @property
     def mm_audio_legacy_path(self) -> Path:
@@ -125,9 +151,9 @@ class Workspace:
         )
 
     def write_mm_audio(self, content: bytes, suffix: str = "wav") -> Path:
-        audio_dir().mkdir(parents=True, exist_ok=True)
+        audio_dir(self.task_id).mkdir(parents=True, exist_ok=True)
         suffix = suffix.lstrip(".") or "wav"
-        path = audio_dir() / f"{self.task_id}_mm.{suffix}"
+        path = audio_dir(self.task_id) / f"{self.task_id}_mm.{suffix}"
         path.write_bytes(content)
         return path
 
@@ -156,37 +182,31 @@ def workspace_root() -> Path:
 
 
 def raw_path(task_id: str) -> Path:
-    path = workspace_root() / "raw" / f"{task_id}.mp4"
+    path = task_base_dir(task_id) / "raw" / f"{task_id}.mp4"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def subs_dir() -> Path:
-    path = workspace_root() / "edits" / "subs"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def scenes_dir() -> Path:
-    path = workspace_root() / "edits" / "scenes"
+def subs_dir(task_id: str) -> Path:
+    path = task_base_dir(task_id) / "subs"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def scenes_json_path(task_id: str) -> Path:
-    path = scenes_dir() / f"{task_id}_scenes.json"
+    path = subs_dir(task_id) / f"{task_id}_scenes.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def segments_json_path(task_id: str) -> Path:
-    path = scenes_dir() / f"{task_id}_segments.json"
+    path = subs_dir(task_id) / f"{task_id}_segments.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 
-def audio_dir() -> Path:
-    path = workspace_root() / "edits" / "audio"
+def audio_dir(task_id: str) -> Path:
+    path = task_base_dir(task_id) / "audio"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -203,8 +223,8 @@ def assets_dir() -> Path:
     return path
 
 
-def packs_dir() -> Path:
-    path = workspace_root() / "packs"
+def packs_dir(task_id: str) -> Path:
+    path = task_base_dir(task_id) / "pack"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -216,32 +236,32 @@ def tmp_dir() -> Path:
 
 
 def audio_wav_path(task_id: str) -> Path:
-    path = subs_dir() / f"{task_id}.wav"
+    path = subs_dir(task_id) / f"{task_id}.wav"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def origin_srt_path(task_id: str) -> Path:
-    path = subs_dir() / f"{task_id}_origin.srt"
+    path = subs_dir(task_id) / f"{task_id}_origin.srt"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def translated_srt_path(task_id: str, target_lang: str) -> Path:
     suffix = target_lang or "mm"
-    path = subs_dir() / f"{task_id}_{suffix}.srt"
+    path = subs_dir(task_id) / f"{task_id}_{suffix}.srt"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def dubbed_audio_path(task_id: str) -> Path:
-    path = audio_dir() / f"{task_id}_mm_vo.wav"
+    path = audio_dir(task_id) / f"{task_id}_mm_vo.wav"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def pack_zip_path(task_id: str) -> Path:
-    path = packs_dir() / f"{task_id}_capcut_pack.zip"
+    path = packs_dir(task_id) / f"{task_id}_capcut_pack.zip"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -249,5 +269,12 @@ def pack_zip_path(task_id: str) -> Path:
 def relative_to_workspace(path: Path) -> str:
     try:
         return str(path.resolve().relative_to(workspace_root()))
+    except ValueError:
+        return str(path)
+
+
+def relative_to_task_workspace(path: Path, task_id: str) -> str:
+    try:
+        return str(path.resolve().relative_to(task_base_dir(task_id)))
     except ValueError:
         return str(path)

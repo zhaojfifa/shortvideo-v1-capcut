@@ -73,10 +73,12 @@ class TaskSummary(BaseModel):
     style_preset: Optional[str] = None
     face_swap_enabled: bool
     status: str
+    last_step: Optional[str] = None
     duration_sec: Optional[int] = None
     thumb_url: Optional[str] = None
     created_at: datetime
     error_reason: Optional[str] = None
+    error_message: Optional[str] = None
 
     class Config:
         orm_mode = True
