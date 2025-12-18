@@ -29,6 +29,7 @@ UI_HTML_PATH = STATIC_DIR / "ui.html"
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 logger = logging.getLogger(__name__)
+tasks_html_path = Path(__file__).resolve().parent / "static" / "tasks.html"
 
 
 @app.on_event("startup")
@@ -37,10 +38,16 @@ def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
     ensure_task_extra_columns(engine)
 
+@app.on_event("startup")
+def on_startup() -> None:
+    """Ensure database schema exists before serving traffic."""
 
 app.include_router(tasks_router.router)
 app.include_router(tasks_router.pages_router)
 
+@app.get("/tasks", response_class=HTMLResponse)
+async def tasks_page():
+    """Serve a minimal operator task list page backed by /api/tasks."""
 
 @app.get("/ui", response_class=HTMLResponse)
 async def pipeline_lab():
