@@ -30,6 +30,7 @@ tasks_html_path = STATIC_DIR / "tasks.html"
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 logger = logging.getLogger(__name__)
+tasks_html_path = Path(__file__).resolve().parent / "static" / "tasks.html"
 
 
 @app.on_event("startup")
@@ -42,6 +43,8 @@ def on_startup() -> None:
 
 app.include_router(tasks_router.router)
 
+    Base.metadata.create_all(bind=engine)
+    ensure_task_extra_columns(engine)
 
 @app.get("/ui", response_class=HTMLResponse)
 async def pipeline_lab():
@@ -55,6 +58,13 @@ async def tasks_page():
     """Serve a minimal operator task list page backed by /api/tasks."""
 
     return FileResponse(tasks_html_path, media_type="text/html")
+
+
+@app.get("/tasks", response_class=HTMLResponse)
+async def tasks_page(request: Request):
+    """Serve a minimal operator task list page backed by /api/tasks."""
+
+    return templates.TemplateResponse("tasks.html", {"request": request})
 
 
 @app.post("/v1/parse")
