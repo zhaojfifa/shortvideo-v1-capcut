@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Task Board · ShortVideo V1</title>
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+  <div class="page">
+    <main class="card">
+      <h1 style="margin-top:0;">Task Board</h1>
+      <div id="message" class="small" style="margin-bottom:8px;">Loading tasks…</div>
+      <div class="table-wrapper">
+        <table class="table-dark">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Platform</th>
+              <th>Source</th>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Pack</th>
+              <th>Detail</th>
+            </tr>
+          </thead>
+          <tbody id="task-tbody"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function statusClass(status) {
+      return {
+        "pending": "status-pending",
+        "processing": "status-processing",
+        "ready": "status-ready",
+        "error": "status-error",
+      }[status] || "status-pending";
+    }
+
+    function shortText(text, limit = 48) {
+      if (!text) return "";
+      return text.length > limit ? text.slice(0, limit - 1) + "…" : text;
+    }
+
+    function renderTasks(tasks) {
+      const tbody = document.getElementById("task-tbody");
+      tbody.innerHTML = "";
+
+      for (const task of tasks) {
+        const tr = document.createElement("tr");
+        const status = task.status || "pending";
+        const packLink = status === "ready"
+          ? `<a class="small" href="/v1/tasks/${encodeURIComponent(task.task_id || "")}/pack">Download</a>`
+          : "–";
+
+        tr.innerHTML = `
+          <td>${task.task_id || ""}</td>
+          <td>${task.platform || ""}</td>
+          <td title="${task.source_url || ""}">${shortText(task.source_url)}</td>
+          <td>${shortText(task.title, 32)}</td>
+          <td><span class="status-badge ${statusClass(status)}">${status}</span></td>
+          <td><span class="small">${task.created_at || ""}</span></td>
+          <td>${packLink}</td>
+          <td><a class="small" href="/api/tasks/${encodeURIComponent(task.task_id || "")}" target="_blank">JSON</a></td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    async function loadTasks() {
+      const messageEl = document.getElementById("message");
+      messageEl.textContent = "Loading tasks…";
+
+      try {
+        const res = await fetch("/api/tasks");
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        const tasks = Array.isArray(data) ? data : (data.items || []);
+
+        if (!tasks.length) {
+          messageEl.textContent = "No tasks yet.";
+          renderTasks([]);
+          return;
+        }
+
+        messageEl.textContent = `Loaded ${tasks.length} task${tasks.length > 1 ? "s" : ""}.`;
+        renderTasks(tasks);
+      } catch (err) {
+        console.error(err);
+        messageEl.textContent = "Failed to load tasks: " + err.message;
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", loadTasks);
+  </script>
+</body>
+</html>

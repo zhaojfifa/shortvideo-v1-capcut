@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Task Board · ShortVideo</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f3f4f6;
+      color: #111827;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+    h1 { margin: 0; font-size: 1.25rem; font-weight: 700; }
+    .actions { display: flex; gap: 8px; }
+    button, .btn {
+      background: #2563eb;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    button:hover, .btn:hover { background: #1d4ed8; }
+    .card {
+      background: #ffffff;
+      border-radius: 10px;
+      padding: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px;
+      border-bottom: 1px solid #e5e7eb;
+      vertical-align: top;
+    }
+    th { background: #f9fafb; font-weight: 700; }
+    .small { color: #6b7280; font-size: 0.8rem; }
+    .status {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      display: inline-block;
+    }
+    .status-pending { background: #e0f2fe; color: #075985; }
+    .status-processing { background: #fef3c7; color: #92400e; }
+    .status-ready { background: #dcfce7; color: #065f46; }
+    .status-error { background: #fee2e2; color: #991b1b; }
+    .json-panel {
+      margin-top: 12px;
+      background: #ffffff;
+      border-radius: 10px;
+      padding: 10px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+      border: 1px solid #e5e7eb;
+    }
+    pre { overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Shortvideo Tasks</h1>
+    <div class="actions">
+      <a class="btn" href="/tasks/new">New suitcase task</a>
+      <button id="refresh-btn" type="button">刷新</button>
+    </div>
+  </header>
+
+  <div id="message" class="small">Loading tasks…</div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Title</th>
+          <th>Category</th>
+          <th>Lang</th>
+          <th>Platform</th>
+          <th>Account</th>
+          <th>Status</th>
+          <th>Last Step</th>
+          <th>Pack</th>
+          <th>Created</th>
+          <th>JSON</th>
+        </tr>
+      </thead>
+      <tbody id="task-rows"></tbody>
+    </table>
+  </div>
+
+  <div id="json-detail" class="json-panel" hidden>
+    <div class="small" id="json-title"></div>
+    <pre id="json-pre"></pre>
+  </div>
+
+  <script>
+    const messageEl = document.getElementById("message");
+    const rowsEl = document.getElementById("task-rows");
+    const jsonPanel = document.getElementById("json-detail");
+    const jsonTitle = document.getElementById("json-title");
+    const jsonPre = document.getElementById("json-pre");
+
+    function statusClass(status) {
+      return {
+        pending: "status-pending",
+        processing: "status-processing",
+        ready: "status-ready",
+        error: "status-error",
+      }[status] || "status-pending";
+    }
+
+    function categoryLabel(key) {
+      if (!key) return "";
+      if (key === "suitcase") return "Suitcase";
+      if (key === "beauty") return "Beauty";
+      return key;
+    }
+
+    function langLabel(code) {
+      if (!code) return "";
+      const lower = code.toLowerCase();
+      if (lower === "mm") return "MM";
+      if (lower === "en") return "EN";
+      if (lower === "zh") return "ZH";
+      return code;
+    }
+
+    function shortText(text, limit = 28) {
+      if (!text) return "";
+      return text.length > limit ? text.slice(0, limit - 1) + "…" : text;
+    }
+
+    function renderTasks(tasks) {
+      rowsEl.innerHTML = "";
+      for (const task of tasks) {
+        const status = task.status || "pending";
+        const tr = document.createElement("tr");
+        const packCell = (task.ui_lang || "en").toLowerCase() === "zh"
+          ? "-"
+          : (task.pack_path
+              ? `<a href="${task.pack_path}" class="text-sm font-medium" target="_blank">Download</a>`
+              : "-");
+        tr.innerHTML = `
+          <td title="${task.task_id || ""}">${shortText(task.task_id, 16)}</td>
+          <td title="${task.title || ""}">${shortText(task.title, 20)}</td>
+          <td>${categoryLabel(task.category_key)}</td>
+          <td>${langLabel(task.content_lang)}</td>
+          <td>${task.platform || ""}</td>
+          <td>${task.account_id || ""}</td>
+          <td><span class="status ${statusClass(status)}">${status}</span></td>
+          <td>${task.last_step || ""}</td>
+          <td>${packCell}</td>
+          <td><span class="small">${task.created_at || ""}</span></td>
+          <td><button class="json-btn" data-task-id="${task.task_id}">查看 JSON</button></td>
+        `;
+        rowsEl.appendChild(tr);
+      }
+    }
+
+    async function loadTasks() {
+      messageEl.textContent = "Loading tasks…";
+      try {
+        const res = await fetch("/api/tasks?limit=50");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const tasks = Array.isArray(data) ? data : (data.items || []);
+        messageEl.textContent = tasks.length ? `Loaded ${tasks.length} tasks.` : "No tasks yet.";
+        renderTasks(tasks);
+      } catch (err) {
+        console.error(err);
+        messageEl.textContent = "Failed to load tasks: " + err.message;
+      }
+    }
+
+    async function showTaskJson(taskId) {
+      if (!taskId) return;
+      try {
+        const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        jsonPanel.hidden = false;
+        jsonTitle.textContent = `Task ${taskId}`;
+        jsonPre.textContent = JSON.stringify(data, null, 2);
+        jsonPanel.scrollIntoView({ behavior: "smooth" });
+      } catch (err) {
+        console.error(err);
+        alert("加载任务详情失败: " + err.message);
+      }
+    }
+
+    document.addEventListener("click", (ev) => {
+      const btn = ev.target.closest(".json-btn");
+      if (btn) {
+        showTaskJson(btn.dataset.taskId);
+      }
+    });
+
+    document.getElementById("refresh-btn").addEventListener("click", loadTasks);
+    document.addEventListener("DOMContentLoaded", loadTasks);
+  </script>
+</body>
+</html>
