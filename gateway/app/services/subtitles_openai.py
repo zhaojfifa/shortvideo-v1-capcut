@@ -144,7 +144,7 @@ async def generate_with_openai(
     if not raw.exists():
         raise SubtitleError("raw video not found")
 
-    subs_dir().mkdir(parents=True, exist_ok=True)
+    subs_dir(task_id).mkdir(parents=True, exist_ok=True)
 
     audio_path: Optional[Path] = None
 
