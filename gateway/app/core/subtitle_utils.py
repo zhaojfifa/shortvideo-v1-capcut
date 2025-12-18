@@ -5,7 +5,31 @@ services/subtitles.py <-> services/subtitles_openai.py 的循环导入。
 这个模块只包含轻量工具，不依赖服务或路由。
 """
 
-from typing import List
+from typing import Iterable, List
+
+
+def format_timestamp(seconds: float) -> str:
+    """Format seconds into SRT timestamp (HH:MM:SS,mmm)."""
+
+    milliseconds = max(int(round(seconds * 1000)), 0)
+    hours, remainder = divmod(milliseconds, 3_600_000)
+    minutes, remainder = divmod(remainder, 60_000)
+    secs, millis = divmod(remainder, 1000)
+    return f"{hours:02}:{minutes:02}:{secs:02},{millis:03}"
+
+
+def segments_to_srt(segments: Iterable[dict], text_key: str = "origin") -> str:
+    """Convert a list of segment dicts to SRT text using the given text key."""
+
+    lines: list[str] = []
+    for idx, seg in enumerate(segments, start=1):
+        start = float(seg.get("start", 0))
+        end = float(seg.get("end", start))
+        text = (seg.get(text_key) or "").strip()
+        timestamp = f"{format_timestamp(start)} --> {format_timestamp(end)}"
+        lines.extend([str(int(seg.get("index", idx))), timestamp, text, ""])
+
+    return "\n".join(lines).strip() + "\n" if lines else ""
 
 
 def preview_lines(text: str, limit: int = 5) -> List[str]:
