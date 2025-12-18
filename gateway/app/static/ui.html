@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shortvideo V1 · Pipeline Lab</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <style>
+    header { margin-bottom: 16px; color: #E5E7EB; }
+    h1 { margin: 0 0 4px 0; }
+    section { border: 1px solid rgba(148, 163, 184, 0.25); padding: 16px; border-radius: 12px; margin-bottom: 16px; background: rgba(255,255,255,0.03); }
+    h2 { margin-top: 0; color: #E5E7EB; }
+    label { display: block; margin: 8px 0 4px; }
+    input, select, button { margin-right: 8px; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .downloads a { margin-right: 12px; }
+    audio { width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <main class="card">
+      <header>
+        <h1>Shortvideo V1 · Pipeline Lab</h1>
+        <p class="small">Use this lab to call /v1 parse → subtitles → dub → pack.</p>
+      </header>
+
+      <section id="task">
+        <h2>Task</h2>
+        <div class="row">
+          <div>
+            <label for="taskId">Task ID</label>
+            <input id="taskId" value="demo_v1" />
+          </div>
+          <div>
+            <label for="platform">Platform</label>
+            <select id="platform">
+              <option value="douyin">douyin</option>
+              <option value="tiktok">tiktok</option>
+              <option value="local_file">local_file</option>
+            </select>
+          </div>
+          <div style="flex:1; min-width:260px;">
+            <label for="link">Video Link</label>
+            <input id="link" style="width:100%;" placeholder="https://www.douyin.com/video/..." />
+          </div>
+        </div>
+        <div class="button-row">
+          <button onclick="runParse()">Step 1: Parse</button>
+          <button onclick="runSubtitles()">Step 2: Subtitles</button>
+          <button onclick="runDub()">Step 3: Dub</button>
+          <button onclick="runPack()">Step 4: Pack</button>
+          <button onclick="runFullPipeline()">Run full pipeline</button>
+        </div>
+        <div class="downloads" style="margin-top:12px;">
+          <span>Downloads:</span>
+          <a id="rawLink" href="#" target="_blank">raw.mp4</a>
+          <a id="originLink" href="#" target="_blank">origin.srt</a>
+          <a id="mmLink" href="#" target="_blank">mm.srt</a>
+          <a id="audioLink" href="#" target="_blank">mm_vo.wav</a>
+          <a id="packLink" href="#" target="_blank">capcut_pack.zip</a>
+        </div>
+      </section>
+
+      <section>
+        <h2>Step 1 · Parse & Download</h2>
+        <div class="button-row"><button onclick="runParse()">Execute parse</button></div>
+        <pre id="parseOutput">Waiting for response...</pre>
+      </section>
+
+      <section>
+        <h2>Step 2 · Transcribe & Translate</h2>
+        <div class="button-row"><button onclick="runSubtitles()">Generate subtitles</button></div>
+        <pre id="subsOutput">(empty)</pre>
+        <div class="section-grid" style="margin-top:8px;">
+          <div>
+            <strong>Origin preview</strong>
+            <pre id="originPreview">(empty)</pre>
+          </div>
+          <div>
+            <strong>Burmese preview</strong>
+            <pre id="mmPreview">(empty)</pre>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Step 3 · Burmese Voiceover</h2>
+        <label for="voiceId">Voice ID</label>
+        <input id="voiceId" value="mm_female_1" />
+        <div class="button-row"><button onclick="runDub()">Generate dub</button></div>
+        <pre id="dubOutput">(empty)</pre>
+        <audio id="audioPlayer" controls style="margin-top:8px; display:none;"></audio>
+      </section>
+
+      <section>
+        <h2>Step 4 · Pack for CapCut</h2>
+        <div class="button-row"><button onclick="runPack()">Build pack</button></div>
+        <pre id="packOutput">(empty)</pre>
+      </section>
+
+      <section>
+        <h2>Log</h2>
+        <pre id="log">Ready.</pre>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const logEl = document.getElementById('log');
+    function log(message) {
+      const now = new Date().toISOString();
+      logEl.textContent += `\n[${now}] ${message}`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function taskId() { return document.getElementById('taskId').value.trim(); }
+    function platform() { return document.getElementById('platform').value; }
+    function link() { return document.getElementById('link').value.trim(); }
+    function voiceId() { return document.getElementById('voiceId').value.trim() || 'mm_female_1'; }
+
+    function updateDownloadLinks(id) {
+      document.getElementById('rawLink').href = `/v1/tasks/${id}/raw`;
+      document.getElementById('originLink').href = `/v1/tasks/${id}/subs_origin`;
+      document.getElementById('mmLink').href = `/v1/tasks/${id}/subs_mm`;
+      document.getElementById('audioLink').href = `/v1/tasks/${id}/audio_mm`;
+      document.getElementById('packLink').href = `/v1/tasks/${id}/pack`;
+    }
+
+    async function runParse() {
+      const body = { task_id: taskId(), platform: platform(), link: link() };
+      log(`Calling /v1/parse for ${body.task_id}`);
+      const res = await fetch('/v1/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      document.getElementById('parseOutput').textContent = JSON.stringify(json, null, 2);
+      if (!res.ok) {
+        log(`Parse failed: ${json.detail || res.status}`);
+        return json;
+      }
+      updateDownloadLinks(body.task_id);
+      log('Parse done, raw downloaded.');
+      return json;
+    }
+
+    async function runSubtitles() {
+      const body = { task_id: taskId(), target_lang: 'my', force: false, translate: true, with_scenes: true };
+      log(`Calling /v1/subtitles for ${body.task_id}`);
+      const res = await fetch('/v1/subtitles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      document.getElementById('subsOutput').textContent = JSON.stringify(json, null, 2);
+      if (!res.ok) {
+        log(`Subtitles failed: ${json.detail || res.status}`);
+      }
+      document.getElementById('originPreview').textContent = (json.origin_preview || []).join('\n') || '(empty)';
+      document.getElementById('mmPreview').textContent = (json.mm_preview || []).join('\n') || '(empty)';
+      log('Subtitles call finished.');
+      return json;
+    }
+
+    async function runDub() {
+      const body = { task_id: taskId(), voice_id: voiceId(), target_lang: 'my', force: false };
+      log(`Calling /v1/dub for ${body.task_id}`);
+      const res = await fetch('/v1/dub', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      document.getElementById('dubOutput').textContent = JSON.stringify(json, null, 2);
+      if (!res.ok) {
+        log(`Dub failed: ${json.detail || res.status}`);
+        return json;
+      }
+      const audioUrl = `/v1/tasks/${body.task_id}/audio_mm`;
+      const audioEl = document.getElementById('audioPlayer');
+      audioEl.src = audioUrl;
+      audioEl.style.display = 'block';
+      log('Dub audio ready.');
+      return json;
+    }
+
+    async function runPack() {
+      const body = { task_id: taskId() };
+      log(`Calling /v1/pack for ${body.task_id}`);
+      const res = await fetch('/v1/pack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      document.getElementById('packOutput').textContent = JSON.stringify(json, null, 2);
+      if (!res.ok) {
+        log(`Pack failed: ${json.detail || res.status}`);
+        return json;
+      }
+      updateDownloadLinks(body.task_id);
+      log('Pack ready.');
+      return json;
+    }
+
+    async function runFullPipeline() {
+      await runParse();
+      await runSubtitles();
+      await runDub();
+      await runPack();
+    }
+  </script>
+</body>
+</html>
