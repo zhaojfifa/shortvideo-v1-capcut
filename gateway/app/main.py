@@ -25,7 +25,6 @@ from gateway.app.services.steps_v1 import (
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 UI_HTML_PATH = STATIC_DIR / "ui.html"
-TASKS_HTML_PATH = STATIC_DIR / "tasks.html"
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -44,23 +43,17 @@ def on_startup() -> None:
     """Ensure database schema exists before serving traffic."""
 
 app.include_router(tasks_router.router)
+app.include_router(tasks_router.pages_router)
 
-@app.on_event("startup")
-def on_startup() -> None:
-    """Ensure database schema exists before serving traffic."""
+@app.get("/tasks", response_class=HTMLResponse)
+async def tasks_page():
+    """Serve a minimal operator task list page backed by /api/tasks."""
 
 @app.get("/ui", response_class=HTMLResponse)
 async def pipeline_lab():
     """Serve the dark pipeline lab page."""
 
     return UI_HTML_PATH.read_text(encoding="utf-8")
-
-
-@app.get("/tasks", response_class=HTMLResponse)
-async def tasks_page():
-    """Serve a minimal operator task list page backed by /api/tasks."""
-
-    return TASKS_HTML_PATH.read_text(encoding="utf-8")
 
 
 @app.post("/v1/parse")

@@ -137,7 +137,7 @@
                   <td><span class="{{ badge }}">{{ status }}</span></td>
                   <td>{{ t.created_at }}</td>
                   <td>
-                    {% if t.pack_path and (t.ui_lang != "zh") %}
+                    {% if t.pack_path %}
                       <a href="/v1/tasks/{{ t.task_id }}/pack" target="_blank" rel="noopener">Download</a>
                     {% else %}
                       –
