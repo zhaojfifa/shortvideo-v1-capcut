@@ -42,12 +42,9 @@ def on_startup() -> None:
 def on_startup() -> None:
     """Ensure database schema exists before serving traffic."""
 
-app.include_router(tasks_router.router)
 app.include_router(tasks_router.pages_router)
+app.include_router(tasks_router.api_router)
 
-@app.get("/tasks", response_class=HTMLResponse)
-async def tasks_page():
-    """Serve a minimal operator task list page backed by /api/tasks."""
 
 @app.get("/ui", response_class=HTMLResponse)
 async def pipeline_lab():
