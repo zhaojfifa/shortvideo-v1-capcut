@@ -18,9 +18,11 @@
       align-items: center;
       justify-content: space-between;
       margin-bottom: 12px;
+      gap: 8px;
     }
     h1 { margin: 0; font-size: 1.25rem; font-weight: 700; }
-    button {
+    .actions { display: flex; gap: 8px; }
+    button, .btn {
       background: #2563eb;
       color: #ffffff;
       border: none;
@@ -28,8 +30,12 @@
       padding: 8px 12px;
       cursor: pointer;
       font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
-    button:hover { background: #1d4ed8; }
+    button:hover, .btn:hover { background: #1d4ed8; }
     .card {
       background: #ffffff;
       border-radius: 10px;
@@ -55,10 +61,10 @@
       font-size: 0.8rem;
       display: inline-block;
     }
-    .status-pending { background: #fef3c7; }
-    .status-processing { background: #e0e7ff; }
-    .status-ready { background: #dcfce7; }
-    .status-error { background: #fee2e2; }
+    .status-pending { background: #e0f2fe; color: #075985; }
+    .status-processing { background: #fef3c7; color: #92400e; }
+    .status-ready { background: #dcfce7; color: #065f46; }
+    .status-error { background: #fee2e2; color: #991b1b; }
     .json-panel {
       margin-top: 12px;
       background: #ffffff;
@@ -73,7 +79,10 @@
 <body>
   <header>
     <h1>Shortvideo Tasks</h1>
-    <button id="refresh-btn" type="button">刷新</button>
+    <div class="actions">
+      <a class="btn" href="/tasks/new">New suitcase task</a>
+      <button id="refresh-btn" type="button">刷新</button>
+    </div>
   </header>
 
   <div id="message" class="small">Loading tasks…</div>
@@ -84,11 +93,13 @@
         <tr>
           <th>ID</th>
           <th>Title</th>
+          <th>Category</th>
+          <th>Lang</th>
           <th>Platform</th>
           <th>Account</th>
-          <th>Category</th>
           <th>Status</th>
           <th>Last Step</th>
+          <th>Pack</th>
           <th>Created</th>
           <th>JSON</th>
         </tr>
@@ -118,6 +129,22 @@
       }[status] || "status-pending";
     }
 
+    function categoryLabel(key) {
+      if (!key) return "";
+      if (key === "suitcase") return "Suitcase";
+      if (key === "beauty") return "Beauty";
+      return key;
+    }
+
+    function langLabel(code) {
+      if (!code) return "";
+      const lower = code.toLowerCase();
+      if (lower === "mm") return "MM";
+      if (lower === "en") return "EN";
+      if (lower === "zh") return "ZH";
+      return code;
+    }
+
     function shortText(text, limit = 28) {
       if (!text) return "";
       return text.length > limit ? text.slice(0, limit - 1) + "…" : text;
@@ -128,14 +155,21 @@
       for (const task of tasks) {
         const status = task.status || "pending";
         const tr = document.createElement("tr");
+        const packCell = (task.ui_lang || "en").toLowerCase() === "zh"
+          ? "-"
+          : (task.pack_path
+              ? `<a href="${task.pack_path}" class="text-sm font-medium" target="_blank">Download</a>`
+              : "-");
         tr.innerHTML = `
           <td title="${task.task_id || ""}">${shortText(task.task_id, 16)}</td>
           <td title="${task.title || ""}">${shortText(task.title, 20)}</td>
+          <td>${categoryLabel(task.category_key)}</td>
+          <td>${langLabel(task.content_lang)}</td>
           <td>${task.platform || ""}</td>
           <td>${task.account_id || ""}</td>
-          <td>${task.category_key || ""}</td>
           <td><span class="status ${statusClass(status)}">${status}</span></td>
           <td>${task.last_step || ""}</td>
+          <td>${packCell}</td>
           <td><span class="small">${task.created_at || ""}</span></td>
           <td><button class="json-btn" data-task-id="${task.task_id}">查看 JSON</button></td>
         `;

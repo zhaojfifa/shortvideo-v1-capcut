@@ -44,6 +44,16 @@ async def tasks_board_page(request: Request):
     )
 
 
+@pages_router.get("/tasks/new", response_class=HTMLResponse)
+async def tasks_new(request: Request) -> HTMLResponse:
+    """Render suitcase quick-create page."""
+
+    return templates.TemplateResponse(
+        "tasks_new.html",
+        {"request": request},
+    )
+
+
 @api_router.post("", response_model=TaskDetail)
 def create_task(
     payload: TaskCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
@@ -152,6 +162,7 @@ def list_tasks(
                 last_step=t.last_step,
                 duration_sec=t.duration_sec,
                 thumb_url=t.thumb_url,
+                pack_path=t.pack_path,
                 created_at=t.created_at,
                 error_message=t.error_message,
                 error_reason=t.error_reason,
