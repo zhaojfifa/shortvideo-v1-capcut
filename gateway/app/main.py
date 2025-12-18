@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -58,10 +57,10 @@ async def pipeline_lab(request: Request):
 
 
 @app.get("/tasks", response_class=HTMLResponse)
-async def tasks_page() -> FileResponse:
+async def tasks_page(request: Request):
     """Serve a minimal operator task list page backed by /api/tasks."""
 
-    return FileResponse(tasks_html_path, media_type="text/html")
+    return templates.TemplateResponse("tasks.html", {"request": request})
 
 
 @app.post("/v1/parse")
