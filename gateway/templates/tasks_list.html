@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ShortVideo Tasks</title>
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 1rem; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; font-size: 14px; }
+    th { background: #f5f5f5; }
+    a { color: #2563eb; }
+  </style>
+</head>
+<body>
+  <h1>Tasks</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Account</th>
+        <th>Platform</th>
+        <th>Status</th>
+        <th>Created</th>
+        <th>Pack</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for task in tasks %}
+      <tr>
+        <td>{{ task.id or task.task_id }}</td>
+        <td>{{ task.account_name or task.account_id or "" }}</td>
+        <td>{{ task.platform or "" }}</td>
+        <td>{{ task.status }}</td>
+        <td>{{ task.created_at }}</td>
+        <td>
+          {% if task.status == "ready" %}
+            <a href="/v1/tasks/{{ task.id or task.task_id }}/pack">Download</a>
+          {% else %}
+            –
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

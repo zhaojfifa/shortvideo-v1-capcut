@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>New Suitcase Task · ShortVideo</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f3f4f6;
+      color: #111827;
+    }
+    .page { max-width: 720px; margin: 0 auto; }
+    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    h1 { margin: 0; font-size: 1.5rem; font-weight: 700; }
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .card {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      border: 1px solid #e5e7eb;
+    }
+    .field { margin-bottom: 12px; }
+    label { display: block; font-weight: 600; margin-bottom: 4px; }
+    input, select, textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 1rem;
+      background: #fff;
+    }
+    textarea { min-height: 80px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .row .field { flex: 1 1 220px; }
+    .radio-group { display: flex; gap: 12px; flex-wrap: wrap; }
+    .radio { display: flex; gap: 6px; align-items: center; }
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-primary:hover { background: #1d4ed8; }
+    .muted { color: #6b7280; font-size: 0.9rem; }
+    pre { background: #f9fafb; padding: 10px; border-radius: 8px; border: 1px solid #e5e7eb; }
+    .error { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>New Suitcase Task</h1>
+      <a href="/tasks">Back to Task Board</a>
+    </header>
+
+    <main class="card">
+      <form id="task-form">
+        <div class="field">
+          <label for="source_url">Source URL *</label>
+          <input id="source_url" name="source_url" type="url" required placeholder="https://www.douyin.com/video/..." />
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="platform">Platform</label>
+            <select id="platform" name="platform">
+              <option value="douyin" selected>Douyin</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="account_id">Account</label>
+            <select id="account_id" name="account_id">
+              <option value="suitcase_mm_1">Suitcase MM #1</option>
+            </select>
+            <input type="hidden" id="account_name" name="account_name" value="Suitcase MM #1" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Video type</label>
+          <div class="radio-group">
+            <label class="radio"><input type="radio" name="video_type" value="review" checked /> Comparison Review</label>
+            <label class="radio"><input type="radio" name="video_type" value="scenario" /> Scenario Usage</label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Style preset</label>
+          <div class="radio-group">
+            <label class="radio"><input type="radio" name="style_preset" value="review_brief" checked /> Short review, fast pace</label>
+            <label class="radio"><input type="radio" name="style_preset" value="scenario_story" /> Scenario story, normal pace</label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="title">Title (optional)</label>
+          <input id="title" name="title" type="text" placeholder="Optional title" />
+        </div>
+
+        <div class="field">
+          <label for="note">Note / Operator hint</label>
+          <textarea id="note" name="note" placeholder="Optional note for operators"></textarea>
+        </div>
+
+        <button class="btn-primary" type="submit">Create &amp; run pipeline</button>
+        <div class="muted" style="margin-top: 6px;">Auto-category: Suitcase · Language: Burmese</div>
+      </form>
+
+      <div style="margin-top: 12px;">
+        <pre id="create-result"></pre>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const form = document.getElementById("task-form");
+    const resultEl = document.getElementById("create-result");
+
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      resultEl.textContent = "Submitting...";
+
+      const source_url = document.getElementById("source_url").value.trim();
+      const platform = document.getElementById("platform").value;
+      const account_id = document.getElementById("account_id").value;
+      const account_name = document.getElementById("account_name").value;
+      const video_type = form.querySelector("input[name='video_type']:checked")?.value || "review";
+      const stylePreset = form.querySelector("input[name='style_preset']:checked")?.value || "review_brief";
+      const title = document.getElementById("title").value.trim();
+      const note = document.getElementById("note").value.trim();
+
+      const payload = {
+        source_url,
+        platform,
+        account_id,
+        account_name,
+        video_type,
+        template: stylePreset,
+        title: title || undefined,
+        note: note || undefined,
+        category_key: "suitcase",
+        content_lang: "mm",
+        ui_lang: "en",
+        style_preset: stylePreset,
+        face_swap_enabled: false,
+      };
+
+      try {
+        const res = await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch (_) { /* noop */ }
+
+        if (!res.ok) {
+          resultEl.textContent = `Error ${res.status}: ${text}`;
+          resultEl.classList.add("error");
+          return;
+        }
+
+        const taskId = data?.task_id || "(unknown)";
+        resultEl.classList.remove("error");
+        resultEl.textContent = `Created task ${taskId}, status: ${data?.status || "pending"}`;
+        setTimeout(() => { window.location.href = "/tasks"; }, 800);
+      } catch (err) {
+        resultEl.textContent = "Request failed: " + err.message;
+        resultEl.classList.add("error");
+      }
+    });
+  </script>
+</body>
+</html>
