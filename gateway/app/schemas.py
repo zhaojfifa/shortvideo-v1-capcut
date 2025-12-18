@@ -76,6 +76,7 @@ class TaskSummary(BaseModel):
     duration_sec: Optional[int] = None
     thumb_url: Optional[str] = None
     created_at: datetime
+    error_reason: Optional[str] = None
 
     class Config:
         orm_mode = True

@@ -120,6 +120,7 @@ async def run_pipeline_for_task(task_id: str, db: Session):
             task.pack_path = str(pack_path_val)
 
         task.status = "ready"
+        task.error_reason = None
         task.updated_at = datetime.utcnow()
         db.commit()
         logger.info("Pipeline finished for task %s", task_id)
@@ -127,5 +128,6 @@ async def run_pipeline_for_task(task_id: str, db: Session):
     except Exception as exc:  # noqa: BLE001
         logger.exception("Pipeline failed for task %s: %s", task_id, exc)
         task.status = "error"
+        task.error_reason = str(exc)
         task.updated_at = datetime.utcnow()
         db.commit()

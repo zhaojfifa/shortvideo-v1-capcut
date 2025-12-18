@@ -31,6 +31,7 @@ class Task(Base):
     raw_path = Column(Text, nullable=True)
     mm_audio_path = Column(Text, nullable=True)
     pack_path = Column(Text, nullable=True)
+    error_reason = Column(Text, nullable=True)
 
     created_at = Column(DateTime, nullable=False, default=dt.datetime.utcnow)
     updated_at = Column(
