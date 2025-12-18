@@ -14,7 +14,7 @@ from gateway.app.db import get_db
 from gateway.app.schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary
 from gateway.app.services.pipeline_v1 import run_pipeline_background
 
-api_router = APIRouter(prefix="/tasks")
+router = APIRouter(prefix="/tasks")
 pages_router = APIRouter()
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -77,7 +77,7 @@ async def tasks_new(request: Request) -> HTMLResponse:
     )
 
 
-@api_router.post("", response_model=TaskDetail)
+@router.post("", response_model=TaskDetail)
 def create_task(
     payload: TaskCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ):
@@ -138,7 +138,7 @@ def create_task(
     )
 
 
-@api_router.get("", response_model=TaskListResponse)
+@router.get("", response_model=TaskListResponse)
 def list_tasks(
     db: Session = Depends(get_db),
     account_id: Optional[str] = Query(default=None),
@@ -195,7 +195,7 @@ def list_tasks(
     return TaskListResponse(items=summaries, page=page, page_size=limit, total=total)
 
 
-@api_router.get("/{task_id}", response_model=TaskDetail)
+@router.get("/{task_id}", response_model=TaskDetail)
 def get_task(task_id: str, db: Session = Depends(get_db)):
     """Retrieve a single task by id."""
 
@@ -229,6 +229,5 @@ def get_task(task_id: str, db: Session = Depends(get_db)):
     )
 
 
-# Backward-compatible default router reference for main include
-router = api_router
-__all__ = ["router", "pages_router", "api_router"]
+# Public exports for API and HTML routers
+__all__ = ["router", "pages_router"]
