@@ -185,8 +185,9 @@
 
     function toHref(path) {
       if (!path) return null;
-      if (path.startsWith("http")) return path;
-      return "/" + String(path).replace(/^\/+/, "");
+      const s = String(path);
+      if (/^https?:\/\//i.test(s)) return s;
+      return "/files/" + s.replace(/^\/+/, "");
     }
 
     function setDownloadLink(id, path) {
@@ -293,6 +294,9 @@
       updateStatusBadge(data);
       updateStepButtons(data);
       updateSourceLink(data);
+      if (data.error_message) {
+        appendLog(`Last error: ${data.error_message}`);
+      }
     }
 
     document.getElementById("btn-parse").addEventListener("click", async () => {

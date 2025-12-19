@@ -135,7 +135,7 @@
                 <td>{{ t.created_at }}</td>
                 <td>
                   {% if t.pack_path %}
-                    <a href="/v1/tasks/{{ t.task_id }}/pack" target="_blank" rel="noopener">Download</a>
+                    <a href="/files/{{ t.pack_path }}" target="_blank" rel="noopener">Download</a>
                   {% else %}
                     –
                   {% endif %}
@@ -237,7 +237,7 @@
             <td>${lang}</td>
             <td><span class="${statusBadgeClass(status)}">${status}</span></td>
             <td>${t.created_at || ""}</td>
-            <td>${t.pack_path ? `<a href="/v1/tasks/${t.task_id}/pack" target="_blank" rel="noopener">Download</a>` : "–"}</td>
+            <td>${t.pack_path ? `<a href="/files/${t.pack_path}" target="_blank" rel="noopener">Download</a>` : "–"}</td>
             <td><a href="/tasks/${t.task_id}">Open</a> · <a href="/api/tasks/${t.task_id}" target="_blank" rel="noopener">JSON</a></td>
           `;
           tableBody.appendChild(row);

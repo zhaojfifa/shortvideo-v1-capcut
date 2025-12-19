@@ -1,4 +1,5 @@
 import logging
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -28,6 +29,10 @@ STATIC_DIR = BASE_DIR / "static"
 UI_HTML_PATH = STATIC_DIR / "ui.html"
 AUDIO_DIR = workspace_root() / "audio"
 AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+WORKSPACE_ROOT = Path(
+    os.environ.get("VIDEO_WORKSPACE", "/opt/render/project/src/video_workspace")
+).resolve()
+ALLOWED_TOP_DIRS = {"raw", "tasks", "audio", "pack"}
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -57,9 +62,42 @@ async def pipeline_lab():
     return UI_HTML_PATH.read_text(encoding="utf-8")
 
 
+@app.get("/files/{rel_path:path}")
+def serve_workspace_file(rel_path: str):
+    rel_path = rel_path.lstrip("/")
+    top = rel_path.split("/", 1)[0] if rel_path else ""
+    if top not in ALLOWED_TOP_DIRS:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    file_path = (WORKSPACE_ROOT / rel_path).resolve()
+    if not str(file_path).startswith(str(WORKSPACE_ROOT) + str(Path("/"))):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    return FileResponse(path=str(file_path))
+
+
 @app.post("/v1/parse")
 async def parse(request: ParseRequest):
-    return await run_parse_step(request)
+    try:
+        return await run_parse_step(request)
+    except HTTPException as exc:
+        from gateway.app.db import SessionLocal
+        from gateway.app import models
+
+        db = SessionLocal()
+        try:
+            task = db.query(models.Task).filter(models.Task.id == request.task_id).first()
+            if task:
+                task.status = "error"
+                task.last_step = "parse"
+                task.error_reason = "parse_failed"
+                task.error_message = str(exc.detail)
+                db.commit()
+        finally:
+            db.close()
+        raise
 
 
 @app.get("/v1/tasks/{task_id}/raw")
