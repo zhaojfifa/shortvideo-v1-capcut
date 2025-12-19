@@ -2,7 +2,7 @@ from datetime import datetime
 import re
 from typing import Optional
 
-from pydantic import BaseModel, constr, validator
+from pydantic import BaseModel, constr, root_validator, validator
 
 _URL_RE = re.compile(r"(https?://[^\s]+)")
 
@@ -11,6 +11,17 @@ class ParseRequest(BaseModel):
     task_id: str
     platform: str | None = None
     link: str
+
+    @root_validator(pre=True)
+    def normalize_link(cls, values: dict) -> dict:
+        link = values.get("link")
+        if not link:
+            for key in ("url", "source_url", "text"):
+                candidate = values.get(key)
+                if candidate:
+                    values["link"] = candidate
+                    break
+        return values
 
     @validator("link")
     def extract_first_url(cls, v: str) -> str:

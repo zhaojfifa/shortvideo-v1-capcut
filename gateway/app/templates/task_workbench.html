@@ -216,14 +216,32 @@
 
     document.getElementById("btn-parse").addEventListener("click", async () => {
       const taskId = window.currentTask.task_id;
+      const linkText = window.currentTask.source_url || "";
+      const platform = window.currentTask.platform || null;
+      if (!linkText) {
+        appendLog("Parse failed: source_url is empty for this task.");
+        return;
+      }
       appendLog(`Calling /v1/parse for ${taskId}...`);
       const resp = await fetch("/v1/parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task_id: taskId }),
+        body: JSON.stringify({
+          task_id: taskId,
+          platform,
+          link: linkText,
+        }),
       });
       if (!resp.ok) {
-        appendLog(`Parse failed: HTTP ${resp.status}`);
+        let errorDetail = `HTTP ${resp.status}`;
+        try {
+          const payload = await resp.json();
+          errorDetail = payload?.detail ? `${errorDetail} - ${payload.detail}` : errorDetail;
+        } catch (err) {
+          appendLog(`Parse failed: ${errorDetail}`);
+          return;
+        }
+        appendLog(`Parse failed: ${errorDetail}`);
         return;
       }
       appendLog("Parse call finished.");
