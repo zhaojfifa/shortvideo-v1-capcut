@@ -11,6 +11,7 @@ from gateway.app.core.workspace import (
     pack_zip_path,
     raw_path,
     translated_srt_path,
+    workspace_root,
 )
 from gateway.app.db import Base, engine, ensure_task_extra_columns
 from gateway.app.routers import tasks as tasks_router
@@ -25,9 +26,12 @@ from gateway.app.services.steps_v1 import (
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 UI_HTML_PATH = STATIC_DIR / "ui.html"
+AUDIO_DIR = workspace_root() / "audio"
+AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+app.mount("/audio", StaticFiles(directory=str(AUDIO_DIR)), name="audio")
 logger = logging.getLogger(__name__)
 tasks_html_path = Path(__file__).resolve().parent / "static" / "tasks.html"
 
@@ -42,12 +46,9 @@ def on_startup() -> None:
 def on_startup() -> None:
     """Ensure database schema exists before serving traffic."""
 
-app.include_router(tasks_router.router)
 app.include_router(tasks_router.pages_router)
+app.include_router(tasks_router.api_router)
 
-@app.get("/tasks", response_class=HTMLResponse)
-async def tasks_page():
-    """Serve a minimal operator task list page backed by /api/tasks."""
 
 @app.get("/ui", response_class=HTMLResponse)
 async def pipeline_lab():
