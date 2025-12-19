@@ -2,7 +2,7 @@ from datetime import datetime
 import re
 from typing import Optional
 
-from pydantic import BaseModel, HttpUrl, validator
+from pydantic import BaseModel, constr, validator
 
 _URL_RE = re.compile(r"(https?://[^\s]+)")
 
@@ -43,7 +43,7 @@ class PackRequest(BaseModel):
 
 
 class TaskCreate(BaseModel):
-    source_url: HttpUrl
+    source_url: constr(strip_whitespace=True, min_length=1)
     platform: Optional[str] = None
     account_id: Optional[str] = None
     account_name: Optional[str] = None
@@ -62,6 +62,7 @@ class TaskCreate(BaseModel):
 class TaskSummary(BaseModel):
     task_id: str
     title: Optional[str] = None
+    source_url: Optional[str] = None
     platform: Optional[str] = None
     account_id: Optional[str] = None
     account_name: Optional[str] = None
@@ -87,6 +88,8 @@ class TaskSummary(BaseModel):
 
 class TaskDetail(TaskSummary):
     raw_path: Optional[str] = None
+    origin_srt_path: Optional[str] = None
+    mm_srt_path: Optional[str] = None
     mm_audio_path: Optional[str] = None
     pack_path: Optional[str] = None
 
