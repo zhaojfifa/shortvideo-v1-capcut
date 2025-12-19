@@ -123,7 +123,7 @@
                 <td>{{ t.platform or "" }}</td>
                 <td class="truncate" title="{{ t.source_url }}">
                   {% if t.source_url %}
-                    <a href="{{ t.source_url }}" target="_blank" rel="noopener">{{ t.source_url }}</a>
+                    <span class="source-text">{{ t.source_url }}</span>
                   {% else %}
                     -
                   {% endif %}
@@ -182,6 +182,27 @@
       return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
     }
 
+    function extractFirstHttpUrl(text) {
+      if (!text) return null;
+      const s = String(text);
+      const m = s.match(/https?:\/\/[^\s]+/i);
+      return m ? m[0] : null;
+    }
+
+    function enhanceSourceLinks() {
+      document.querySelectorAll("td .source-text").forEach((el) => {
+        const raw = el.textContent || "";
+        const url = extractFirstHttpUrl(raw);
+        if (!url) return;
+        const a = document.createElement("a");
+        a.href = url;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = el.textContent;
+        el.replaceWith(a);
+      });
+    }
+
     function renderTasks(tasks) {
       tableBody.innerHTML = "";
 
@@ -198,11 +219,19 @@
           const status = t.status || "unknown";
           const catLabel = categoryLabel(t.category_key);
           const lang = langLabel(t.content_lang);
+          const srcRaw = t.source_url || "";
+          const srcUrl = extractFirstHttpUrl(srcRaw);
           const row = document.createElement("tr");
           row.innerHTML = `
             <td class="truncate" title="${t.task_id || ""}"><a href="/tasks/${t.task_id}">${truncate(t.task_id, 16)}</a></td>
             <td>${t.platform || ""}</td>
-            <td class="truncate" title="${t.source_url || ""}">${t.source_url ? `<a href="${t.source_url}" target="_blank" rel="noopener">${truncate(t.source_url, 48)}</a>` : "-"}</td>
+            <td class="truncate" title="${srcRaw}">
+              ${srcRaw
+                ? (srcUrl
+                  ? `<a href="${srcUrl}" target="_blank" rel="noopener">${truncate(srcRaw, 48)}</a>`
+                  : `<span class="muted">${truncate(srcRaw, 48)}</span>`)
+                : "-"}
+            </td>
             <td class="truncate" title="${t.title || ""}">${t.title || ""}</td>
             <td>${catLabel}</td>
             <td>${lang}</td>
@@ -215,6 +244,7 @@
         }
       }
 
+      enhanceSourceLinks();
       const count = tasks.length;
       countEl.textContent = `Loaded ${count} task${count === 1 ? "" : "s"}.`;
     }

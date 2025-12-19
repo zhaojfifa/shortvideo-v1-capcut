@@ -75,7 +75,13 @@
         <div class="meta-item"><strong>Lang</strong><span>{{ task.content_lang or '-' }}</span></div>
         <div class="meta-item"><strong>Status</strong><span>{{ task.status }}</span></div>
         <div class="meta-item"><strong>Created</strong><span>{{ task.created_at }}</span></div>
-        <div class="meta-item"><strong>Source URL</strong><span><a href="{{ task.source_url | e }}" target="_blank" rel="noopener">{{ task.source_url | e }}</a></span></div>
+        <div class="meta-item">
+          <strong>Source URL</strong>
+          <div id="source-text" style="white-space:pre-wrap;">{{ task.source_url | e }}</div>
+          <div style="margin-top:6px;">
+            <a id="source-link" class="disabled" href="#" target="_blank" rel="noopener">Open source link</a>
+          </div>
+        </div>
       </div>
       <div class="env" style="margin-top:12px;">
         <div>Workspace: <code>{{ env_summary.workspace_root }}</code></div>
@@ -180,7 +186,7 @@
     function toHref(path) {
       if (!path) return null;
       if (path.startsWith("http")) return path;
-      return `/${path.replace(/^\\/+/, "")}`;
+      return "/" + String(path).replace(/^\/+/, "");
     }
 
     function setDownloadLink(id, path) {
@@ -227,6 +233,26 @@
       }
     }
 
+    function extractFirstHttpUrl(text) {
+      if (!text) return null;
+      const s = String(text);
+      const m = s.match(/https?:\/\/[^\s]+/i);
+      return m ? m[0] : null;
+    }
+
+    function updateSourceLink(data) {
+      const linkEl = document.getElementById("source-link");
+      if (!linkEl) return;
+      const url = extractFirstHttpUrl(data.source_url || "");
+      if (url) {
+        linkEl.href = url;
+        linkEl.classList.remove("disabled");
+      } else {
+        linkEl.href = "#";
+        linkEl.classList.add("disabled");
+      }
+    }
+
     function updateStepButtons(data) {
       const parseBtn = document.getElementById("btn-parse");
       const subsBtn = document.getElementById("btn-subtitles");
@@ -252,6 +278,7 @@
     updateDownloadsFromTask(window.currentTask);
     updateStatusBadge(window.currentTask);
     updateStepButtons(window.currentTask);
+    updateSourceLink(window.currentTask);
 
     async function refreshTaskState() {
       const taskId = window.currentTask.task_id;
@@ -265,6 +292,7 @@
       updateDownloadsFromTask(data);
       updateStatusBadge(data);
       updateStepButtons(data);
+      updateSourceLink(data);
     }
 
     document.getElementById("btn-parse").addEventListener("click", async () => {
