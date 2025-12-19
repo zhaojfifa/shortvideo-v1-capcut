@@ -62,6 +62,7 @@ class TaskCreate(BaseModel):
 class TaskSummary(BaseModel):
     task_id: str
     title: Optional[str] = None
+    source_url: Optional[str] = None
     platform: Optional[str] = None
     account_id: Optional[str] = None
     account_name: Optional[str] = None
@@ -87,6 +88,8 @@ class TaskSummary(BaseModel):
 
 class TaskDetail(TaskSummary):
     raw_path: Optional[str] = None
+    origin_srt_path: Optional[str] = None
+    mm_srt_path: Optional[str] = None
     mm_audio_path: Optional[str] = None
     pack_path: Optional[str] = None
 
