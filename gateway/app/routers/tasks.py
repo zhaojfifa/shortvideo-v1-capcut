@@ -202,13 +202,14 @@ def create_task(
 ):
     """Create a Task record and kick off the V1 pipeline asynchronously."""
 
-    platform = payload.platform or _infer_platform_from_url(str(payload.source_url))
+    source_text = payload.source_url.strip()
+    platform = payload.platform or _infer_platform_from_url(source_text)
     task_id = uuid4().hex[:12]
 
     db_task = models.Task(
         id=task_id,
         title=payload.title,
-        source_url=str(payload.source_url),
+        source_url=source_text,
         platform=platform,
         account_id=payload.account_id,
         account_name=payload.account_name,

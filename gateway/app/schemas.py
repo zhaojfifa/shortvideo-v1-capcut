@@ -2,7 +2,7 @@ from datetime import datetime
 import re
 from typing import Optional
 
-from pydantic import BaseModel, HttpUrl, validator
+from pydantic import BaseModel, constr, validator
 
 _URL_RE = re.compile(r"(https?://[^\s]+)")
 
@@ -43,7 +43,7 @@ class PackRequest(BaseModel):
 
 
 class TaskCreate(BaseModel):
-    source_url: HttpUrl
+    source_url: constr(strip_whitespace=True, min_length=1)
     platform: Optional[str] = None
     account_id: Optional[str] = None
     account_name: Optional[str] = None
