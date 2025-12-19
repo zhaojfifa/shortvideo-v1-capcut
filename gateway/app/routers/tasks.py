@@ -111,8 +111,12 @@ def _resolve_paths(task: models.Task) -> dict[str, Optional[str]]:
             translated_srt = relative_to_workspace(path)
 
     mm_audio = getattr(task, "mm_audio_path", None) or None
-    if not mm_audio and workspace.mm_audio_exists():
-        mm_audio = relative_to_workspace(workspace.mm_audio_path)
+    if workspace.mm_audio_exists():
+        from ..core.workspace import ensure_public_audio
+
+        ensure_public_audio(workspace.mm_audio_path)
+        if not mm_audio:
+            mm_audio = f"audio/{workspace.mm_audio_path.name}"
 
     pack_path = task.pack_path or None
     if not pack_path:

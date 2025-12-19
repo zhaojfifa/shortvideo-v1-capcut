@@ -94,8 +94,11 @@
         <a id="raw-link" class="disabled" href="#" target="_blank" rel="noopener">raw.mp4</a>
         <a id="origin-link" class="disabled" href="#" target="_blank" rel="noopener">origin.srt</a>
         <a id="mm-link" class="disabled" href="#" target="_blank" rel="noopener">mm.srt</a>
-        <a id="audio-link" class="disabled" href="#" target="_blank" rel="noopener">mm_vo.wav</a>
+        <a id="audio-link" class="disabled" href="#" target="_blank" rel="noopener">mm_audio</a>
         <a id="pack-link" class="disabled" href="#" target="_blank" rel="noopener">capcut_pack.zip</a>
+      </div>
+      <div style="margin-top:8px;">
+        <audio id="audio-preview" controls style="display:none; width: 100%; max-width: 360px;"></audio>
       </div>
     </div>
 
@@ -174,11 +177,17 @@
         : "badge-unknown");
     }
 
+    function toHref(path) {
+      if (!path) return null;
+      if (path.startsWith("http")) return path;
+      return `/${path.replace(/^\\/+/, "")}`;
+    }
+
     function setDownloadLink(id, path) {
       const el = document.getElementById(id);
       if (!el) return;
-      if (path) {
-        const href = path.startsWith("/") ? path : `/${path}`;
+      const href = toHref(path);
+      if (href) {
         el.href = href;
         el.classList.remove("disabled");
         el.removeAttribute("aria-disabled");
@@ -195,11 +204,54 @@
       setDownloadLink("mm-link", data.mm_srt_path);
       setDownloadLink("audio-link", data.mm_audio_path);
       setDownloadLink("pack-link", data.pack_path);
+
+      const audioEl = document.getElementById("audio-preview");
+      const audioLink = document.getElementById("audio-link");
+      const audioHref = toHref(data.mm_audio_path);
+      if (audioEl) {
+        if (audioHref) {
+          audioEl.src = audioHref;
+          audioEl.style.display = "block";
+        } else {
+          audioEl.removeAttribute("src");
+          audioEl.style.display = "none";
+        }
+      }
+      if (audioLink) {
+        if (data.mm_audio_path) {
+          const ext = data.mm_audio_path.split(".").pop() || "audio";
+          audioLink.textContent = `mm_audio.${ext}`;
+        } else {
+          audioLink.textContent = "mm_audio";
+        }
+      }
+    }
+
+    function updateStepButtons(data) {
+      const parseBtn = document.getElementById("btn-parse");
+      const subsBtn = document.getElementById("btn-subtitles");
+      const dubBtn = document.getElementById("btn-dub");
+      const packBtn = document.getElementById("btn-pack");
+
+      if (parseBtn) {
+        parseBtn.textContent = data.raw_path ? "Re-run parse" : "Execute parse";
+      }
+      if (subsBtn) {
+        const hasSubs = data.mm_srt_path || data.origin_srt_path;
+        subsBtn.textContent = hasSubs ? "Re-run subtitles" : "Generate subtitles";
+      }
+      if (dubBtn) {
+        dubBtn.textContent = data.mm_audio_path ? "Re-run dub" : "Generate dub";
+      }
+      if (packBtn) {
+        packBtn.textContent = data.pack_path ? "Re-run pack" : "Build pack";
+      }
     }
 
     // Initialize with server-rendered values in case files already exist.
     updateDownloadsFromTask(window.currentTask);
     updateStatusBadge(window.currentTask);
+    updateStepButtons(window.currentTask);
 
     async function refreshTaskState() {
       const taskId = window.currentTask.task_id;
@@ -212,6 +264,7 @@
       window.currentTask = data;
       updateDownloadsFromTask(data);
       updateStatusBadge(data);
+      updateStepButtons(data);
     }
 
     document.getElementById("btn-parse").addEventListener("click", async () => {
