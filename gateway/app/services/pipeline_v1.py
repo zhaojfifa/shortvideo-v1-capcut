@@ -27,6 +27,7 @@ from gateway.app.services.steps_v1 import (
     run_parse_step,
     run_subtitles_step,
 )
+from gateway.app.providers.registry import get_provider, resolve_tool_providers
 logger = logging.getLogger(__name__)
 
 DEFAULT_MM_LANG = os.getenv("DEFAULT_MM_LANG", "my")
@@ -67,153 +68,188 @@ async def run_pipeline_for_task(task_id: str, db: Session):
         logger.error("Task %s not found, abort pipeline", task_id)
         return
 
-    get_task_workspace(task_id)
-    workspace = Workspace(task_id)
+    try:
+        tool_cfg = resolve_tool_providers(engine, get_settings()).get("tools", {})
+        defaults = {
+            key: (value.get("provider") if isinstance(value, dict) else None)
+            for key, value in tool_cfg.items()
+        }
+        enabled = {
+            key: (bool(value.get("enabled")) if isinstance(value, dict) else True)
+            for key, value in tool_cfg.items()
+        }
+        defaults.setdefault("parse", "xiongmao")
+        defaults.setdefault("subtitles", "gemini")
+        defaults.setdefault("dub", "lovo")
+        defaults.setdefault("pack", "capcut")
+        defaults.setdefault("face_swap", "none")
 
-    logger.info(
-        "Starting pipeline for task %s",
-        task_id,
-    )
-    logger.info(
-        "Pipeline context task=%s category=%s content_lang=%s ui_lang=%s video_type=%s face_swap_enabled=%s",
-        task_id,
-        getattr(task, "category_key", None),
-        getattr(task, "content_lang", None),
-        getattr(task, "ui_lang", None),
-        getattr(task, "video_type", None),
-        getattr(task, "face_swap_enabled", None),
-    )
-    task.status = "processing"
-    task.last_step = None
-    task.error_message = None
-    task.error_reason = None
-    db.commit()
+        get_task_workspace(task_id)
+        workspace = Workspace(task_id)
 
-    async def _run_step(name: str, coro):
-        try:
-            result = await coro
-            task.last_step = name
+        logger.info(
+            "Starting pipeline for task %s",
+            task_id,
+        )
+        logger.info(
+            "Pipeline context task=%s category=%s content_lang=%s ui_lang=%s video_type=%s face_swap_enabled=%s",
+            task_id,
+            getattr(task, "category_key", None),
+            getattr(task, "content_lang", None),
+            getattr(task, "ui_lang", None),
+            getattr(task, "video_type", None),
+            getattr(task, "face_swap_enabled", None),
+        )
+        task.status = "processing"
+        task.last_step = None
+        task.error_message = None
+        task.error_reason = None
+        db.commit()
+
+        async def _run_step(name: str, coro):
+            try:
+                result = await coro
+                task.last_step = name
+                db.commit()
+                return True, result
+            except HTTPException as exc:
+                logger.exception("%s step failed for task %s: %s", name, task_id, exc)
+                return False, exc.detail or str(exc)
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.exception("%s step failed for task %s", name, task_id)
+                return False, str(exc)
+
+        def _disabled_step(step_name: str) -> bool:
+            if enabled.get(step_name, True):
+                return False
+            task.status = "error"
+            task.last_step = step_name
+            task.error_message = f"Tool disabled: {step_name}"
+            task.error_reason = f"Tool disabled: {step_name}"
+            task.updated_at = datetime.utcnow()
             db.commit()
-            return True, result
-        except HTTPException as exc:
-            logger.exception("%s step failed for task %s: %s", name, task_id, exc)
-            return False, exc.detail or str(exc)
-        except Exception as exc:  # pragma: no cover - defensive logging
-            logger.exception("%s step failed for task %s", name, task_id)
-            return False, str(exc)
+            return True
 
-    defaults = get_defaults()
+        # Parse
+        if _disabled_step("parse"):
+            return
+        parse_provider = defaults.get("parse")
+        parse_handler = get_provider("parse", parse_provider)
+        parse_req = schemas.ParseRequest(
+            task_id=task.id,
+            platform=task.platform,
+            link=task.source_url,
+        )
+        ok, parse_res = await _run_step("parse", parse_handler(parse_req))
+        if not ok:
+            task.status = "error"
+            task.last_step = "parse"
+            task.error_message = str(parse_res)
+            task.error_reason = str(parse_res)
+            task.updated_at = datetime.utcnow()
+            db.commit()
+            return
 
-    # Parse
-    parse_provider = task.parse_provider or defaults["parse"]
-    task.parse_provider = parse_provider
-    db.commit()
-    parse_req = schemas.ParseRequest(
-        task_id=task.id,
-        platform=task.platform,
-        link=task.source_url,
-    )
-    parse_handler = get_provider("parse", parse_provider).run
-    ok, parse_res = await _run_step("parse", parse_handler(parse_req))
-    if not ok:
-        task.status = "error"
-        task.last_step = "parse"
-        task.error_message = str(parse_res)
-        task.error_reason = str(parse_res)
-        task.updated_at = datetime.utcnow()
+        raw_file = raw_path(task.id)
+        if raw_file.exists():
+            task.raw_path = relative_to_task_workspace(raw_file, task.id)
+        if isinstance(parse_res, dict):
+            duration_sec = parse_res.get("duration_sec")
+        else:
+            duration_sec = getattr(parse_res, "duration_sec", None)
+        if duration_sec:
+            task.duration_sec = int(duration_sec)
         db.commit()
-        return
 
-    raw_file = raw_path(task.id)
-    if raw_file.exists():
-        task.raw_path = relative_to_task_workspace(raw_file, task.id)
-    if isinstance(parse_res, dict):
-        duration_sec = parse_res.get("duration_sec")
-    else:
-        duration_sec = getattr(parse_res, "duration_sec", None)
-    if duration_sec:
-        task.duration_sec = int(duration_sec)
-    db.commit()
+        # Subtitles
+        if _disabled_step("subtitles"):
+            return
+        subtitles_provider = defaults.get("subtitles")
+        subtitles_handler = get_provider("subtitles", subtitles_provider)
+        subs_req = schemas.SubtitlesRequest(
+            task_id=task.id,
+            target_lang=DEFAULT_MM_LANG,
+            force=False,
+            translate=True,
+            with_scenes=True,
+        )
+        ok, subs_res = await _run_step("subtitles", subtitles_handler(subs_req))
+        if not ok:
+            task.status = "error"
+            task.last_step = "subtitles"
+            task.error_message = str(subs_res)
+            task.error_reason = str(subs_res)
+            task.updated_at = datetime.utcnow()
+            db.commit()
+            return
 
-    # Subtitles
-    subtitles_provider = task.subtitles_provider or defaults["subtitles"]
-    task.subtitles_provider = subtitles_provider
-    db.commit()
-    subs_req = schemas.SubtitlesRequest(
-        task_id=task.id,
-        target_lang=DEFAULT_MM_LANG,
-        force=False,
-        translate=True,
-        with_scenes=True,
-    )
-    subtitles_handler = get_provider("subtitles", subtitles_provider).run
-    ok, subs_res = await _run_step("subtitles", subtitles_handler(subs_req))
-    if not ok:
-        task.status = "error"
-        task.last_step = "subtitles"
-        task.error_message = str(subs_res)
-        task.error_reason = str(subs_res)
-        task.updated_at = datetime.utcnow()
+        # Dub
+        if _disabled_step("dub"):
+            return
+        dub_provider = defaults.get("dub")
+        dub_handler = get_provider("dub", dub_provider)
+        dub_req = schemas.DubRequest(
+            task_id=task.id,
+            voice_id=DEFAULT_MM_VOICE_ID,
+            target_lang=DEFAULT_MM_LANG,
+            force=False,
+        )
+        ok, dub_res = await _run_step("dub", dub_handler(dub_req))
+        if not ok:
+            task.status = "error"
+            task.last_step = "dub"
+            task.error_message = str(dub_res)
+            task.error_reason = str(dub_res)
+            task.updated_at = datetime.utcnow()
+            db.commit()
+            return
+
+        if workspace.mm_audio_exists():
+            task.mm_audio_path = relative_to_task_workspace(
+                workspace.mm_audio_path, task.id
+            )
+        elif isinstance(dub_res, dict):
+            audio_path_val = dub_res.get("audio_path") or dub_res.get("path")
+            if audio_path_val:
+                task.mm_audio_path = str(audio_path_val)
         db.commit()
-        return
 
-    # Dub
-    dub_provider = task.dub_provider or defaults["dub"]
-    task.dub_provider = dub_provider
-    db.commit()
-    dub_req = schemas.DubRequest(
-        task_id=task.id,
-        voice_id=DEFAULT_MM_VOICE_ID,
-        target_lang=DEFAULT_MM_LANG,
-        force=False,
-    )
-    dub_handler = get_provider("dub", dub_provider).run
-    ok, dub_res = await _run_step("dub", dub_handler(dub_req))
-    if not ok:
-        task.status = "error"
-        task.last_step = "dub"
-        task.error_message = str(dub_res)
-        task.error_reason = str(dub_res)
-        task.updated_at = datetime.utcnow()
-        db.commit()
-        return
+        # Pack
+        if _disabled_step("pack"):
+            return
+        pack_provider = defaults.get("pack")
+        pack_handler = get_provider("pack", pack_provider)
+        pack_req = schemas.PackRequest(task_id=task.id)
+        ok, pack_res = await _run_step("pack", pack_handler(pack_req))
+        if not ok:
+            task.status = "error"
+            task.last_step = "pack"
+            task.error_message = str(pack_res)
+            task.error_reason = str(pack_res)
+            task.updated_at = datetime.utcnow()
+            db.commit()
+            return
 
-    if workspace.mm_audio_exists():
-        task.mm_audio_path = relative_to_task_workspace(workspace.mm_audio_path, task.id)
-    elif isinstance(dub_res, dict):
-        audio_path_val = dub_res.get("audio_path") or dub_res.get("path")
-        if audio_path_val:
-            task.mm_audio_path = str(audio_path_val)
-    db.commit()
+        pack_file = pack_zip_path(task.id)
+        if pack_file.exists():
+            task.pack_path = relative_to_workspace(pack_file)
+        elif isinstance(pack_res, dict):
+            maybe_pack = pack_res.get("pack_path") or pack_res.get("zip_path")
+            if maybe_pack:
+                task.pack_path = str(maybe_pack)
 
-    # Pack
-    pack_provider = task.pack_provider or defaults["pack"]
-    task.pack_provider = pack_provider
-    db.commit()
-    pack_req = schemas.PackRequest(task_id=task.id)
-    pack_handler = get_provider("pack", pack_provider).run
-    ok, pack_res = await _run_step("pack", pack_handler(pack_req))
-    if not ok:
-        task.status = "error"
+        task.status = "ready"
         task.last_step = "pack"
-        task.error_message = str(pack_res)
-        task.error_reason = str(pack_res)
+        task.error_message = None
+        task.error_reason = None
         task.updated_at = datetime.utcnow()
         db.commit()
-        return
-
-    pack_file = pack_zip_path(task.id)
-    if pack_file.exists():
-        task.pack_path = relative_to_workspace(pack_file)
-    elif isinstance(pack_res, dict):
-        maybe_pack = pack_res.get("pack_path") or pack_res.get("zip_path")
-        if maybe_pack:
-            task.pack_path = str(maybe_pack)
-
-    task.status = "ready"
-    task.last_step = "pack"
-    task.error_message = None
-    task.error_reason = None
-    task.updated_at = datetime.utcnow()
-    db.commit()
-    logger.info("Pipeline finished for task %s", task_id)
+        logger.info("Pipeline finished for task %s", task_id)
+    except Exception as exc:  # pragma: no cover - defensive
+        task.status = "error"
+        task.last_step = task.last_step or "pipeline"
+        task.error_message = str(exc)
+        task.error_reason = str(exc)
+        task.updated_at = datetime.utcnow()
+        db.commit()
+        logger.exception("Pipeline crashed for task %s", task_id)
