@@ -1,17 +1,16 @@
 """Task API and HTML routers for the gateway application."""
 
-from pathlib import Path
 import re
 from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..core.features import get_features
+from gateway.app.web.templates import templates
 from .. import models
 from ..db import get_db
 from ..schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary
@@ -25,8 +24,6 @@ from ..core.workspace import (
 )
 
 
-BASE_DIR = Path(__file__).resolve().parents[1]
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 pages_router = APIRouter()
 api_router = APIRouter(prefix="/api", tags=["tasks"])
