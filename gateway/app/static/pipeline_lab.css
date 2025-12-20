@@ -7,74 +7,236 @@ body {
 
 .page {
   min-height: 100vh;
-  padding: 24px 16px 40px;
+  padding: 20px 16px 48px;
   background: radial-gradient(circle at top, #ffffff 0, #f3f4f6 60%);
 }
 
 .card {
   background-color: #ffffff;
-  border-radius: 12px;
+  border-radius: 16px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   padding: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-  max-width: 1200px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+  max-width: 1100px;
   margin: 0 auto;
 }
 
-.section-grid {
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.hero-title h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.hero-subtitle {
+  margin: 0;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.env-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.env-card {
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.env-label {
+  font-weight: 600;
+  color: #64748b;
+  font-size: 0.7rem;
+}
+
+.env-label > span:first-child {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.env-value {
+  font-weight: 600;
+  color: #0f172a;
+  word-break: break-all;
+}
+
+.panel {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: #ffffff;
+}
+
+.section-title {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.section-title h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.bilingual {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.secondary {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
   gap: 12px;
+}
+
+.form-grid .span-2 {
+  grid-column: span 1;
+}
+
+.field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 
 .button-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 button {
-  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  background: #1d4ed8;
   color: #fff;
   border: none;
-  padding: 8px 12px;
-  border-radius: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
   cursor: pointer;
   font-weight: 600;
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.2);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+button.primary {
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+}
+
+button.ghost {
+  background: #e2e8f0;
+  color: #0f172a;
+  box-shadow: none;
 }
 
 button:hover {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  background: #1e40af;
+}
+
+button.ghost:hover {
+  background: #cbd5f5;
 }
 
 input,
 select,
 textarea {
+  width: 100%;
+  box-sizing: border-box;
   background: #fff;
   border: 1px solid rgba(15, 23, 42, 0.12);
   color: #111827;
-  border-radius: 8px;
-  padding: 8px 10px;
-}
-
-label {
-  color: #111827;
-}
-
-a {
-  color: #1d4ed8;
-}
-
-a:hover {
-  color: #1e40af;
-}
-
-pre {
-  background: #f9fafb;
   border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.downloads {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.downloads-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.downloads a {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.downloads a:hover {
+  text-decoration: underline;
+}
+
+.output {
+  background: #f9fafb;
+  border-radius: 12px;
   padding: 12px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   color: #111827;
+  white-space: pre-wrap;
+  min-height: 48px;
+}
+
+.section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .page {
+    padding: 28px 24px 56px;
+  }
+
+  .section-title {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .form-grid .span-2 {
+    grid-column: span 2;
+  }
+
+  button {
+    align-items: center;
+  }
 }

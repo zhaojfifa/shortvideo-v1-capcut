@@ -17,7 +17,7 @@ def _t(lang: str) -> Callable[[str], str]:
 
 def get_template_globals() -> Dict[str, object]:
     settings = get_settings()
-    primary = settings.ui_primary_lang or "zh"
+    primary = settings.ui_primary_lang or "en"
     secondary = settings.ui_secondary_lang or "my"
     return {
         "t_primary": _t(primary),
