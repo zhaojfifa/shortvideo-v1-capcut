@@ -77,10 +77,16 @@
         <div class="meta-item"><strong>Created</strong><span>{{ task.created_at }}</span></div>
         <div class="meta-item">
           <strong>Source URL</strong>
-          <div id="source-text" style="white-space:pre-wrap;">{{ task.source_url | e }}</div>
-          <div style="margin-top:6px;">
-            <a id="source-link" class="disabled" href="#" target="_blank" rel="noopener">Open source link</a>
-          </div>
+          {% if task_view.source_url_open %}
+            <div><a href="{{ task_view.source_url_open }}" target="_blank" rel="noopener">Open source link</a></div>
+          {% else %}
+            <div class="muted">No clickable URL found in source text.</div>
+          {% endif %}
+          {% if task.source_url %}
+            <div style="margin-top:6px; white-space:pre-wrap; word-break:break-word; color:#111827;">
+              {{ task.source_url }}
+            </div>
+          {% endif %}
         </div>
       </div>
       <div class="env" style="margin-top:12px;">
@@ -154,15 +160,7 @@
   </div>
 
   <script>
-    window.currentTask = {
-      task_id: "{{ task.task_id | e }}",
-      status: "{{ task.status | e }}",
-      platform: "{{ (task.platform or '') | e }}",
-      category_key: "{{ (task.category_key or '') | e }}",
-      content_lang: "{{ (task.content_lang or '') | e }}",
-      ui_lang: "{{ (task.ui_lang or '') | e }}",
-      source_url: "{{ (task.source_url or '') | e }}",
-    };
+    window.currentTask = {{ task_json | tojson | safe }};
 
     function appendLog(line) {
       const logEl = document.getElementById("log-output");
@@ -186,17 +184,9 @@
         : "badge-unknown");
     }
 
-    function toHref(path) {
-      if (!path) return null;
-      const s = String(path);
-      if (/^https?:\/\//i.test(s)) return s;
-      return "/files/" + String(path).replace(/^\/+/, "");
-    }
-
-    function setDownloadLink(id, path) {
+    function setDownloadLink(id, href) {
       const el = document.getElementById(id);
       if (!el) return;
-      const href = toHref(path);
       if (href) {
         el.href = href;
         el.classList.remove("disabled");
@@ -208,16 +198,26 @@
       }
     }
 
+    function taskEndpoint(taskId, kind) {
+      const id = encodeURIComponent(taskId);
+      if (kind === "raw") return `/v1/tasks/${id}/raw`;
+      if (kind === "origin") return `/v1/tasks/${id}/subs_origin`;
+      if (kind === "mm") return `/v1/tasks/${id}/subs_mm`;
+      if (kind === "audio") return `/v1/tasks/${id}/audio_mm`;
+      if (kind === "pack") return `/v1/tasks/${id}/pack`;
+      return null;
+    }
+
     function updateDownloadsFromTask(data) {
-      setDownloadLink("raw-link", data.raw_path);
-      setDownloadLink("origin-link", data.origin_srt_path);
-      setDownloadLink("mm-link", data.mm_srt_path);
-      setDownloadLink("audio-link", data.mm_audio_path);
-      setDownloadLink("pack-link", data.pack_path);
+      setDownloadLink("raw-link", data.raw_path ? taskEndpoint(data.task_id, "raw") : null);
+      setDownloadLink("origin-link", data.origin_srt_path ? taskEndpoint(data.task_id, "origin") : null);
+      setDownloadLink("mm-link", data.mm_srt_path ? taskEndpoint(data.task_id, "mm") : null);
+      setDownloadLink("audio-link", data.mm_audio_path ? taskEndpoint(data.task_id, "audio") : null);
+      setDownloadLink("pack-link", data.pack_path ? taskEndpoint(data.task_id, "pack") : null);
 
       const audioEl = document.getElementById("audio-preview");
       const audioLink = document.getElementById("audio-link");
-      const audioHref = toHref(data.mm_audio_path);
+      const audioHref = data.mm_audio_path ? taskEndpoint(data.task_id, "audio") : null;
       if (audioEl) {
         if (audioHref) {
           audioEl.src = audioHref;
@@ -237,25 +237,6 @@
       }
     }
 
-    function extractFirstHttpUrl(text) {
-      if (!text) return null;
-      const s = String(text);
-      const m = s.match(/https?:\/\/[^\s]+/i);
-      return m ? m[0] : null;
-    }
-
-    function updateSourceLink(data) {
-      const linkEl = document.getElementById("source-link");
-      if (!linkEl) return;
-      const url = extractFirstHttpUrl(data.source_url || "");
-      if (url) {
-        linkEl.href = url;
-        linkEl.classList.remove("disabled");
-      } else {
-        linkEl.href = "#";
-        linkEl.classList.add("disabled");
-      }
-    }
 
     function updateStepButtons(data) {
       const parseBtn = document.getElementById("btn-parse");
@@ -282,7 +263,6 @@
     updateDownloadsFromTask(window.currentTask);
     updateStatusBadge(window.currentTask);
     updateStepButtons(window.currentTask);
-    updateSourceLink(window.currentTask);
 
     async function refreshTaskState() {
       const taskId = window.currentTask.task_id;
@@ -296,7 +276,6 @@
       updateDownloadsFromTask(data);
       updateStatusBadge(data);
       updateStepButtons(data);
-      updateSourceLink(data);
       if (data.error_message) {
         appendLog(`Last error: ${data.error_message}`);
       }

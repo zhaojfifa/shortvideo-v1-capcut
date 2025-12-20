@@ -1,6 +1,7 @@
 """Task API and HTML routers for the gateway application."""
 
 from pathlib import Path
+import re
 from typing import Optional
 from uuid import uuid4
 
@@ -170,6 +171,13 @@ def _task_to_detail(task: models.Task) -> TaskDetail:
     )
 
 
+def _extract_first_http_url(text: str | None) -> str | None:
+    if not text:
+        return None
+    match = re.search(r"https?://\S+", text)
+    return match.group(0) if match else None
+
+
 @pages_router.get("/tasks/{task_id}", response_class=HTMLResponse)
 async def task_workbench_page(
     request: Request, task_id: str, db: Session = Depends(get_db)
@@ -201,11 +209,30 @@ async def task_workbench_page(
     except Exception:
         env_summary["defaults"] = {}
 
+    detail = _task_to_detail(task)
+    task_json = {
+        "task_id": detail.task_id,
+        "status": detail.status,
+        "platform": detail.platform,
+        "category_key": detail.category_key,
+        "content_lang": detail.content_lang,
+        "ui_lang": detail.ui_lang,
+        "source_url": detail.source_url,
+        "raw_path": detail.raw_path,
+        "origin_srt_path": detail.origin_srt_path,
+        "mm_srt_path": detail.mm_srt_path,
+        "mm_audio_path": detail.mm_audio_path,
+        "pack_path": detail.pack_path,
+    }
+    task_view = {"source_url_open": _extract_first_http_url(task.source_url)}
+
     return templates.TemplateResponse(
         "task_workbench.html",
         {
             "request": request,
-            "task": _task_to_detail(task),
+            "task": detail,
+            "task_json": task_json,
+            "task_view": task_view,
             "env_summary": env_summary,
         },
     )
