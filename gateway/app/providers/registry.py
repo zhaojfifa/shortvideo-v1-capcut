@@ -4,6 +4,12 @@ from typing import Any, Dict
 
 from gateway.app.config import get_settings
 from gateway.app.db import engine, get_provider_config_map
+from gateway.app.services.steps_v1 import (
+    run_dub_step,
+    run_pack_step,
+    run_parse_step,
+    run_subtitles_step,
+)
 
 AVAILABLE_PROVIDERS: Dict[str, list[str]] = {
     "parse": ["xiongmao", "xiaomao"],
@@ -44,3 +50,28 @@ def resolve_tool_providers(db_engine=engine, settings=None) -> Dict[str, Any]:
             "available": available,
         }
     return {"tools": tools}
+
+
+def get_provider(tool_type: str, name: str):
+    providers = {
+        "parse": {
+            "xiongmao": run_parse_step,
+            "xiaomao": run_parse_step,
+        },
+        "subtitles": {
+            "gemini": run_subtitles_step,
+            "whisper": run_subtitles_step,
+        },
+        "dub": {
+            "lovo": run_dub_step,
+            "edge-tts": run_dub_step,
+        },
+        "pack": {
+            "capcut": run_pack_step,
+            "youcut": run_pack_step,
+        },
+    }
+    tool_map = providers.get(tool_type, {})
+    if name not in tool_map:
+        raise KeyError(f"Unknown provider: {tool_type}:{name}")
+    return tool_map[name]

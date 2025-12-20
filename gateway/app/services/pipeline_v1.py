@@ -10,7 +10,8 @@ from datetime import datetime
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from gateway.app.db import SessionLocal
+from gateway.app.config import get_settings
+from gateway.app.db import SessionLocal, engine
 from gateway.app.core.workspace import (
     Workspace,
     get_task_workspace,
@@ -26,10 +27,17 @@ from gateway.app.services.steps_v1 import (
     run_parse_step,
     run_subtitles_step,
 )
+from gateway.app.providers.registry import get_provider, resolve_tool_providers
 logger = logging.getLogger(__name__)
 
 DEFAULT_MM_LANG = os.getenv("DEFAULT_MM_LANG", "my")
 DEFAULT_MM_VOICE_ID = os.getenv("DEFAULT_MM_VOICE_ID", "mm_female_1")
+
+
+def get_defaults() -> dict:
+    settings = get_settings()
+    tools = resolve_tool_providers(engine, settings).get("tools", {})
+    return {tool: config.get("provider") for tool, config in tools.items()}
 
 
 def run_pipeline_background(task_id: str):
@@ -38,6 +46,16 @@ def run_pipeline_background(task_id: str):
     db = SessionLocal()
     try:
         asyncio.run(run_pipeline_for_task(task_id, db))
+    except Exception as exc:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if task:
+            task.status = "error"
+            task.last_step = "pipeline"
+            task.error_reason = "pipeline_crash"
+            task.error_message = str(exc)
+            task.updated_at = datetime.utcnow()
+            db.commit()
+        logger.exception("Pipeline crashed for task %s", task_id)
     finally:
         db.close()
 
