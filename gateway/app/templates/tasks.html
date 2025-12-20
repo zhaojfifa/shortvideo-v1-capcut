@@ -249,14 +249,33 @@
       countEl.textContent = `Loaded ${count} task${count === 1 ? "" : "s"}.`;
     }
 
+    function hasInFlight(tasks) {
+      return tasks.some((t) => {
+        const s = String(t.status || "").toLowerCase();
+        return s === "pending" || s === "processing";
+      });
+    }
+
+    let pollTimer = null;
+
     async function refreshTasks() {
       countEl.textContent = "Loading tasks…";
       try {
-        const res = await fetch("/api/tasks?limit=50");
+        const url = `/api/tasks?limit=50&ts=${Date.now()}`;
+        const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const tasks = Array.isArray(data) ? data : (data.items || []);
         renderTasks(tasks);
+
+        if (hasInFlight(tasks)) {
+          if (!pollTimer) {
+            pollTimer = setInterval(refreshTasks, 5000);
+          }
+        } else if (pollTimer) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+        }
       } catch (err) {
         console.error(err);
         countEl.textContent = `Failed to load tasks: ${err.message}`;
@@ -264,7 +283,14 @@
     }
 
     renderTasks(initialTasks || []);
-    document.addEventListener("DOMContentLoaded", refreshTasks);
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", refreshTasks, { once: true });
+    } else {
+      refreshTasks();
+    }
+
+    window.addEventListener("focus", () => refreshTasks());
   </script>
 </body>
 </html>
