@@ -17,6 +17,7 @@ from gateway.app.core.workspace import (
     pack_zip_path,
     raw_path,
     relative_to_task_workspace,
+    relative_to_workspace,
 )
 from gateway.app import models, schemas
 from gateway.app.services.steps_v1 import (
@@ -169,7 +170,7 @@ async def run_pipeline_for_task(task_id: str, db: Session):
 
     pack_file = pack_zip_path(task.id)
     if pack_file.exists():
-        task.pack_path = relative_to_task_workspace(pack_file, task.id)
+        task.pack_path = relative_to_workspace(pack_file)
     elif isinstance(pack_res, dict):
         maybe_pack = pack_res.get("pack_path") or pack_res.get("zip_path")
         if maybe_pack:

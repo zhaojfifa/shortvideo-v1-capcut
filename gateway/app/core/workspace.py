@@ -238,8 +238,8 @@ def ensure_public_audio(path: Path) -> Path:
     return target
 
 
-def packs_dir(task_id: str) -> Path:
-    path = task_base_dir(task_id) / "pack"
+def packs_dir(_task_id: str) -> Path:
+    path = workspace_root() / "pack"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
