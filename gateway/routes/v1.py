@@ -7,7 +7,6 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from gateway.app.config import get_settings
-from gateway.app.core.workspace import relative_to_workspace
 from gateway.app.db import SessionLocal
 from gateway.app import models
 from gateway.app.core.workspace import (
