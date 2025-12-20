@@ -79,13 +79,19 @@ async def run_pipeline_for_task(task_id: str, db: Session):
             logger.exception("%s step failed for task %s", name, task_id)
             return False, str(exc)
 
+    defaults = get_defaults()
+
     # Parse
+    parse_provider = task.parse_provider or defaults["parse"]
+    task.parse_provider = parse_provider
+    db.commit()
     parse_req = schemas.ParseRequest(
         task_id=task.id,
         platform=task.platform,
         link=task.source_url,
     )
-    ok, parse_res = await _run_step("parse", run_parse_step(parse_req))
+    parse_handler = get_provider("parse", parse_provider).run
+    ok, parse_res = await _run_step("parse", parse_handler(parse_req))
     if not ok:
         task.status = "error"
         task.last_step = "parse"
@@ -107,6 +113,9 @@ async def run_pipeline_for_task(task_id: str, db: Session):
     db.commit()
 
     # Subtitles
+    subtitles_provider = task.subtitles_provider or defaults["subtitles"]
+    task.subtitles_provider = subtitles_provider
+    db.commit()
     subs_req = schemas.SubtitlesRequest(
         task_id=task.id,
         target_lang=DEFAULT_MM_LANG,
@@ -114,7 +123,8 @@ async def run_pipeline_for_task(task_id: str, db: Session):
         translate=True,
         with_scenes=True,
     )
-    ok, subs_res = await _run_step("subtitles", run_subtitles_step(subs_req))
+    subtitles_handler = get_provider("subtitles", subtitles_provider).run
+    ok, subs_res = await _run_step("subtitles", subtitles_handler(subs_req))
     if not ok:
         task.status = "error"
         task.last_step = "subtitles"
@@ -125,13 +135,17 @@ async def run_pipeline_for_task(task_id: str, db: Session):
         return
 
     # Dub
+    dub_provider = task.dub_provider or defaults["dub"]
+    task.dub_provider = dub_provider
+    db.commit()
     dub_req = schemas.DubRequest(
         task_id=task.id,
         voice_id=DEFAULT_MM_VOICE_ID,
         target_lang=DEFAULT_MM_LANG,
         force=False,
     )
-    ok, dub_res = await _run_step("dub", run_dub_step(dub_req))
+    dub_handler = get_provider("dub", dub_provider).run
+    ok, dub_res = await _run_step("dub", dub_handler(dub_req))
     if not ok:
         task.status = "error"
         task.last_step = "dub"
@@ -150,8 +164,12 @@ async def run_pipeline_for_task(task_id: str, db: Session):
     db.commit()
 
     # Pack
+    pack_provider = task.pack_provider or defaults["pack"]
+    task.pack_provider = pack_provider
+    db.commit()
     pack_req = schemas.PackRequest(task_id=task.id)
-    ok, pack_res = await _run_step("pack", run_pack_step(pack_req))
+    pack_handler = get_provider("pack", pack_provider).run
+    ok, pack_res = await _run_step("pack", pack_handler(pack_req))
     if not ok:
         task.status = "error"
         task.last_step = "pack"
