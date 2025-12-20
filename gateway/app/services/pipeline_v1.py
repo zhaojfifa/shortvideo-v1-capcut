@@ -27,7 +27,6 @@ from gateway.app.services.steps_v1 import (
     run_parse_step,
     run_subtitles_step,
 )
-from gateway.app.providers.registry import get_provider, resolve_tool_providers
 logger = logging.getLogger(__name__)
 
 DEFAULT_MM_LANG = os.getenv("DEFAULT_MM_LANG", "my")
