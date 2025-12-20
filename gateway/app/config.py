@@ -73,6 +73,12 @@ class Settings(BaseSettings):
     # Dubbing provider selection
     dub_provider: str = Field("edge-tts", env="DUB_PROVIDER")
 
+    # UI language settings
+    ui_primary_lang: str = Field("zh", env="UI_PRIMARY_LANG")
+    ui_secondary_lang: str = Field("my", env="UI_SECONDARY_LANG")
+    ui_show_secondary: bool = Field(True, env="UI_SHOW_SECONDARY")
+    ui_mobile_prefix_enabled: bool = Field(True, env="UI_MOBILE_PREFIX_ENABLED")
+
     class Config:
         env_file = ".env"
         case_sensitive = False
