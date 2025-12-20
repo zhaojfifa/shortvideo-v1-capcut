@@ -26,6 +26,7 @@
 | POST | `/v1/subtitles` | Transcribe + translate | `SubtitlesRequest` | JSON | Writes origin/mm SRT |
 | POST | `/v1/dub` | Generate dubbing audio | `DubRequest` | JSON | Writes mm audio |
 | POST | `/v1/pack` | Build CapCut pack | `PackRequest` | JSON | Writes pack zip + marks task ready |
+| POST | `/v1/publish` | Publish CapCut pack | `PublishRequest` | `PublishResponse` | Uploads to R2 or local archive |
 
 ## V1 Artifact Downloads
 
@@ -35,7 +36,7 @@
 | GET | `/v1/tasks/{task_id}/subs_origin` | Origin SRT | — | SRT | `origin_srt_path` indicates presence |
 | GET | `/v1/tasks/{task_id}/subs_mm` | Burmese SRT | — | SRT | `mm_srt_path` indicates presence |
 | GET | `/v1/tasks/{task_id}/audio_mm` | Dubbed audio | — | Audio | `mm_audio_path` indicates presence |
-| GET | `/v1/tasks/{task_id}/pack` | CapCut pack ZIP | — | ZIP | Uses `pack_path` when available |
+| GET | `/v1/tasks/{task_id}/pack` | CapCut pack ZIP | — | Redirect | Redirects to published R2/public URL or `/files/...` |
 
 ## Admin Tools APIs
 
@@ -43,12 +44,13 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/admin/tools` | Provider defaults | — | JSON | Returns `tools` with provider + enabled |
 | POST | `/api/admin/tools` | Save defaults | JSON payload | JSON | Validates provider names |
+| POST | `/api/admin/publish/backfill` | Publish backfill | Query params | JSON | Publishes latest packs (admin) |
 
 ## File Serving
 
 | Method | Path | Description | Request | Response | Notes |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/files/{rel_path:path}` | Workspace file access | — | File | `rel_path` must be under `raw/`, `tasks/`, `audio/`, or `pack/` |
+| GET | `/files/{rel_path:path}` | Workspace file access | — | File | `rel_path` must be under `raw/`, `tasks/`, `audio/`, `pack/`, or `published/` |
 
 ## cURL Examples
 
@@ -104,8 +106,16 @@ curl -s -X POST "http://127.0.0.1:8000/v1/pack" \
   -d '{"task_id":"<task_id>"}'
 ```
 
-### Download pack (workspace-relative)
+### Publish pack
 
 ```bash
-curl -s -O "http://127.0.0.1:8000/files/pack/<task_id>_capcut_pack.zip"
+curl -s -X POST "http://127.0.0.1:8000/v1/publish" \
+  -H "Content-Type: application/json" \
+  -d '{"task_id":"<task_id>","force":false}'
+```
+
+### Download pack (stable link)
+
+```bash
+curl -s -L -O "http://127.0.0.1:8000/v1/tasks/<task_id>/pack"
 ```
