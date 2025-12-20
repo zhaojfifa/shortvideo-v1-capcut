@@ -11,10 +11,12 @@ from gateway.app.core.workspace import (
     origin_srt_path,
     pack_zip_path,
     raw_path,
+    relative_to_workspace,
     translated_srt_path,
     workspace_root,
 )
-from gateway.app.db import Base, engine, ensure_provider_config_table, ensure_task_extra_columns
+from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
+from gateway.app import models
 from gateway.app.routers import tasks as tasks_router
 from gateway.routes import admin_tools
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
@@ -151,7 +153,20 @@ async def get_audio(task_id: str):
 
 @app.post("/v1/pack")
 async def pack(request: PackRequest):
-    return await run_pack_step(request)
+    result = await run_pack_step(request)
+    pack_file = pack_zip_path(request.task_id)
+    if pack_file.exists():
+        db = SessionLocal()
+        try:
+            task = db.query(models.Task).filter(models.Task.id == request.task_id).first()
+            if task:
+                task.pack_path = relative_to_workspace(pack_file)
+                task.status = "ready"
+                task.last_step = "pack"
+                db.commit()
+        finally:
+            db.close()
+    return result
 
 
 @app.get("/v1/tasks/{task_id}/pack")

@@ -136,11 +136,15 @@ def _resolve_paths(task: models.Task) -> dict[str, Optional[str]]:
 
 def _task_to_detail(task: models.Task) -> TaskDetail:
     paths = _resolve_paths(task)
+    status = task.status or "pending"
+    if status != "error" and paths["pack_path"]:
+        status = "ready"
 
     return TaskDetail(
         task_id=task.id,
         title=task.title,
         source_url=str(task.source_url) if task.source_url else None,
+        source_link_url=_extract_first_http_url(task.source_url),
         platform=task.platform,
         account_id=task.account_id,
         account_name=task.account_name,
@@ -151,7 +155,7 @@ def _task_to_detail(task: models.Task) -> TaskDetail:
         ui_lang=task.ui_lang or "en",
         style_preset=task.style_preset,
         face_swap_enabled=bool(task.face_swap_enabled),
-        status=task.status,
+        status=status,
         last_step=task.last_step,
         duration_sec=task.duration_sec,
         thumb_url=task.thumb_url,
@@ -302,11 +306,16 @@ def list_tasks(
 
     summaries: list[TaskSummary] = []
     for t in items:
+        pack_path = str(t.pack_path) if t.pack_path else None
+        status = t.status or "pending"
+        if status != "error" and pack_path:
+            status = "ready"
         summaries.append(
             TaskSummary(
                 task_id=t.id,
                 title=t.title,
                 source_url=str(t.source_url) if t.source_url else None,
+                source_link_url=_extract_first_http_url(t.source_url),
                 platform=t.platform,
                 account_id=t.account_id,
                 account_name=t.account_name,
@@ -317,11 +326,11 @@ def list_tasks(
                 ui_lang=t.ui_lang or "en",
                 style_preset=t.style_preset,
                 face_swap_enabled=bool(t.face_swap_enabled),
-                status=t.status,
+                status=status,
                 last_step=t.last_step,
                 duration_sec=t.duration_sec,
                 thumb_url=t.thumb_url,
-                pack_path=t.pack_path,
+                pack_path=pack_path,
                 created_at=t.created_at,
                 error_message=t.error_message,
                 error_reason=t.error_reason,

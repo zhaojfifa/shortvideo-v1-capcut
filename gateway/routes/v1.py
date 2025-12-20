@@ -5,6 +5,9 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from gateway.app.config import get_settings
+from gateway.app.core.workspace import relative_to_workspace
+from gateway.app.db import SessionLocal
+from gateway.app import models
 from gateway.app.core.workspace import (
     Workspace,
     origin_srt_path,
@@ -94,7 +97,20 @@ async def get_audio(task_id: str):
 
 @router.post("/pack")
 async def pack(request: PackRequest):
-    return await run_pack_step(request)
+    result = await run_pack_step(request)
+    pack_file = pack_zip_path(request.task_id)
+    if pack_file.exists():
+        db = SessionLocal()
+        try:
+            task = db.query(models.Task).filter(models.Task.id == request.task_id).first()
+            if task:
+                task.pack_path = relative_to_workspace(pack_file)
+                task.status = "ready"
+                task.last_step = "pack"
+                db.commit()
+        finally:
+            db.close()
+    return result
 
 
 @router.get("/tasks/{task_id}/pack")
