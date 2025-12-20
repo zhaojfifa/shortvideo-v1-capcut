@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Task not found</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #f3f4f6; color: #0f172a; margin:0; padding:24px; }
+    .card { max-width: 640px; margin: 0 auto; background: #fff; border-radius: 12px; border: 1px solid #e5e7eb; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    h1 { margin-top: 0; }
+    a { color: #2563eb; text-decoration: none; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Task not found</h1>
+    <p>No task exists for ID <code>{{ task_id }}</code>.</p>
+    <p><a href="/tasks">← Back to Task Board</a></p>
+  </div>
+</body>
+</html>

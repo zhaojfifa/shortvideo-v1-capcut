@@ -59,7 +59,10 @@
 <body>
   <div class="page">
     <header>
-      <h1>New Suitcase Task</h1>
+      <h1>{{ t_primary("new_suitcase_task") }}</h1>
+      {% if ui_show_secondary %}
+        <div class="muted">{{ t_secondary("new_suitcase_task") }}</div>
+      {% endif %}
       <a href="/tasks">Back to Task Board</a>
     </header>
 
@@ -67,7 +70,7 @@
       <form id="task-form">
         <div class="field">
           <label for="source_url">Source URL *</label>
-          <input id="source_url" name="source_url" type="url" required placeholder="https://www.douyin.com/video/..." />
+          <input id="source_url" name="source_url" type="text" autocomplete="off" required placeholder="可粘贴整段分享文案，例如抖音/XHS/TK/FB的分享文本" />
         </div>
 
         <div class="row">
@@ -75,6 +78,9 @@
             <label for="platform">Platform</label>
             <select id="platform" name="platform">
               <option value="douyin" selected>Douyin</option>
+              <option value="xhs">XHS</option>
+              <option value="tk">TikTok</option>
+              <option value="fb">Facebook</option>
             </select>
           </div>
           <div class="field">
@@ -123,6 +129,7 @@
   </div>
 
   <script>
+    window.__FEATURES__ = {{ features | tojson | safe }};
     const form = document.getElementById("task-form");
     const resultEl = document.getElementById("create-result");
 
@@ -130,7 +137,12 @@
       ev.preventDefault();
       resultEl.textContent = "Submitting...";
 
-      const source_url = document.getElementById("source_url").value.trim();
+      const rawSource = document.getElementById("source_url").value.trim();
+      if (!rawSource) {
+        alert("请输入短视频分享文案或链接。");
+        resultEl.textContent = "";
+        return;
+      }
       const platform = document.getElementById("platform").value;
       const account_id = document.getElementById("account_id").value;
       const account_name = document.getElementById("account_name").value;
@@ -140,7 +152,7 @@
       const note = document.getElementById("note").value.trim();
 
       const payload = {
-        source_url,
+        source_url: rawSource,
         platform,
         account_id,
         account_name,
