@@ -132,6 +132,18 @@ curl -X POST "http://127.0.0.1:8000/v1/pack" \
   -d '{"task_id":"dy_demo_v1"}'
 ```
 
+## Admin Tools（Provider 配置）
+
+访问 `/admin/tools` 查看与更新默认 provider（parse/subtitles/dub/pack/face_swap）。页面会列出可用 provider 并允许启用/禁用。
+
+当前支持的 provider 列表：
+
+- parse: xiongmao, xiaomao
+- subtitles: gemini, whisper
+- dub: lovo, edge-tts
+- pack: capcut, youcut
+- face_swap: none, xxx_faceswap_api
+
 ## Render 部署说明
 
 - 构建：`pip install -r requirements.txt`
