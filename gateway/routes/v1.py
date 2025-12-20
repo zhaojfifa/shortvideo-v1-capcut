@@ -1,10 +1,13 @@
 """V1 routes exposing parse/subtitles/dub/pack and related assets."""
 
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
-from fastapi.templating import Jinja2Templates
-
 from gateway.app.config import get_settings
+from gateway.app.db import SessionLocal
+from gateway.app import models
+from gateway.app.web.templates import get_templates
 from gateway.app.core.workspace import (
     Workspace,
     origin_srt_path,
@@ -21,7 +24,7 @@ from gateway.app.services.steps_v1 import (
 )
 
 router = APIRouter()
-templates = Jinja2Templates(directory="gateway/app/templates")
+templates = get_templates()
 
 
 @router.get("/ui", response_class=HTMLResponse)
@@ -99,6 +102,19 @@ async def pack(request: PackRequest):
 
 @router.get("/tasks/{task_id}/pack")
 async def download_pack(task_id: str):
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if task and task.pack_path:
+            ws_root = Path(get_settings().workspace_root)
+            pack_file = ws_root / task.pack_path
+            if pack_file.exists():
+                return FileResponse(
+                    pack_file, media_type="application/zip", filename=pack_file.name
+                )
+    finally:
+        db.close()
+
     pack_file = pack_zip_path(task_id)
     if not pack_file.exists():
         raise HTTPException(status_code=404, detail="pack not found")

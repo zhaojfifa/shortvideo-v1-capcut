@@ -2,7 +2,7 @@ from datetime import datetime
 import re
 from typing import Optional
 
-from pydantic import BaseModel, HttpUrl, validator
+from pydantic import BaseModel, constr, root_validator, validator
 
 _URL_RE = re.compile(r"(https?://[^\s]+)")
 
@@ -11,6 +11,17 @@ class ParseRequest(BaseModel):
     task_id: str
     platform: str | None = None
     link: str
+
+    @root_validator(pre=True)
+    def normalize_link(cls, values: dict) -> dict:
+        link = values.get("link")
+        if not link:
+            for key in ("url", "source_url", "text"):
+                candidate = values.get(key)
+                if candidate:
+                    values["link"] = candidate
+                    break
+        return values
 
     @validator("link")
     def extract_first_url(cls, v: str) -> str:
@@ -43,7 +54,7 @@ class PackRequest(BaseModel):
 
 
 class TaskCreate(BaseModel):
-    source_url: HttpUrl
+    source_url: constr(strip_whitespace=True, min_length=1)
     platform: Optional[str] = None
     account_id: Optional[str] = None
     account_name: Optional[str] = None
@@ -62,6 +73,8 @@ class TaskCreate(BaseModel):
 class TaskSummary(BaseModel):
     task_id: str
     title: Optional[str] = None
+    source_url: Optional[str] = None
+    source_link_url: Optional[str] = None
     platform: Optional[str] = None
     account_id: Optional[str] = None
     account_name: Optional[str] = None
@@ -80,6 +93,11 @@ class TaskSummary(BaseModel):
     created_at: datetime
     error_reason: Optional[str] = None
     error_message: Optional[str] = None
+    parse_provider: Optional[str] = None
+    subtitles_provider: Optional[str] = None
+    dub_provider: Optional[str] = None
+    pack_provider: Optional[str] = None
+    face_swap_provider: Optional[str] = None
 
     class Config:
         orm_mode = True
@@ -87,6 +105,8 @@ class TaskSummary(BaseModel):
 
 class TaskDetail(TaskSummary):
     raw_path: Optional[str] = None
+    origin_srt_path: Optional[str] = None
+    mm_srt_path: Optional[str] = None
     mm_audio_path: Optional[str] = None
     pack_path: Optional[str] = None
 
