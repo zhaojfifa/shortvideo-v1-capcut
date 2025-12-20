@@ -34,6 +34,12 @@ DEFAULT_MM_LANG = os.getenv("DEFAULT_MM_LANG", "my")
 DEFAULT_MM_VOICE_ID = os.getenv("DEFAULT_MM_VOICE_ID", "mm_female_1")
 
 
+def get_defaults() -> dict:
+    settings = get_settings()
+    tools = resolve_tool_providers(engine, settings).get("tools", {})
+    return {tool: config.get("provider") for tool, config in tools.items()}
+
+
 def run_pipeline_background(task_id: str):
     """Entry point for FastAPI BackgroundTasks; manages its own DB session."""
 
