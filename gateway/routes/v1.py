@@ -1,10 +1,15 @@
 """V1 routes exposing parse/subtitles/dub/pack and related assets."""
 
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from gateway.app.config import get_settings
+from gateway.app.core.workspace import relative_to_workspace
+from gateway.app.db import SessionLocal
+from gateway.app import models
 from gateway.app.core.workspace import (
     Workspace,
     origin_srt_path,
@@ -94,11 +99,78 @@ async def get_audio(task_id: str):
 
 @router.post("/pack")
 async def pack(request: PackRequest):
-    return await run_pack_step(request)
+    result = await run_pack_step(request)
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == request.task_id).first()
+        if not task:
+            return result
+
+        rel_pack = None
+        if isinstance(result, dict):
+            rel_pack = (
+                result.get("pack_path")
+                or result.get("zip_path")
+                or result.get("pack")
+                or result.get("path")
+            )
+
+        if not rel_pack and task.pack_path:
+            rel_pack = task.pack_path
+
+        pack_file = None
+        if rel_pack:
+            ws_root = Path(get_settings().workspace_root)
+            candidate = ws_root / rel_pack
+            if candidate.exists():
+                pack_file = candidate
+
+        if not pack_file:
+            candidates = [
+                pack_zip_path(request.task_id),
+                Path(get_settings().workspace_root)
+                / "files"
+                / "pack"
+                / f"{request.task_id}_capcut_pack.zip",
+                Path(get_settings().workspace_root)
+                / "pack"
+                / f"{request.task_id}_capcut_pack.zip",
+            ]
+            for candidate in candidates:
+                if candidate.exists():
+                    pack_file = candidate
+                    break
+
+        if pack_file and pack_file.exists():
+            task.pack_path = relative_to_workspace(pack_file)
+
+        task.status = "ready"
+        task.last_step = "pack"
+        task.error_message = None
+        task.error_reason = None
+
+        db.commit()
+        db.refresh(task)
+    finally:
+        db.close()
+    return result
 
 
 @router.get("/tasks/{task_id}/pack")
 async def download_pack(task_id: str):
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if task and task.pack_path:
+            ws_root = Path(get_settings().workspace_root)
+            pack_file = ws_root / task.pack_path
+            if pack_file.exists():
+                return FileResponse(
+                    pack_file, media_type="application/zip", filename=pack_file.name
+                )
+    finally:
+        db.close()
+
     pack_file = pack_zip_path(task_id)
     if not pack_file.exists():
         raise HTTPException(status_code=404, detail="pack not found")
