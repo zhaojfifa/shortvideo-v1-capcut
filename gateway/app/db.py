@@ -73,6 +73,26 @@ def ensure_task_extra_columns(engine) -> None:
         alter_statements.append(
             "ALTER TABLE tasks ADD COLUMN face_swap_provider VARCHAR(64)"
         )
+    if "publish_status" not in columns:
+        alter_statements.append(
+            "ALTER TABLE tasks ADD COLUMN publish_status VARCHAR(32)"
+        )
+    if "publish_provider" not in columns:
+        alter_statements.append(
+            "ALTER TABLE tasks ADD COLUMN publish_provider VARCHAR(32)"
+        )
+    if "publish_key" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN publish_key TEXT")
+    if "publish_url" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN publish_url TEXT")
+    if "published_at" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN published_at TEXT")
+    if "priority" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN priority INTEGER")
+    if "assignee" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN assignee VARCHAR(64)")
+    if "ops_notes" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN ops_notes TEXT")
 
     if not alter_statements:
         return
