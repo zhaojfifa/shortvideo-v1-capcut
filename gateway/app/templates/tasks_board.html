@@ -119,6 +119,7 @@
     const jsonPanel = document.getElementById("json-detail");
     const jsonTitle = document.getElementById("json-title");
     const jsonPre = document.getElementById("json-pre");
+    const initialTasks = {{ (tasks or []) | tojson | safe }};
 
     function statusClass(status) {
       return {
@@ -215,6 +216,10 @@
       }
     });
 
+    renderTasks(initialTasks || []);
+    messageEl.textContent = initialTasks.length
+      ? `Loaded ${initialTasks.length} tasks.`
+      : "No tasks yet.";
     document.getElementById("refresh-btn").addEventListener("click", loadTasks);
     document.addEventListener("DOMContentLoaded", loadTasks);
   </script>
