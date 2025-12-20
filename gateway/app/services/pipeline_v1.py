@@ -20,9 +20,6 @@ from gateway.app.core.workspace import (
     relative_to_workspace,
 )
 from gateway.app import models, schemas
-from gateway.app.tools_config import get_defaults
-from gateway.app.tools_registry import get_provider
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_MM_LANG = os.getenv("DEFAULT_MM_LANG", "my")

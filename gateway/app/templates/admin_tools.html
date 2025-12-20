@@ -43,26 +43,42 @@
   <div class="page">
     <div class="card">
       <h1>Admin Tools</h1>
-      <div class="row">
-        <label for="parse-provider">Parse provider</label>
-        <select id="parse-provider"></select>
-      </div>
-      <div class="row">
-        <label for="subtitles-provider">Subtitles provider</label>
-        <select id="subtitles-provider"></select>
-      </div>
-      <div class="row">
-        <label for="dub-provider">Dub provider</label>
-        <select id="dub-provider"></select>
-      </div>
-      <div class="row">
-        <label for="pack-provider">Pack provider</label>
-        <select id="pack-provider"></select>
-      </div>
-      <div class="row">
-        <label for="face-swap-provider">Face swap provider</label>
-        <select id="face-swap-provider"></select>
-      </div>
+      <table style="width:100%; border-collapse: collapse; margin-bottom: 12px;">
+        <thead>
+          <tr>
+            <th style="text-align:left; padding: 6px 4px;">Tool</th>
+            <th style="text-align:left; padding: 6px 4px;">Provider</th>
+            <th style="text-align:left; padding: 6px 4px;">Enabled</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Parse</td>
+            <td><select id="parse-provider"></select></td>
+            <td><input type="checkbox" id="parse-enabled" checked /></td>
+          </tr>
+          <tr>
+            <td>Subtitles</td>
+            <td><select id="subtitles-provider"></select></td>
+            <td><input type="checkbox" id="subtitles-enabled" checked /></td>
+          </tr>
+          <tr>
+            <td>Dub</td>
+            <td><select id="dub-provider"></select></td>
+            <td><input type="checkbox" id="dub-enabled" checked /></td>
+          </tr>
+          <tr>
+            <td>Pack</td>
+            <td><select id="pack-provider"></select></td>
+            <td><input type="checkbox" id="pack-enabled" checked /></td>
+          </tr>
+          <tr>
+            <td>Face swap</td>
+            <td><select id="face-swap-provider"></select></td>
+            <td><input type="checkbox" id="face-swap-enabled" /></td>
+          </tr>
+        </tbody>
+      </table>
       <button id="save-btn" type="button">Save defaults</button>
       <div class="status muted" id="status-text"></div>
     </div>
@@ -94,24 +110,48 @@
         return;
       }
       const data = await res.json();
-      const defaults = data.defaults || {};
-      const providers = data.providers || {};
-      populateSelect(document.getElementById("parse-provider"), providers.parse || [], defaults.parse);
-      populateSelect(document.getElementById("subtitles-provider"), providers.subtitles || [], defaults.subtitles);
-      populateSelect(document.getElementById("dub-provider"), providers.dub || [], defaults.dub);
-      populateSelect(document.getElementById("pack-provider"), providers.pack || [], defaults.pack);
-      populateSelect(document.getElementById("face-swap-provider"), providers.face_swap || [], defaults.face_swap);
+      const tools = data.tools || {};
+      const parseTool = tools.parse || {};
+      const subtitlesTool = tools.subtitles || {};
+      const dubTool = tools.dub || {};
+      const packTool = tools.pack || {};
+      const faceSwapTool = tools.face_swap || {};
+      populateSelect(document.getElementById("parse-provider"), parseTool.available || [], parseTool.provider);
+      populateSelect(document.getElementById("subtitles-provider"), subtitlesTool.available || [], subtitlesTool.provider);
+      populateSelect(document.getElementById("dub-provider"), dubTool.available || [], dubTool.provider);
+      populateSelect(document.getElementById("pack-provider"), packTool.available || [], packTool.provider);
+      populateSelect(document.getElementById("face-swap-provider"), faceSwapTool.available || [], faceSwapTool.provider);
+      document.getElementById("parse-enabled").checked = Boolean(parseTool.enabled);
+      document.getElementById("subtitles-enabled").checked = Boolean(subtitlesTool.enabled);
+      document.getElementById("dub-enabled").checked = Boolean(dubTool.enabled);
+      document.getElementById("pack-enabled").checked = Boolean(packTool.enabled);
+      document.getElementById("face-swap-enabled").checked = Boolean(faceSwapTool.enabled);
       setStatus("Ready.");
     }
 
     document.getElementById("save-btn").addEventListener("click", async () => {
       const payload = {
-        defaults: {
-          parse: document.getElementById("parse-provider").value,
-          subtitles: document.getElementById("subtitles-provider").value,
-          dub: document.getElementById("dub-provider").value,
-          pack: document.getElementById("pack-provider").value,
-          face_swap: document.getElementById("face-swap-provider").value,
+        tools: {
+          parse: {
+            provider: document.getElementById("parse-provider").value,
+            enabled: document.getElementById("parse-enabled").checked,
+          },
+          subtitles: {
+            provider: document.getElementById("subtitles-provider").value,
+            enabled: document.getElementById("subtitles-enabled").checked,
+          },
+          dub: {
+            provider: document.getElementById("dub-provider").value,
+            enabled: document.getElementById("dub-enabled").checked,
+          },
+          pack: {
+            provider: document.getElementById("pack-provider").value,
+            enabled: document.getElementById("pack-enabled").checked,
+          },
+          face_swap: {
+            provider: document.getElementById("face-swap-provider").value,
+            enabled: document.getElementById("face-swap-enabled").checked,
+          },
         },
       };
       setStatus("Saving...");
@@ -126,6 +166,7 @@
         return;
       }
       setStatus("Saved.");
+      await loadDefaults();
     });
 
     document.addEventListener("DOMContentLoaded", loadDefaults);

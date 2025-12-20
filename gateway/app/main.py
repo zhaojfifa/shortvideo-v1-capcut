@@ -14,8 +14,9 @@ from gateway.app.core.workspace import (
     translated_srt_path,
     workspace_root,
 )
-from gateway.app.db import Base, engine, ensure_task_extra_columns
+from gateway.app.db import Base, engine, ensure_provider_config_table, ensure_task_extra_columns
 from gateway.app.routers import tasks as tasks_router
+from gateway.routes import admin_tools
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
 from gateway.app.services.steps_v1 import (
     run_dub_step,
@@ -46,6 +47,7 @@ def on_startup() -> None:
     # Initialize database schema on boot (safe no-op if tables already exist)
     Base.metadata.create_all(bind=engine)
     ensure_task_extra_columns(engine)
+    ensure_provider_config_table(engine)
 
 @app.on_event("startup")
 def on_startup() -> None:
@@ -53,6 +55,8 @@ def on_startup() -> None:
 
 app.include_router(tasks_router.pages_router)
 app.include_router(tasks_router.api_router)
+app.include_router(admin_tools.router, tags=["admin"])
+app.include_router(admin_tools.pages_router)
 
 
 @app.get("/ui", response_class=HTMLResponse)

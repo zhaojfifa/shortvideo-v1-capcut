@@ -82,6 +82,54 @@ def ensure_task_extra_columns(engine) -> None:
             conn.execute(text(stmt))
 
 
+def ensure_provider_config_table(engine) -> None:
+    """Ensure provider_config table exists (idempotent)."""
+
+    inspector = inspect(engine)
+    if "provider_config" in inspector.get_table_names():
+        return
+
+    create_sql = """
+    CREATE TABLE provider_config (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT
+    )
+    """
+    with engine.begin() as conn:
+        conn.execute(text(create_sql))
+
+
+def get_provider_config_map(engine) -> dict[str, str]:
+    inspector = inspect(engine)
+    if "provider_config" not in inspector.get_table_names():
+        return {}
+
+    with engine.begin() as conn:
+        rows = conn.execute(text("SELECT key, value FROM provider_config")).fetchall()
+    return {row[0]: row[1] for row in rows}
+
+
+def set_provider_config_map(engine, updates: dict[str, str]) -> dict[str, str]:
+    inspector = inspect(engine)
+    if "provider_config" not in inspector.get_table_names():
+        ensure_provider_config_table(engine)
+
+    with engine.begin() as conn:
+        for key, value in updates.items():
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO provider_config (key, value, updated_at)
+                    VALUES (:key, :value, datetime('now'))
+                    ON CONFLICT(key) DO UPDATE SET value = :value, updated_at = datetime('now')
+                    """
+                ),
+                {"key": key, "value": value},
+            )
+    return get_provider_config_map(engine)
+
+
 def get_db():
     from sqlalchemy.orm import Session
 

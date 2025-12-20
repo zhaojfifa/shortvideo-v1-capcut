@@ -5,36 +5,48 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from gateway.app.tools_config import get_defaults, save_defaults
-from gateway.app.tools_registry import registry
+from gateway.app.config import get_settings
+from gateway.app.db import engine, set_provider_config_map
+from gateway.app.providers.registry import AVAILABLE_PROVIDERS, resolve_tool_providers
 
 router = APIRouter()
 pages_router = APIRouter()
 templates = Jinja2Templates(directory="gateway/app/templates")
 
 
-class ToolsDefaultsPayload(BaseModel):
-    defaults: Dict[str, str]
+class ToolEntry(BaseModel):
+    provider: str
+    enabled: bool
 
 
-@router.get("/admin/tools")
+class ToolsPayload(BaseModel):
+    tools: Dict[str, ToolEntry]
+
+
+@router.get("/api/admin/tools")
 def get_tools():
-    return {"defaults": get_defaults(), "providers": registry.list()}
+    settings = get_settings()
+    return resolve_tool_providers(engine, settings)
 
 
-@router.post("/admin/tools")
-def update_tools(payload: ToolsDefaultsPayload):
-    providers = registry.list()
-    for tool_type, name in payload.defaults.items():
-        if tool_type not in providers:
-            raise HTTPException(status_code=400, detail=f"Unknown tool type: {tool_type}")
-        if name not in providers[tool_type]:
+@router.post("/api/admin/tools")
+def update_tools(payload: ToolsPayload):
+    updates: Dict[str, str] = {}
+    for tool, entry in payload.tools.items():
+        available = AVAILABLE_PROVIDERS.get(tool)
+        if not available:
+            raise HTTPException(status_code=400, detail=f"Unknown tool type: {tool}")
+        if entry.provider not in available:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unknown provider for {tool_type}: {name}",
+                detail=f"Unknown provider for {tool}: {entry.provider}",
             )
-    defaults = save_defaults(payload.defaults)
-    return {"defaults": defaults, "providers": providers}
+        updates[f"{tool}_provider"] = entry.provider
+        updates[f"{tool}_enabled"] = "true" if entry.enabled else "false"
+
+    set_provider_config_map(engine, updates)
+    settings = get_settings()
+    return resolve_tool_providers(engine, settings)
 
 
 @pages_router.get("/admin/tools", response_class=HTMLResponse)

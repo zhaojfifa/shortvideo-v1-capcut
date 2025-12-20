@@ -195,9 +195,9 @@ async def task_workbench_page(
         "gemini_model": getattr(app_settings, "gemini_model", ""),
     }
     try:
-        from ..tools_config import get_defaults
+        from gateway.app.providers.registry import resolve_tool_providers
 
-        env_summary["defaults"] = get_defaults()
+        env_summary["defaults"] = resolve_tool_providers().get("tools", {})
     except Exception:
         env_summary["defaults"] = {}
 

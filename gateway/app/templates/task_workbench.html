@@ -190,7 +190,7 @@
       if (!path) return null;
       const s = String(path);
       if (/^https?:\/\//i.test(s)) return s;
-      return "/files/" + s.replace(/^\/+/, "");
+      return "/files/" + String(path).replace(/^\/+/, "");
     }
 
     function setDownloadLink(id, path) {
@@ -311,14 +311,12 @@
         return;
       }
       appendLog(`Calling /v1/parse for ${taskId}...`);
+      const payload = { task_id: taskId, link: linkText };
+      if (platform) payload.platform = platform;
       const resp = await fetch("/v1/parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          task_id: taskId,
-          platform,
-          link: linkText,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!resp.ok) {
         let errorDetail = `HTTP ${resp.status}`;
@@ -339,10 +337,11 @@
     document.getElementById("btn-subtitles").addEventListener("click", async () => {
       const taskId = window.currentTask.task_id;
       appendLog(`Calling /v1/subtitles for ${taskId}...`);
+      const payload = { task_id: taskId };
       const resp = await fetch("/v1/subtitles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task_id: taskId }),
+        body: JSON.stringify(payload),
       });
       if (!resp.ok) {
         appendLog(`Subtitles failed: HTTP ${resp.status}`);
@@ -356,10 +355,11 @@
       const taskId = window.currentTask.task_id;
       const voiceId = document.getElementById("voice-id").value;
       appendLog(`Calling /v1/dub for ${taskId} (voice=${voiceId})...`);
+      const payload = { task_id: taskId, voice_id: voiceId };
       const resp = await fetch("/v1/dub", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task_id: taskId, voice_id: voiceId }),
+        body: JSON.stringify(payload),
       });
       if (!resp.ok) {
         appendLog(`Dub failed: HTTP ${resp.status}`);
@@ -372,10 +372,11 @@
     document.getElementById("btn-pack").addEventListener("click", async () => {
       const taskId = window.currentTask.task_id;
       appendLog(`Calling /v1/pack for ${taskId}...`);
+      const payload = { task_id: taskId };
       const resp = await fetch("/v1/pack", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task_id: taskId }),
+        body: JSON.stringify(payload),
       });
       if (!resp.ok) {
         appendLog(`Pack failed: HTTP ${resp.status}`);
