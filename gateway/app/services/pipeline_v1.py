@@ -17,6 +17,7 @@ from gateway.app.core.workspace import (
     pack_zip_path,
     raw_path,
     relative_to_task_workspace,
+    relative_to_workspace,
 )
 from gateway.app import models, schemas
 from gateway.app.services.steps_v1 import (
@@ -25,7 +26,6 @@ from gateway.app.services.steps_v1 import (
     run_parse_step,
     run_subtitles_step,
 )
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_MM_LANG = os.getenv("DEFAULT_MM_LANG", "my")
@@ -38,6 +38,16 @@ def run_pipeline_background(task_id: str):
     db = SessionLocal()
     try:
         asyncio.run(run_pipeline_for_task(task_id, db))
+    except Exception as exc:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if task:
+            task.status = "error"
+            task.last_step = "pipeline"
+            task.error_reason = "pipeline_crash"
+            task.error_message = str(exc)
+            task.updated_at = datetime.utcnow()
+            db.commit()
+        logger.exception("Pipeline crashed for task %s", task_id)
     finally:
         db.close()
 
@@ -169,7 +179,7 @@ async def run_pipeline_for_task(task_id: str, db: Session):
 
     pack_file = pack_zip_path(task.id)
     if pack_file.exists():
-        task.pack_path = relative_to_task_workspace(pack_file, task.id)
+        task.pack_path = relative_to_workspace(pack_file)
     elif isinstance(pack_res, dict):
         maybe_pack = pack_res.get("pack_path") or pack_res.get("zip_path")
         if maybe_pack:
