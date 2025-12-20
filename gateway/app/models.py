@@ -34,6 +34,11 @@ class Task(Base):
     last_step = Column(String(32), nullable=True)
     error_message = Column(Text, nullable=True)
     error_reason = Column(Text, nullable=True)
+    parse_provider = Column(String(64), nullable=True)
+    subtitles_provider = Column(String(64), nullable=True)
+    dub_provider = Column(String(64), nullable=True)
+    pack_provider = Column(String(64), nullable=True)
+    face_swap_provider = Column(String(64), nullable=True)
 
     created_at = Column(DateTime, nullable=False, default=dt.datetime.utcnow)
     updated_at = Column(
