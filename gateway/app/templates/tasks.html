@@ -30,6 +30,23 @@
     }
     h1 { margin: 0; font-size: 1.5rem; font-weight: 700; color: #0f172a; }
     .subhead { margin: 4px 0 0; color: #6b7280; font-size: 0.95rem; }
+    .bilingual { display: flex; flex-direction: column; gap: 2px; }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      align-items: center;
+      margin-top: 8px;
+      font-size: 0.85rem;
+      color: #475569;
+    }
+    .legend-title { font-weight: 600; color: #111827; }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+    .badge-dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+    .dot-ready { background: #22c55e; }
+    .dot-processing { background: #f59e0b; }
+    .dot-pending { background: #38bdf8; }
+    .dot-error { background: #ef4444; }
     .btn-primary {
       background: #2563eb;
       color: #ffffff;
@@ -44,7 +61,7 @@
     .table-wrapper { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
     thead { background: #f9fafb; color: #475569; }
-    th, td { padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+    th, td { padding: 12px 10px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: top; }
     th { font-weight: 700; font-size: 0.9rem; }
     a { color: #2563eb; text-decoration: none; }
     a:hover { text-decoration: underline; }
@@ -52,16 +69,19 @@
     .badge { padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; display: inline-block; }
     .badge-ready { background: #dcfce7; color: #15803d; }
     .badge-processing { background: #fef3c7; color: #b45309; }
+    .badge-pending { background: #e0f2fe; color: #0369a1; }
     .badge-error { background: #fee2e2; color: #b91c1c; }
     .badge-unknown { background: #e5e7eb; color: #374151; }
     .truncate { max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .empty { padding: 12px 0; }
     .secondary { display: block; color: #6b7280; font-size: 0.85rem; }
+    .action-stack { display: flex; flex-direction: column; gap: 6px; }
+    .action-item { display: flex; flex-direction: column; gap: 2px; }
     @media (max-width: 768px) {
       thead { display: none; }
       table, tbody, tr, td { display: block; width: 100%; }
-      tr { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 12px; padding: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
-      td { border: none; padding: 6px 8px; }
+      tr { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; margin-bottom: 16px; padding: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+      td { border: none; padding: 8px 10px; }
       td::before {
         content: attr(data-label);
         display: block;
@@ -81,7 +101,56 @@
           {% if ui_show_secondary %}
             <p class="subhead secondary">{{ t_secondary("task_board") }}</p>
           {% endif %}
-          <p id="task-count" class="subhead">Loaded {{ tasks | length }} task{{ "s" if (tasks | length) != 1 else "" }}.</p>
+          <p id="task-count" class="subhead bilingual">
+            <span id="task-count-primary">{{ t_primary("task_count") | replace("{count}", tasks | length) }}</span>
+            {% if ui_show_secondary %}
+              <span id="task-count-secondary" class="secondary">{{ t_secondary("task_count") | replace("{count}", tasks | length) }}</span>
+            {% endif %}
+          </p>
+          <div class="legend">
+            <span class="legend-title">
+              {{ t_primary("legend") }}
+              {% if ui_show_secondary %}
+                <span class="secondary">{{ t_secondary("legend") }}</span>
+              {% endif %}
+            </span>
+            <span class="legend-item">
+              <span class="badge-dot dot-ready"></span>
+              <span class="bilingual">
+                <span>{{ t_primary("status_ready") }}</span>
+                {% if ui_show_secondary %}
+                  <span class="secondary">{{ t_secondary("status_ready") }}</span>
+                {% endif %}
+              </span>
+            </span>
+            <span class="legend-item">
+              <span class="badge-dot dot-processing"></span>
+              <span class="bilingual">
+                <span>{{ t_primary("status_processing") }}</span>
+                {% if ui_show_secondary %}
+                  <span class="secondary">{{ t_secondary("status_processing") }}</span>
+                {% endif %}
+              </span>
+            </span>
+            <span class="legend-item">
+              <span class="badge-dot dot-pending"></span>
+              <span class="bilingual">
+                <span>{{ t_primary("status_pending") }}</span>
+                {% if ui_show_secondary %}
+                  <span class="secondary">{{ t_secondary("status_pending") }}</span>
+                {% endif %}
+              </span>
+            </span>
+            <span class="legend-item">
+              <span class="badge-dot dot-error"></span>
+              <span class="bilingual">
+                <span>{{ t_primary("status_error") }}</span>
+                {% if ui_show_secondary %}
+                  <span class="secondary">{{ t_secondary("status_error") }}</span>
+                {% endif %}
+              </span>
+            </span>
+          </div>
         </div>
         <a class="btn-primary" href="/tasks/new">
           {{ t_primary("new_suitcase_task") }}
@@ -95,25 +164,88 @@
         <table>
           <thead>
             <tr>
-              <th>{{ t_primary("id") }}</th>
-              <th>{{ t_primary("platform") }}</th>
-              <th>{{ t_primary("source") }}</th>
-              <th>{{ t_primary("title") }}</th>
-              <th>{{ t_primary("category") }}</th>
-              <th>{{ t_primary("lang") }}</th>
-              <th>{{ t_primary("status") }}</th>
-              <th>{{ t_primary("created") }}</th>
-              <th>{{ t_primary("pack") }}</th>
-              <th>{{ t_primary("detail") }}</th>
+              <th class="bilingual">
+                <span>{{ t_primary("id") }}</span>
+                {% if ui_show_secondary %}
+                  <span class="secondary">{{ t_secondary("id") }}</span>
+                {% endif %}
+              </th>
+              <th class="bilingual">
+                <span>{{ t_primary("platform") }}</span>
+                {% if ui_show_secondary %}
+                  <span class="secondary">{{ t_secondary("platform") }}</span>
+                {% endif %}
+              </th>
+              <th class="bilingual">
+                <span>{{ t_primary("source") }}</span>
+                {% if ui_show_secondary %}
+                  <span class="secondary">{{ t_secondary("source") }}</span>
+                {% endif %}
+              </th>
+              <th class="bilingual">
+                <span>{{ t_primary("title") }}</span>
+                {% if ui_show_secondary %}
+                  <span class="secondary">{{ t_secondary("title") }}</span>
+                {% endif %}
+              </th>
+              <th class="bilingual">
+                <span>{{ t_primary("category") }}</span>
+                {% if ui_show_secondary %}
+                  <span class="secondary">{{ t_secondary("category") }}</span>
+                {% endif %}
+              </th>
+              <th class="bilingual">
+                <span>{{ t_primary("lang") }}</span>
+                {% if ui_show_secondary %}
+                  <span class="secondary">{{ t_secondary("lang") }}</span>
+                {% endif %}
+              </th>
+              <th class="bilingual">
+                <span>{{ t_primary("status") }}</span>
+                {% if ui_show_secondary %}
+                  <span class="secondary">{{ t_secondary("status") }}</span>
+                {% endif %}
+              </th>
+              <th class="bilingual">
+                <span>{{ t_primary("created") }}</span>
+                {% if ui_show_secondary %}
+                  <span class="secondary">{{ t_secondary("created") }}</span>
+                {% endif %}
+              </th>
+              <th class="bilingual">
+                <span>{{ t_primary("pack") }}</span>
+                {% if ui_show_secondary %}
+                  <span class="secondary">{{ t_secondary("pack") }}</span>
+                {% endif %}
+              </th>
+              <th class="bilingual">
+                <span>{{ t_primary("detail") }}</span>
+                {% if ui_show_secondary %}
+                  <span class="secondary">{{ t_secondary("detail") }}</span>
+                {% endif %}
+              </th>
             </tr>
           </thead>
           <tbody id="task-table-body">
             {% for t in tasks %}
               {% set status = t.status or "unknown" %}
               {% if status == "ready" %}
+                {% set status_key = "status_ready" %}
+              {% elif status == "processing" %}
+                {% set status_key = "status_processing" %}
+              {% elif status == "pending" %}
+                {% set status_key = "status_pending" %}
+              {% elif status == "error" %}
+                {% set status_key = "status_error" %}
+              {% else %}
+                {% set status_key = "status_unknown" %}
+              {% endif %}
+              {% if status == "ready" %}
                 {% set badge = "badge badge-ready" %}
               {% elif status == "processing" %}
                 {% set badge = "badge badge-processing" %}
+              {% elif status == "pending" %}
+                {% set badge = "badge badge-pending" %}
               {% elif status == "error" %}
                 {% set badge = "badge badge-error" %}
               {% else %}
@@ -122,11 +254,17 @@
 
               {% set cat_key = t.category_key or "-" %}
               {% if cat_key == "suitcase" %}
-                {% set cat_label = "Suitcase" %}
+                {% set cat_label_primary = t_primary("category_suitcase") %}
+                {% set cat_label_secondary = t_secondary("category_suitcase") %}
               {% elif cat_key == "beauty" %}
-                {% set cat_label = "Beauty" %}
+                {% set cat_label_primary = t_primary("category_beauty") %}
+                {% set cat_label_secondary = t_secondary("category_beauty") %}
+              {% elif cat_key == "-" %}
+                {% set cat_label_primary = "-" %}
+                {% set cat_label_secondary = "-" %}
               {% else %}
-                {% set cat_label = cat_key %}
+                {% set cat_label_primary = cat_key %}
+                {% set cat_label_secondary = cat_key %}
               {% endif %}
 
               {% set lang_key = t.content_lang or "-" %}
@@ -151,18 +289,52 @@
                   {% endif %}
                 </td>
                 <td class="truncate" data-label="{{ t_primary('title') }} / {{ t_secondary('title') }}" title="{{ t.title }}">{{ t.title or "" }}</td>
-                <td data-label="{{ t_primary('category') }} / {{ t_secondary('category') }}">{{ cat_label or "-" }}</td>
+                <td data-label="{{ t_primary('category') }} / {{ t_secondary('category') }}">
+                  <div class="bilingual">
+                    <span>{{ cat_label_primary }}</span>
+                    {% if ui_show_secondary %}
+                      <span class="secondary">{{ cat_label_secondary }}</span>
+                    {% endif %}
+                  </div>
+                </td>
                 <td data-label="{{ t_primary('lang') }} / {{ t_secondary('lang') }}">{{ lang_label or "-" }}</td>
-                <td data-label="{{ t_primary('status') }} / {{ t_secondary('status') }}"><span class="{{ badge }}">{{ status }}</span></td>
+                <td data-label="{{ t_primary('status') }} / {{ t_secondary('status') }}">
+                  <div class="bilingual">
+                    <span class="{{ badge }}">{{ t_primary(status_key) }}</span>
+                    {% if ui_show_secondary %}
+                      <span class="secondary">{{ t_secondary(status_key) }}</span>
+                    {% endif %}
+                  </div>
+                </td>
                 <td data-label="{{ t_primary('created') }} / {{ t_secondary('created') }}">{{ t.created_at }}</td>
                 <td data-label="{{ t_primary('pack') }} / {{ t_secondary('pack') }}">
                   {% if features.allow_pack_download and t.pack_path %}
-                    <a href="/files/{{ t.pack_path }}" target="_blank" rel="noopener">Download</a>
+                    <div class="action-item">
+                      <a href="/files/{{ t.pack_path }}" target="_blank" rel="noopener">{{ t_primary("download") }}</a>
+                      {% if ui_show_secondary %}
+                        <span class="secondary">{{ t_secondary("download") }}</span>
+                      {% endif %}
+                    </div>
                   {% else %}
                     –
                   {% endif %}
                 </td>
-                <td data-label="{{ t_primary('detail') }} / {{ t_secondary('detail') }}"><a href="/tasks/{{ t.task_id }}">Open</a> · <a href="/api/tasks/{{ t.task_id }}" target="_blank" rel="noopener">JSON</a></td>
+                <td data-label="{{ t_primary('detail') }} / {{ t_secondary('detail') }}">
+                  <div class="action-stack">
+                    <div class="action-item">
+                      <a href="/tasks/{{ t.task_id }}">{{ t_primary("open") }}</a>
+                      {% if ui_show_secondary %}
+                        <span class="secondary">{{ t_secondary("open") }}</span>
+                      {% endif %}
+                    </div>
+                    <div class="action-item">
+                      <a href="/api/tasks/{{ t.task_id }}" target="_blank" rel="noopener">{{ t_primary("json") }}</a>
+                      {% if ui_show_secondary %}
+                        <span class="secondary">{{ t_secondary("json") }}</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                </td>
               </tr>
             {% endfor %}
           </tbody>
@@ -176,7 +348,9 @@
     const initialTasks = {{ tasks | tojson | safe }};
     const allowPackDownload = {{ "true" if features.allow_pack_download else "false" }};
     const tableBody = document.getElementById("task-table-body");
-    const countEl = document.getElementById("task-count");
+    const countPrimaryEl = document.getElementById("task-count-primary");
+    const countSecondaryEl = document.getElementById("task-count-secondary");
+    const showSecondary = {{ "true" if ui_show_secondary else "false" }};
     const LABELS = {
       id: "{{ t_primary('id') }} / {{ t_secondary('id') }}",
       platform: "{{ t_primary('platform') }} / {{ t_secondary('platform') }}",
@@ -189,19 +363,42 @@
       pack: "{{ t_primary('pack') }} / {{ t_secondary('pack') }}",
       detail: "{{ t_primary('detail') }} / {{ t_secondary('detail') }}",
     };
+    const STATUS_LABELS = {
+      ready: { primary: "{{ t_primary('status_ready') }}", secondary: "{{ t_secondary('status_ready') }}" },
+      processing: { primary: "{{ t_primary('status_processing') }}", secondary: "{{ t_secondary('status_processing') }}" },
+      pending: { primary: "{{ t_primary('status_pending') }}", secondary: "{{ t_secondary('status_pending') }}" },
+      error: { primary: "{{ t_primary('status_error') }}", secondary: "{{ t_secondary('status_error') }}" },
+      unknown: { primary: "{{ t_primary('status_unknown') }}", secondary: "{{ t_secondary('status_unknown') }}" },
+    };
+    const CATEGORY_LABELS = {
+      suitcase: { primary: "{{ t_primary('category_suitcase') }}", secondary: "{{ t_secondary('category_suitcase') }}" },
+      beauty: { primary: "{{ t_primary('category_beauty') }}", secondary: "{{ t_secondary('category_beauty') }}" },
+      other: { primary: "{{ t_primary('category_other') }}", secondary: "{{ t_secondary('category_other') }}" },
+    };
+    const COUNT_LABELS = {
+      primary: "{{ t_primary('task_count') }}",
+      secondary: "{{ t_secondary('task_count') }}",
+    };
 
     function statusBadgeClass(status) {
       if (status === "ready") return "badge badge-ready";
       if (status === "processing") return "badge badge-processing";
+      if (status === "pending") return "badge badge-pending";
       if (status === "error") return "badge badge-error";
       return "badge badge-unknown";
     }
 
     function categoryLabel(key) {
-      if (!key) return "-";
-      if (key === "suitcase") return "Suitcase";
-      if (key === "beauty") return "Beauty";
-      return key;
+      if (!key) return { primary: "-", secondary: "-" };
+      const lower = String(key).toLowerCase();
+      if (CATEGORY_LABELS[lower]) return CATEGORY_LABELS[lower];
+      return { primary: key, secondary: key };
+    }
+
+    function statusLabel(status) {
+      if (!status) return STATUS_LABELS.unknown;
+      const lower = String(status).toLowerCase();
+      return STATUS_LABELS[lower] || STATUS_LABELS.unknown;
     }
 
     function langLabel(code) {
@@ -247,13 +444,19 @@
         const emptyCell = document.createElement("td");
         emptyCell.colSpan = 10;
         emptyCell.className = "empty muted";
-        emptyCell.textContent = "No tasks yet.";
+        emptyCell.innerHTML = `
+          <div class="bilingual">
+            <span>{{ t_primary("no_tasks") }}</span>
+            ${showSecondary ? `<span class="secondary">{{ t_secondary("no_tasks") }}</span>` : ""}
+          </div>
+        `;
         emptyRow.appendChild(emptyCell);
         tableBody.appendChild(emptyRow);
       } else {
         for (const t of tasks) {
           const status = t.status || "unknown";
           const catLabel = categoryLabel(t.category_key);
+          const statusLabels = statusLabel(status);
           const lang = langLabel(t.content_lang);
           const srcRaw = t.source_url || "";
           const srcUrl = extractFirstHttpUrl(srcRaw);
@@ -269,16 +472,40 @@
                 : "-"}
             </td>
             <td class="truncate" data-label="${LABELS.title}" title="${t.title || ""}">${t.title || ""}</td>
-            <td data-label="${LABELS.category}">${catLabel}</td>
+            <td data-label="${LABELS.category}">
+              <div class="bilingual">
+                <span>${catLabel.primary}</span>
+                ${showSecondary ? `<span class="secondary">${catLabel.secondary}</span>` : ""}
+              </div>
+            </td>
             <td data-label="${LABELS.lang}">${lang}</td>
-            <td data-label="${LABELS.status}"><span class="${statusBadgeClass(status)}">${status}</span></td>
+            <td data-label="${LABELS.status}">
+              <div class="bilingual">
+                <span class="${statusBadgeClass(status)}">${statusLabels.primary}</span>
+                ${showSecondary ? `<span class="secondary">${statusLabels.secondary}</span>` : ""}
+              </div>
+            </td>
             <td data-label="${LABELS.created}">${t.created_at || ""}</td>
             <td data-label="${LABELS.pack}">${
               (allowPackDownload && t.pack_path)
-                ? `<a href="/files/${t.pack_path}" target="_blank" rel="noopener">Download</a>`
+                ? `<div class="action-item">
+                    <a href="/files/${t.pack_path}" target="_blank" rel="noopener">{{ t_primary("download") }}</a>
+                    ${showSecondary ? `<span class="secondary">{{ t_secondary("download") }}</span>` : ""}
+                  </div>`
                 : "–"
             }</td>
-            <td data-label="${LABELS.detail}"><a href="/tasks/${t.task_id}">Open</a> · <a href="/api/tasks/${t.task_id}" target="_blank" rel="noopener">JSON</a></td>
+            <td data-label="${LABELS.detail}">
+              <div class="action-stack">
+                <div class="action-item">
+                  <a href="/tasks/${t.task_id}">{{ t_primary("open") }}</a>
+                  ${showSecondary ? `<span class="secondary">{{ t_secondary("open") }}</span>` : ""}
+                </div>
+                <div class="action-item">
+                  <a href="/api/tasks/${t.task_id}" target="_blank" rel="noopener">{{ t_primary("json") }}</a>
+                  ${showSecondary ? `<span class="secondary">{{ t_secondary("json") }}</span>` : ""}
+                </div>
+              </div>
+            </td>
           `;
           tableBody.appendChild(row);
         }
@@ -286,7 +513,12 @@
 
       enhanceSourceLinks();
       const count = tasks.length;
-      countEl.textContent = `Loaded ${count} task${count === 1 ? "" : "s"}.`;
+      if (countPrimaryEl) {
+        countPrimaryEl.textContent = COUNT_LABELS.primary.replace("{count}", count);
+      }
+      if (countSecondaryEl) {
+        countSecondaryEl.textContent = COUNT_LABELS.secondary.replace("{count}", count);
+      }
     }
 
     function hasInFlight(tasks) {
@@ -299,7 +531,12 @@
     let pollTimer = null;
 
     async function refreshTasks() {
-      countEl.textContent = "Loading tasks…";
+      if (countPrimaryEl) {
+        countPrimaryEl.textContent = "Loading tasks…";
+      }
+      if (countSecondaryEl) {
+        countSecondaryEl.textContent = "";
+      }
       try {
         const url = `/api/tasks?limit=50&ts=${Date.now()}`;
         const res = await fetch(url, { cache: "no-store" });

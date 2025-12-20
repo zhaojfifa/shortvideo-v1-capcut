@@ -44,6 +44,13 @@ Use the mobile-prefixed routes when training mobile operators:
 - `/m/tasks/new`
 - `/m/tasks/{task_id}`
 
+## Task board UI behavior
+
+- Task board labels render in both primary and secondary languages when `UI_SHOW_SECONDARY=true`.
+- Category and status values are translated via i18n keys (e.g., suitcase/beauty, ready/processing/pending/error).
+- Status badges include an inline legend on the task list page to explain color meanings.
+- The task count and empty-state copy are bilingual when secondary language display is enabled.
+
 ## Feature Flags
 
 Feature flags are injected into HTML templates via `window.__FEATURES__`.
