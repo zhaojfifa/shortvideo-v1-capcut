@@ -138,7 +138,7 @@ curl -X POST "http://127.0.0.1:8000/v1/pack" \
 
 当前支持的 provider 列表：
 
-- parse: xiongmao, xiaomao
+- parse: xiongmao, 
 - subtitles: gemini, whisper
 - dub: lovo, edge-tts
 - pack: capcut, youcut
