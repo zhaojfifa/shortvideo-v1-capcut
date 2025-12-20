@@ -47,32 +47,11 @@ def _infer_platform_from_url(url: str) -> Optional[str]:
 async def tasks_board_page(
     request: Request, db: Session = Depends(get_db), limit: int = Query(50, ge=1, le=500)
 ):
-    """Render the task board HTML with the latest tasks preloaded."""
-
-    db_tasks = (
-        db.query(models.Task).order_by(models.Task.created_at.desc()).limit(limit).all()
-    )
-
-    rows: list[dict] = []
-    for t in db_tasks:
-        rows.append(
-            {
-                "task_id": t.id,
-                "platform": t.platform,
-                "source_url": t.source_url,
-                "title": t.title or "",
-                "category_key": t.category_key or "",
-                "content_lang": t.content_lang or "",
-                "status": t.status or "pending",
-                "created_at": t.created_at,
-                "pack_path": t.pack_path,
-                "ui_lang": t.ui_lang or "",
-            }
-        )
+    """Render the task board HTML without preloading ORM tasks."""
 
     return templates.TemplateResponse(
-        "tasks.html",
-        {"request": request, "tasks": rows, "features": get_features()},
+        "tasks_board.html",
+        {"request": request, "tasks": []},
     )
 
 
