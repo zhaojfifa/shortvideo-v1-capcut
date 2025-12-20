@@ -132,10 +132,22 @@ curl -X POST "http://127.0.0.1:8000/v1/pack" \
   -d '{"task_id":"dy_demo_v1"}'
 ```
 
+## Admin Tools（Provider 配置）
+
+访问 `/admin/tools` 查看与更新默认 provider（parse/subtitles/dub/pack/face_swap）。页面会列出可用 provider 并允许启用/禁用。
+
+当前支持的 provider 列表：
+
+- parse: xiongmao, xiaomao
+- subtitles: gemini, whisper
+- dub: lovo, edge-tts
+- pack: capcut, youcut
+- face_swap: none, xxx_faceswap_api
+
 ## Render 部署说明
 
 - 构建：`pip install -r requirements.txt`
-- 启动：`uvicorn gateway.app.main:app --host 0.0.0.0 --port $PORT`
+- 启动：`uvicorn gateway.main:app --host 0.0.0.0 --port $PORT`
 - 在 Render Dashboard 配置环境变量：
   - `XIONGMAO_API_BASE`
   - `XIONGMAO_APP_ID`
@@ -144,6 +156,35 @@ curl -X POST "http://127.0.0.1:8000/v1/pack" \
   - 其他按需：`OPENAI_API_KEY` 等
 
 网关返回格式保持稳定，后续可将 Xiongmao 换成自研下载服务（如 Douyin_TikTok_Download_API、XHS-Downloader 等）而不影响对外 API。
+
+## 主要页面入口
+
+- `/ui`
+- `/tasks`
+- `/tasks/new`
+- `/admin/tools`
+
+## 主要 API 入口
+
+- `POST /v1/parse`
+- `POST /v1/subtitles`
+- `POST /v1/dub`
+- `POST /v1/pack`
+- `GET /api/tasks`
+- `GET /api/tasks/{task_id}`
+- `POST /api/tasks`
+- `GET /files/{rel_path}`
+
+## FAQ
+
+**任务状态不更新怎么办？**\n\n先查 `/api/tasks/{task_id}` 是否 `status=ready` 且 `pack_path` 非空；然后确认 `WORKSPACE_ROOT` 指向持久化盘，并且 `workspace_root/pack/<task_id>_capcut_pack.zip` 存在。\n\n**Pack 下载路径规则？**\n\n`pack_path` 存的是相对 `workspace_root` 的路径，例如 `pack/<task_id>_capcut_pack.zip`，下载使用 `/files/<pack_path>`。
+
+## 文档索引
+
+- `docs/ARCHITECTURE.md`
+- `docs/API.md`
+- `docs/OPERATIONS.md`
+- `docs/CHANGELOG.md`
 
 ## V1 Pipeline Lab（Web UI）
 

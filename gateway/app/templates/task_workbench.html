@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Task Workbench · {{ task.task_id }}</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #f3f4f6;
+      color: #0f172a;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+    .card {
+      background: #ffffff;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      padding: 16px;
+    }
+    .header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    h1 { margin: 0; font-size: 1.6rem; font-weight: 800; }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 700; }
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 16px; margin-top: 12px; }
+    .meta-item { font-size: 0.95rem; color: #374151; }
+    .meta-item strong { display: block; color: #0f172a; font-size: 0.9rem; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .badge { padding: 6px 10px; border-radius: 999px; font-size: 0.85rem; font-weight: 700; display: inline-block; }
+    .badge-ready { background: #dcfce7; color: #15803d; }
+    .badge-processing { background: #fef3c7; color: #b45309; }
+    .badge-error { background: #fee2e2; color: #b91c1c; }
+    .badge-unknown { background: #e5e7eb; color: #374151; }
+    .downloads { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 0.95rem; }
+    .downloads a { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .downloads a.disabled { color: #9ca3af; pointer-events: none; text-decoration: none; }
+    .downloads span.label { font-weight: 700; color: #111827; margin-right: 4px; }
+    section { border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+    section h2 { margin-top: 0; font-size: 1.2rem; }
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover { background: #1d4ed8; }
+    button:disabled { background: #cbd5e1; cursor: not-allowed; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    label { font-weight: 700; color: #111827; font-size: 0.9rem; }
+    select, input { padding: 8px 10px; border-radius: 8px; border: 1px solid #e5e7eb; font-size: 0.95rem; min-width: 180px; }
+    pre { background: #0b1727; color: #e5e7eb; border-radius: 12px; padding: 12px; overflow: auto; max-height: 240px; white-space: pre-wrap; border: 1px solid #0f172a; }
+    .log { max-height: 200px; }
+    .env { display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.9rem; color: #4b5563; }
+    .env code { background: #f3f4f6; padding: 4px 6px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <a class="back-link" href="/tasks">← Back to Task Board</a>
+      <h1>Task Workbench</h1>
+      <div id="status-badge" class="badge badge-unknown">{{ task.status }}</div>
+    </div>
+
+    <div class="card">
+      <div class="meta-grid">
+        <div class="meta-item"><strong>Task ID</strong><span>{{ task.task_id }}</span></div>
+        <div class="meta-item"><strong>Platform</strong><span>{{ task.platform or '-' }}</span></div>
+        <div class="meta-item"><strong>Category</strong><span>{{ task.category_key or '-' }}</span></div>
+        <div class="meta-item"><strong>Lang</strong><span>{{ task.content_lang or '-' }}</span></div>
+        <div class="meta-item"><strong>Status</strong><span>{{ task.status }}</span></div>
+        <div class="meta-item"><strong>Created</strong><span>{{ task.created_at }}</span></div>
+        <div class="meta-item">
+          <strong>Source URL</strong>
+          {% if task_view.source_url_open %}
+            <div><a href="{{ task_view.source_url_open }}" target="_blank" rel="noopener">Open source link</a></div>
+          {% else %}
+            <div class="muted">No clickable URL found in source text.</div>
+          {% endif %}
+          {% if task.source_url %}
+            <div style="margin-top:6px; white-space:pre-wrap; word-break:break-word; color:#111827;">
+              {{ task.source_url }}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="env" style="margin-top:12px;">
+        <div>Workspace: <code>{{ env_summary.workspace_root }}</code></div>
+        <div>Douyin API: <code>{{ env_summary.douyin_api_base }}</code></div>
+        <div>ASR: <code>{{ env_summary.asr_backend }}</code></div>
+        <div>Subtitles: <code>{{ env_summary.subtitles_backend }}</code></div>
+        <div>Whisper: <code>{{ env_summary.whisper_model }}</code></div>
+        <div>Gemini: <code>{{ env_summary.gemini_model }}</code></div>
+        <div>GPT: <code>{{ env_summary.gpt_model }}</code></div>
+        {% if env_summary.defaults %}
+          <div>Defaults: <code>{{ env_summary.defaults }}</code></div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="downloads" id="downloads">
+        <span class="label">Downloads:</span>
+        <a id="raw-link" class="disabled" href="#" target="_blank" rel="noopener">raw.mp4</a>
+        <a id="origin-link" class="disabled" href="#" target="_blank" rel="noopener">origin.srt</a>
+        <a id="mm-link" class="disabled" href="#" target="_blank" rel="noopener">mm.srt</a>
+        <a id="audio-link" class="disabled" href="#" target="_blank" rel="noopener">mm_audio</a>
+        <a id="pack-link" class="disabled" href="#" target="_blank" rel="noopener">capcut_pack.zip</a>
+      </div>
+      <div style="margin-top:8px;">
+        <audio id="audio-preview" controls style="display:none; width: 100%; max-width: 360px;"></audio>
+      </div>
+    </div>
+
+    <section>
+      <h2>Step 1 · Parse & Download</h2>
+      <p>Call /v1/parse for this task.</p>
+      <button id="btn-parse">Execute parse</button>
+    </section>
+
+    <section>
+      <h2>Step 2 · Transcribe & Translate</h2>
+      <p>Generate subtitles via /v1/subtitles.</p>
+      <button id="btn-subtitles">Generate subtitles</button>
+    </section>
+
+    <section>
+      <h2>Step 3 · Burmese Voiceover</h2>
+      <div class="row">
+        <div class="field">
+          <label for="voice-id">Voice ID</label>
+          <select id="voice-id">
+            <option value="mm_female_1">mm_female_1</option>
+            <option value="mm_male_1">mm_male_1</option>
+            <option value="mm_female_2">mm_female_2</option>
+          </select>
+        </div>
+        <div class="field" style="justify-content:flex-end;">
+          <label>&nbsp;</label>
+          <button id="btn-dub">Generate dub</button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Step 4 · Pack for CapCut</h2>
+      <p>Bundle the CapCut project for this task.</p>
+      <button id="btn-pack">Build pack</button>
+    </section>
+
+    <section>
+      <h2>Log</h2>
+      <pre id="log-output" class="log">Ready.</pre>
+    </section>
+  </div>
+
+  <script>
+    window.__FEATURES__ = {{ features | tojson | safe }};
+    window.currentTask = {{ task_json | tojson | safe }};
+
+    function appendLog(line) {
+      const logEl = document.getElementById("log-output");
+      if (!logEl) return;
+      const now = new Date().toISOString();
+      logEl.textContent += `\n[${now}] ${line}`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function updateStatusBadge(data) {
+      const badge = document.getElementById("status-badge");
+      if (!badge) return;
+      const status = data.status || "unknown";
+      badge.textContent = status;
+      badge.className = "badge " + (status === "ready"
+        ? "badge-ready"
+        : status === "processing"
+        ? "badge-processing"
+        : status === "error"
+        ? "badge-error"
+        : "badge-unknown");
+    }
+
+    function setDownloadLink(id, href) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (href) {
+        el.href = href;
+        el.classList.remove("disabled");
+        el.removeAttribute("aria-disabled");
+      } else {
+        el.href = "#";
+        el.classList.add("disabled");
+        el.setAttribute("aria-disabled", "true");
+      }
+    }
+
+    function taskEndpoint(taskId, kind) {
+      const id = encodeURIComponent(taskId);
+      if (kind === "raw") return `/v1/tasks/${id}/raw`;
+      if (kind === "origin") return `/v1/tasks/${id}/subs_origin`;
+      if (kind === "mm") return `/v1/tasks/${id}/subs_mm`;
+      if (kind === "audio") return `/v1/tasks/${id}/audio_mm`;
+      if (kind === "pack") return `/v1/tasks/${id}/pack`;
+      return null;
+    }
+
+    function updateDownloadsFromTask(data) {
+      setDownloadLink("raw-link", data.raw_path ? taskEndpoint(data.task_id, "raw") : null);
+      setDownloadLink("origin-link", data.origin_srt_path ? taskEndpoint(data.task_id, "origin") : null);
+      setDownloadLink("mm-link", data.mm_srt_path ? taskEndpoint(data.task_id, "mm") : null);
+      setDownloadLink("audio-link", data.mm_audio_path ? taskEndpoint(data.task_id, "audio") : null);
+      setDownloadLink("pack-link", data.pack_path ? taskEndpoint(data.task_id, "pack") : null);
+
+      const audioEl = document.getElementById("audio-preview");
+      const audioLink = document.getElementById("audio-link");
+      const audioHref = data.mm_audio_path ? taskEndpoint(data.task_id, "audio") : null;
+      if (audioEl) {
+        if (audioHref) {
+          audioEl.src = audioHref;
+          audioEl.style.display = "block";
+        } else {
+          audioEl.removeAttribute("src");
+          audioEl.style.display = "none";
+        }
+      }
+      if (audioLink) {
+        if (data.mm_audio_path) {
+          const ext = data.mm_audio_path.split(".").pop() || "audio";
+          audioLink.textContent = `mm_audio.${ext}`;
+        } else {
+          audioLink.textContent = "mm_audio";
+        }
+      }
+    }
+
+
+    function updateStepButtons(data) {
+      const parseBtn = document.getElementById("btn-parse");
+      const subsBtn = document.getElementById("btn-subtitles");
+      const dubBtn = document.getElementById("btn-dub");
+      const packBtn = document.getElementById("btn-pack");
+
+      if (parseBtn) {
+        parseBtn.textContent = data.raw_path ? "Re-run parse" : "Execute parse";
+      }
+      if (subsBtn) {
+        const hasSubs = data.mm_srt_path || data.origin_srt_path;
+        subsBtn.textContent = hasSubs ? "Re-run subtitles" : "Generate subtitles";
+      }
+      if (dubBtn) {
+        dubBtn.textContent = data.mm_audio_path ? "Re-run dub" : "Generate dub";
+      }
+      if (packBtn) {
+        packBtn.textContent = data.pack_path ? "Re-run pack" : "Build pack";
+      }
+    }
+
+    // Initialize with server-rendered values in case files already exist.
+    updateDownloadsFromTask(window.currentTask);
+    updateStatusBadge(window.currentTask);
+    updateStepButtons(window.currentTask);
+
+    async function refreshTaskState() {
+      const taskId = window.currentTask.task_id;
+      const resp = await fetch(`/api/tasks/${taskId}`);
+      if (!resp.ok) {
+        appendLog(`Failed to refresh task: HTTP ${resp.status}`);
+        return;
+      }
+      const data = await resp.json();
+      window.currentTask = data;
+      updateDownloadsFromTask(data);
+      updateStatusBadge(data);
+      updateStepButtons(data);
+      if (data.error_message) {
+        appendLog(`Last error: ${data.error_message}`);
+      }
+    }
+
+    document.getElementById("btn-parse").addEventListener("click", async () => {
+      const taskId = window.currentTask.task_id;
+      const linkText = window.currentTask.source_url || "";
+      const platform = window.currentTask.platform || null;
+      if (!linkText) {
+        appendLog("Parse failed: source_url is empty for this task.");
+        return;
+      }
+      appendLog(`Calling /v1/parse for ${taskId}...`);
+      const payload = { task_id: taskId, link: linkText };
+      if (platform) payload.platform = platform;
+      const resp = await fetch("/v1/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) {
+        let errorDetail = `HTTP ${resp.status}`;
+        try {
+          const payload = await resp.json();
+          errorDetail = payload?.detail ? `${errorDetail} - ${payload.detail}` : errorDetail;
+        } catch (err) {
+          appendLog(`Parse failed: ${errorDetail}`);
+          return;
+        }
+        appendLog(`Parse failed: ${errorDetail}`);
+        return;
+      }
+      appendLog("Parse call finished.");
+      await refreshTaskState();
+    });
+
+    document.getElementById("btn-subtitles").addEventListener("click", async () => {
+      const taskId = window.currentTask.task_id;
+      appendLog(`Calling /v1/subtitles for ${taskId}...`);
+      const payload = { task_id: taskId };
+      const resp = await fetch("/v1/subtitles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) {
+        appendLog(`Subtitles failed: HTTP ${resp.status}`);
+        return;
+      }
+      appendLog("Subtitles call finished.");
+      await refreshTaskState();
+    });
+
+    document.getElementById("btn-dub").addEventListener("click", async () => {
+      const taskId = window.currentTask.task_id;
+      const voiceId = document.getElementById("voice-id").value;
+      appendLog(`Calling /v1/dub for ${taskId} (voice=${voiceId})...`);
+      const payload = { task_id: taskId, voice_id: voiceId };
+      const resp = await fetch("/v1/dub", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) {
+        appendLog(`Dub failed: HTTP ${resp.status}`);
+        return;
+      }
+      appendLog("Dub audio ready.");
+      await refreshTaskState();
+    });
+
+    document.getElementById("btn-pack").addEventListener("click", async () => {
+      const taskId = window.currentTask.task_id;
+      appendLog(`Calling /v1/pack for ${taskId}...`);
+      const payload = { task_id: taskId };
+      const resp = await fetch("/v1/pack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) {
+        appendLog(`Pack failed: HTTP ${resp.status}`);
+        return;
+      }
+      appendLog("Pack ready.");
+      await refreshTaskState();
+    });
+
+    document.addEventListener("DOMContentLoaded", () => {
+      refreshTaskState().catch((err) => {
+        console.error(err);
+        appendLog("Initial refresh failed: " + err);
+      });
+    });
+  </script>
+</body>
+</html>

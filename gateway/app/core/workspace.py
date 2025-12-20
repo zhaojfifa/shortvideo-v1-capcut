@@ -1,4 +1,5 @@
 import json
+import shutil
 from pathlib import Path
 
 from gateway.app.config import get_settings
@@ -155,6 +156,7 @@ class Workspace:
         suffix = suffix.lstrip(".") or "wav"
         path = audio_dir(self.task_id) / f"{self.task_id}_mm.{suffix}"
         path.write_bytes(content)
+        ensure_public_audio(path)
         return path
 
     def mm_audio_media_type(self) -> str:
@@ -223,8 +225,21 @@ def assets_dir() -> Path:
     return path
 
 
-def packs_dir(task_id: str) -> Path:
-    path = task_base_dir(task_id) / "pack"
+def public_audio_dir() -> Path:
+    path = workspace_root() / "audio"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def ensure_public_audio(path: Path) -> Path:
+    target = public_audio_dir() / path.name
+    if path.exists() and not target.exists():
+        shutil.copy2(path, target)
+    return target
+
+
+def packs_dir(_task_id: str) -> Path:
+    path = workspace_root() / "pack"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
