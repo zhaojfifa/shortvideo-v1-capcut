@@ -91,6 +91,9 @@
         <div>Whisper: <code>{{ env_summary.whisper_model }}</code></div>
         <div>Gemini: <code>{{ env_summary.gemini_model }}</code></div>
         <div>GPT: <code>{{ env_summary.gpt_model }}</code></div>
+        {% if env_summary.defaults %}
+          <div>Defaults: <code>{{ env_summary.defaults }}</code></div>
+        {% endif %}
       </div>
     </div>
 

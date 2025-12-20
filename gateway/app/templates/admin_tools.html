@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Tools · ShortVideo</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #f3f4f6;
+      color: #111827;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page { max-width: 720px; margin: 0 auto; }
+    .card {
+      background: #ffffff;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      padding: 16px;
+    }
+    h1 { margin: 0 0 12px; font-size: 1.5rem; }
+    .row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    label { font-weight: 700; }
+    select { padding: 8px 10px; border-radius: 8px; border: 1px solid #e5e7eb; }
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover { background: #1d4ed8; }
+    .muted { color: #6b7280; font-size: 0.9rem; }
+    .status { margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <h1>Admin Tools</h1>
+      <div class="row">
+        <label for="parse-provider">Parse provider</label>
+        <select id="parse-provider"></select>
+      </div>
+      <div class="row">
+        <label for="subtitles-provider">Subtitles provider</label>
+        <select id="subtitles-provider"></select>
+      </div>
+      <div class="row">
+        <label for="dub-provider">Dub provider</label>
+        <select id="dub-provider"></select>
+      </div>
+      <div class="row">
+        <label for="pack-provider">Pack provider</label>
+        <select id="pack-provider"></select>
+      </div>
+      <div class="row">
+        <label for="face-swap-provider">Face swap provider</label>
+        <select id="face-swap-provider"></select>
+      </div>
+      <button id="save-btn" type="button">Save defaults</button>
+      <div class="status muted" id="status-text"></div>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById("status-text");
+
+    function setStatus(message) {
+      statusEl.textContent = message;
+    }
+
+    function populateSelect(selectEl, providers, selected) {
+      selectEl.innerHTML = "";
+      providers.forEach((name) => {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        if (name === selected) opt.selected = true;
+        selectEl.appendChild(opt);
+      });
+    }
+
+    async function loadDefaults() {
+      setStatus("Loading...");
+      const res = await fetch("/api/admin/tools");
+      if (!res.ok) {
+        setStatus(`Failed to load: HTTP ${res.status}`);
+        return;
+      }
+      const data = await res.json();
+      const defaults = data.defaults || {};
+      const providers = data.providers || {};
+      populateSelect(document.getElementById("parse-provider"), providers.parse || [], defaults.parse);
+      populateSelect(document.getElementById("subtitles-provider"), providers.subtitles || [], defaults.subtitles);
+      populateSelect(document.getElementById("dub-provider"), providers.dub || [], defaults.dub);
+      populateSelect(document.getElementById("pack-provider"), providers.pack || [], defaults.pack);
+      populateSelect(document.getElementById("face-swap-provider"), providers.face_swap || [], defaults.face_swap);
+      setStatus("Ready.");
+    }
+
+    document.getElementById("save-btn").addEventListener("click", async () => {
+      const payload = {
+        defaults: {
+          parse: document.getElementById("parse-provider").value,
+          subtitles: document.getElementById("subtitles-provider").value,
+          dub: document.getElementById("dub-provider").value,
+          pack: document.getElementById("pack-provider").value,
+          face_swap: document.getElementById("face-swap-provider").value,
+        },
+      };
+      setStatus("Saving...");
+      const res = await fetch("/api/admin/tools", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        setStatus(`Save failed: ${res.status} ${text}`);
+        return;
+      }
+      setStatus("Saved.");
+    });
+
+    document.addEventListener("DOMContentLoaded", loadDefaults);
+  </script>
+</body>
+</html>

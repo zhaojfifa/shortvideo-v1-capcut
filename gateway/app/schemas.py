@@ -92,6 +92,11 @@ class TaskSummary(BaseModel):
     created_at: datetime
     error_reason: Optional[str] = None
     error_message: Optional[str] = None
+    parse_provider: Optional[str] = None
+    subtitles_provider: Optional[str] = None
+    dub_provider: Optional[str] = None
+    pack_provider: Optional[str] = None
+    face_swap_provider: Optional[str] = None
 
     class Config:
         orm_mode = True

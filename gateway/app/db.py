@@ -53,6 +53,26 @@ def ensure_task_extra_columns(engine) -> None:
         alter_statements.append(
             "ALTER TABLE tasks ADD COLUMN error_reason TEXT"
         )
+    if "parse_provider" not in columns:
+        alter_statements.append(
+            "ALTER TABLE tasks ADD COLUMN parse_provider VARCHAR(64)"
+        )
+    if "subtitles_provider" not in columns:
+        alter_statements.append(
+            "ALTER TABLE tasks ADD COLUMN subtitles_provider VARCHAR(64)"
+        )
+    if "dub_provider" not in columns:
+        alter_statements.append(
+            "ALTER TABLE tasks ADD COLUMN dub_provider VARCHAR(64)"
+        )
+    if "pack_provider" not in columns:
+        alter_statements.append(
+            "ALTER TABLE tasks ADD COLUMN pack_provider VARCHAR(64)"
+        )
+    if "face_swap_provider" not in columns:
+        alter_statements.append(
+            "ALTER TABLE tasks ADD COLUMN face_swap_provider VARCHAR(64)"
+        )
 
     if not alter_statements:
         return

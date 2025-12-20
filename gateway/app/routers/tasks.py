@@ -162,6 +162,11 @@ def _task_to_detail(task: models.Task) -> TaskDetail:
         created_at=task.created_at,
         error_message=task.error_message,
         error_reason=task.error_reason,
+        parse_provider=task.parse_provider,
+        subtitles_provider=task.subtitles_provider,
+        dub_provider=task.dub_provider,
+        pack_provider=task.pack_provider,
+        face_swap_provider=task.face_swap_provider,
     )
 
 
@@ -189,6 +194,12 @@ async def task_workbench_page(
         "subtitles_backend": getattr(app_settings, "subtitles_backend", "gemini"),
         "gemini_model": getattr(app_settings, "gemini_model", ""),
     }
+    try:
+        from ..tools_config import get_defaults
+
+        env_summary["defaults"] = get_defaults()
+    except Exception:
+        env_summary["defaults"] = {}
 
     return templates.TemplateResponse(
         "task_workbench.html",
@@ -287,6 +298,11 @@ def list_tasks(
                 created_at=t.created_at,
                 error_message=t.error_message,
                 error_reason=t.error_reason,
+                parse_provider=t.parse_provider,
+                subtitles_provider=t.subtitles_provider,
+                dub_provider=t.dub_provider,
+                pack_provider=t.pack_provider,
+                face_swap_provider=t.face_swap_provider,
             )
         )
 
