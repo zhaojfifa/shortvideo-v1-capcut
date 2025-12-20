@@ -4,11 +4,10 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
-from fastapi.templating import Jinja2Templates
-
 from gateway.app.config import get_settings
 from gateway.app.db import SessionLocal
 from gateway.app import models
+from gateway.app.web.templates import get_templates
 from gateway.app.core.workspace import (
     Workspace,
     origin_srt_path,
@@ -25,7 +24,7 @@ from gateway.app.services.steps_v1 import (
 )
 
 router = APIRouter()
-templates = Jinja2Templates(directory="gateway/app/templates")
+templates = get_templates()
 
 
 @router.get("/ui", response_class=HTMLResponse)

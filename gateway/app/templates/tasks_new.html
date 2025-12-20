@@ -59,7 +59,10 @@
 <body>
   <div class="page">
     <header>
-      <h1>New Suitcase Task</h1>
+      <h1>{{ t_primary("new_suitcase_task") }}</h1>
+      {% if ui_show_secondary %}
+        <div class="muted">{{ t_secondary("new_suitcase_task") }}</div>
+      {% endif %}
       <a href="/tasks">Back to Task Board</a>
     </header>
 

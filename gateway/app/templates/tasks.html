@@ -56,33 +56,55 @@
     .badge-unknown { background: #e5e7eb; color: #374151; }
     .truncate { max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .empty { padding: 12px 0; }
+    .secondary { display: block; color: #6b7280; font-size: 0.85rem; }
+    @media (max-width: 768px) {
+      thead { display: none; }
+      table, tbody, tr, td { display: block; width: 100%; }
+      tr { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 12px; padding: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+      td { border: none; padding: 6px 8px; }
+      td::before {
+        content: attr(data-label);
+        display: block;
+        font-weight: 700;
+        color: #111827;
+        margin-bottom: 2px;
+      }
+    }
   </style>
 </head>
-<body>
+<body class="{{ 'mobile' if is_mobile else 'desktop' }}">
   <div class="page">
     <div class="card">
       <div class="header">
         <div>
-          <h1>Task Board</h1>
+          <h1>{{ t_primary("task_board") }}</h1>
+          {% if ui_show_secondary %}
+            <p class="subhead secondary">{{ t_secondary("task_board") }}</p>
+          {% endif %}
           <p id="task-count" class="subhead">Loaded {{ tasks | length }} task{{ "s" if (tasks | length) != 1 else "" }}.</p>
         </div>
-        <a class="btn-primary" href="/tasks/new">New suitcase task</a>
+        <a class="btn-primary" href="/tasks/new">
+          {{ t_primary("new_suitcase_task") }}
+          {% if ui_show_secondary %}
+            <span class="secondary">{{ t_secondary("new_suitcase_task") }}</span>
+          {% endif %}
+        </a>
       </div>
 
       <div class="table-wrapper">
         <table>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Platform</th>
-              <th>Source</th>
-              <th>Title</th>
-              <th>Category</th>
-              <th>Lang</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th>Pack</th>
-              <th>Detail</th>
+              <th>{{ t_primary("id") }}</th>
+              <th>{{ t_primary("platform") }}</th>
+              <th>{{ t_primary("source") }}</th>
+              <th>{{ t_primary("title") }}</th>
+              <th>{{ t_primary("category") }}</th>
+              <th>{{ t_primary("lang") }}</th>
+              <th>{{ t_primary("status") }}</th>
+              <th>{{ t_primary("created") }}</th>
+              <th>{{ t_primary("pack") }}</th>
+              <th>{{ t_primary("detail") }}</th>
             </tr>
           </thead>
           <tbody id="task-table-body">
@@ -119,28 +141,28 @@
               {% endif %}
 
               <tr>
-                <td class="truncate" title="{{ t.task_id }}"><a href="/tasks/{{ t.task_id }}">{{ t.task_id }}</a></td>
-                <td>{{ t.platform or "" }}</td>
-                <td class="truncate" title="{{ t.source_url }}">
+                <td class="truncate" data-label="{{ t_primary('id') }} / {{ t_secondary('id') }}" title="{{ t.task_id }}"><a href="/tasks/{{ t.task_id }}">{{ t.task_id }}</a></td>
+                <td data-label="{{ t_primary('platform') }} / {{ t_secondary('platform') }}">{{ t.platform or "" }}</td>
+                <td class="truncate" data-label="{{ t_primary('source') }} / {{ t_secondary('source') }}" title="{{ t.source_url }}">
                   {% if t.source_url %}
                     <span class="source-text">{{ t.source_url }}</span>
                   {% else %}
                     -
                   {% endif %}
                 </td>
-                <td class="truncate" title="{{ t.title }}">{{ t.title or "" }}</td>
-                <td>{{ cat_label or "-" }}</td>
-                <td>{{ lang_label or "-" }}</td>
-                <td><span class="{{ badge }}">{{ status }}</span></td>
-                <td>{{ t.created_at }}</td>
-                <td>
+                <td class="truncate" data-label="{{ t_primary('title') }} / {{ t_secondary('title') }}" title="{{ t.title }}">{{ t.title or "" }}</td>
+                <td data-label="{{ t_primary('category') }} / {{ t_secondary('category') }}">{{ cat_label or "-" }}</td>
+                <td data-label="{{ t_primary('lang') }} / {{ t_secondary('lang') }}">{{ lang_label or "-" }}</td>
+                <td data-label="{{ t_primary('status') }} / {{ t_secondary('status') }}"><span class="{{ badge }}">{{ status }}</span></td>
+                <td data-label="{{ t_primary('created') }} / {{ t_secondary('created') }}">{{ t.created_at }}</td>
+                <td data-label="{{ t_primary('pack') }} / {{ t_secondary('pack') }}">
                   {% if t.pack_path %}
                     <a href="/files/{{ t.pack_path }}" target="_blank" rel="noopener">Download</a>
                   {% else %}
                     –
                   {% endif %}
                 </td>
-                <td><a href="/tasks/{{ t.task_id }}">Open</a> · <a href="/api/tasks/{{ t.task_id }}" target="_blank" rel="noopener">JSON</a></td>
+                <td data-label="{{ t_primary('detail') }} / {{ t_secondary('detail') }}"><a href="/tasks/{{ t.task_id }}">Open</a> · <a href="/api/tasks/{{ t.task_id }}" target="_blank" rel="noopener">JSON</a></td>
               </tr>
             {% endfor %}
           </tbody>
@@ -154,6 +176,18 @@
     const initialTasks = {{ tasks | tojson | safe }};
     const tableBody = document.getElementById("task-table-body");
     const countEl = document.getElementById("task-count");
+    const LABELS = {
+      id: "{{ t_primary('id') }} / {{ t_secondary('id') }}",
+      platform: "{{ t_primary('platform') }} / {{ t_secondary('platform') }}",
+      source: "{{ t_primary('source') }} / {{ t_secondary('source') }}",
+      title: "{{ t_primary('title') }} / {{ t_secondary('title') }}",
+      category: "{{ t_primary('category') }} / {{ t_secondary('category') }}",
+      lang: "{{ t_primary('lang') }} / {{ t_secondary('lang') }}",
+      status: "{{ t_primary('status') }} / {{ t_secondary('status') }}",
+      created: "{{ t_primary('created') }} / {{ t_secondary('created') }}",
+      pack: "{{ t_primary('pack') }} / {{ t_secondary('pack') }}",
+      detail: "{{ t_primary('detail') }} / {{ t_secondary('detail') }}",
+    };
 
     function statusBadgeClass(status) {
       if (status === "ready") return "badge badge-ready";
@@ -224,22 +258,22 @@
           const srcUrl = extractFirstHttpUrl(srcRaw);
           const row = document.createElement("tr");
           row.innerHTML = `
-            <td class="truncate" title="${t.task_id || ""}"><a href="/tasks/${t.task_id}">${truncate(t.task_id, 16)}</a></td>
-            <td>${t.platform || ""}</td>
-            <td class="truncate" title="${srcRaw}">
+            <td class="truncate" data-label="${LABELS.id}" title="${t.task_id || ""}"><a href="/tasks/${t.task_id}">${truncate(t.task_id, 16)}</a></td>
+            <td data-label="${LABELS.platform}">${t.platform || ""}</td>
+            <td class="truncate" data-label="${LABELS.source}" title="${srcRaw}">
               ${srcRaw
                 ? (srcUrl
                   ? `<a href="${srcUrl}" target="_blank" rel="noopener">${truncate(srcRaw, 48)}</a>`
                   : `<span class="muted">${truncate(srcRaw, 48)}</span>`)
                 : "-"}
             </td>
-            <td class="truncate" title="${t.title || ""}">${t.title || ""}</td>
-            <td>${catLabel}</td>
-            <td>${lang}</td>
-            <td><span class="${statusBadgeClass(status)}">${status}</span></td>
-            <td>${t.created_at || ""}</td>
-            <td>${t.pack_path ? `<a href="/files/${t.pack_path}" target="_blank" rel="noopener">Download</a>` : "–"}</td>
-            <td><a href="/tasks/${t.task_id}">Open</a> · <a href="/api/tasks/${t.task_id}" target="_blank" rel="noopener">JSON</a></td>
+            <td class="truncate" data-label="${LABELS.title}" title="${t.title || ""}">${t.title || ""}</td>
+            <td data-label="${LABELS.category}">${catLabel}</td>
+            <td data-label="${LABELS.lang}">${lang}</td>
+            <td data-label="${LABELS.status}"><span class="${statusBadgeClass(status)}">${status}</span></td>
+            <td data-label="${LABELS.created}">${t.created_at || ""}</td>
+            <td data-label="${LABELS.pack}">${t.pack_path ? `<a href="/files/${t.pack_path}" target="_blank" rel="noopener">Download</a>` : "–"}</td>
+            <td data-label="${LABELS.detail}"><a href="/tasks/${t.task_id}">Open</a> · <a href="/api/tasks/${t.task_id}" target="_blank" rel="noopener">JSON</a></td>
           `;
           tableBody.appendChild(row);
         }

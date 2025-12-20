@@ -36,6 +36,14 @@ Refer to `.env.example` for all environment variables. Key ones:
 - `POST /v1/parse` returns JSON
 - `POST /v1/pack` eventually yields `status: ready` in `/api/tasks/<task_id>`
 
+## Mobile access
+
+Use the mobile-prefixed routes when training mobile operators:
+
+- `/m/tasks`
+- `/m/tasks/new`
+- `/m/tasks/{task_id}`
+
 ## Feature Flags
 
 Feature flags are injected into HTML templates via `window.__FEATURES__`.

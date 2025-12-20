@@ -2,16 +2,16 @@ from typing import Dict
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from gateway.app.config import get_settings
 from gateway.app.db import engine, set_provider_config_map
 from gateway.app.providers.registry import AVAILABLE_PROVIDERS, resolve_tool_providers
+from gateway.app.web.templates import get_templates
 
 router = APIRouter()
 pages_router = APIRouter()
-templates = Jinja2Templates(directory="gateway/app/templates")
+templates = get_templates()
 
 
 class ToolEntry(BaseModel):

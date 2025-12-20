@@ -57,13 +57,20 @@
     .log { max-height: 200px; }
     .env { display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.9rem; color: #4b5563; }
     .env code { background: #f3f4f6; padding: 4px 6px; border-radius: 6px; }
+    .mobile-only { display: none; }
+    .desktop-only { display: block; }
+    @media (max-width: 768px) {
+      .mobile-only { display: block; }
+      .desktop-only { display: none; }
+      button { width: 100%; }
+    }
   </style>
 </head>
-<body>
+<body class="{{ 'mobile' if is_mobile else 'desktop' }}">
   <div class="page">
     <div class="header">
       <a class="back-link" href="/tasks">← Back to Task Board</a>
-      <h1>Task Workbench</h1>
+      <h1>{{ t_primary("task_workbench") }}</h1>
       <div id="status-badge" class="badge badge-unknown">{{ task.status }}</div>
     </div>
 
@@ -103,7 +110,20 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card mobile-only">
+      <h2>{{ t_primary("downloads") }}</h2>
+      {% if ui_show_secondary %}
+        <div class="muted">{{ t_secondary("downloads") }}</div>
+      {% endif %}
+      <div class="downloads" style="margin-top:8px;">
+        <a id="mobile-raw-link" class="disabled" href="#" target="_blank" rel="noopener">raw.mp4</a>
+        <a id="mobile-audio-link" class="disabled" href="#" target="_blank" rel="noopener">mm_audio</a>
+        <a id="mobile-mm-link" class="disabled" href="#" target="_blank" rel="noopener">mm.srt</a>
+        <a id="mobile-pack-link" class="disabled" href="#" target="_blank" rel="noopener">capcut_pack.zip</a>
+      </div>
+    </div>
+
+    <div class="card desktop-only">
       <div class="downloads" id="downloads">
         <span class="label">Downloads:</span>
         <a id="raw-link" class="disabled" href="#" target="_blank" rel="noopener">raw.mp4</a>
@@ -124,13 +144,13 @@
     </section>
 
     <section>
-      <h2>Step 2 · Transcribe & Translate</h2>
+      <h2>{{ t_primary("step2") }} · Transcribe & Translate</h2>
       <p>Generate subtitles via /v1/subtitles.</p>
       <button id="btn-subtitles">Generate subtitles</button>
     </section>
 
     <section>
-      <h2>Step 3 · Burmese Voiceover</h2>
+      <h2>{{ t_primary("step3") }} · Burmese Voiceover</h2>
       <div class="row">
         <div class="field">
           <label for="voice-id">Voice ID</label>
@@ -148,13 +168,13 @@
     </section>
 
     <section>
-      <h2>Step 4 · Pack for CapCut</h2>
+      <h2>{{ t_primary("step4") }} · Pack for CapCut</h2>
       <p>Bundle the CapCut project for this task.</p>
       <button id="btn-pack">Build pack</button>
     </section>
 
     <section>
-      <h2>Log</h2>
+      <h2>{{ t_primary("log") }}</h2>
       <pre id="log-output" class="log">Ready.</pre>
     </section>
   </div>
@@ -215,6 +235,10 @@
       setDownloadLink("mm-link", data.mm_srt_path ? taskEndpoint(data.task_id, "mm") : null);
       setDownloadLink("audio-link", data.mm_audio_path ? taskEndpoint(data.task_id, "audio") : null);
       setDownloadLink("pack-link", data.pack_path ? taskEndpoint(data.task_id, "pack") : null);
+      setDownloadLink("mobile-raw-link", data.raw_path ? taskEndpoint(data.task_id, "raw") : null);
+      setDownloadLink("mobile-audio-link", data.mm_audio_path ? taskEndpoint(data.task_id, "audio") : null);
+      setDownloadLink("mobile-mm-link", data.mm_srt_path ? taskEndpoint(data.task_id, "mm") : null);
+      setDownloadLink("mobile-pack-link", data.pack_path ? taskEndpoint(data.task_id, "pack") : null);
 
       const audioEl = document.getElementById("audio-preview");
       const audioLink = document.getElementById("audio-link");
