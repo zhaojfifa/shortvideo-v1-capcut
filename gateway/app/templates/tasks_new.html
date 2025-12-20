@@ -126,6 +126,7 @@
   </div>
 
   <script>
+    window.__FEATURES__ = {{ features | tojson | safe }};
     const form = document.getElementById("task-form");
     const resultEl = document.getElementById("create-result");
 

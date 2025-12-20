@@ -160,6 +160,7 @@
   </div>
 
   <script>
+    window.__FEATURES__ = {{ features | tojson | safe }};
     window.currentTask = {{ task_json | tojson | safe }};
 
     function appendLog(line) {

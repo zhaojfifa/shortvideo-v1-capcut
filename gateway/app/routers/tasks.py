@@ -11,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
+from ..core.features import get_features
 from .. import models
 from ..db import get_db
 from ..schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary
@@ -73,7 +74,7 @@ async def tasks_page(
 
     return templates.TemplateResponse(
         "tasks.html",
-        {"request": request, "tasks": rows},
+        {"request": request, "tasks": rows, "features": get_features()},
     )
 
 
@@ -83,7 +84,7 @@ async def tasks_new(request: Request) -> HTMLResponse:
 
     return templates.TemplateResponse(
         "tasks_new.html",
-        {"request": request},
+        {"request": request, "features": get_features()},
     )
 
 
@@ -238,6 +239,7 @@ async def task_workbench_page(
             "task_json": task_json,
             "task_view": task_view,
             "env_summary": env_summary,
+            "features": get_features(),
         },
     )
 

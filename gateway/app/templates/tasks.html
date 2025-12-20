@@ -150,6 +150,7 @@
   </div>
 
   <script>
+    window.__FEATURES__ = {{ features | tojson | safe }};
     const initialTasks = {{ tasks | tojson | safe }};
     const tableBody = document.getElementById("task-table-body");
     const countEl = document.getElementById("task-count");

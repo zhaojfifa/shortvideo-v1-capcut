@@ -13,6 +13,9 @@ Refer to `.env.example` for all environment variables. Key ones:
 - `WORKSPACE_ROOT`: filesystem root for task artifacts
 - `XIONGMAO_API_KEY`: required for parse provider
 - `OPENAI_API_KEY`, `GEMINI_API_KEY`, `LOVO_API_KEY`: optional providers
+- `FEATURE_PACK_DOWNLOAD` (default `true`)
+- `FEATURE_ASSET_DOWNLOAD` (default `true`)
+- `FEATURE_PUBLISH_BACKFILL` (default `false`)
 
 ## Persistence Strategy
 
@@ -32,3 +35,21 @@ Refer to `.env.example` for all environment variables. Key ones:
 - `GET /api/tasks?limit=1` returns JSON
 - `POST /v1/parse` returns JSON
 - `POST /v1/pack` eventually yields `status: ready` in `/api/tasks/<task_id>`
+
+## Feature Flags
+
+Feature flags are injected into HTML templates via `window.__FEATURES__`.
+
+Defaults:
+
+- `FEATURE_PACK_DOWNLOAD=true`
+- `FEATURE_ASSET_DOWNLOAD=true`
+- `FEATURE_PUBLISH_BACKFILL=false`
+
+Smoke commands:
+
+```bash
+python -m compileall gateway
+curl -I https://<host>/tasks
+curl -s https://<host>/api/tasks?limit=1 | jq
+```
