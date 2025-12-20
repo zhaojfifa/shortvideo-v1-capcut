@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from gateway.routes import tasks, v1
+from gateway.routes import files, tasks, v1
 from gateway.app.config import get_settings
 from gateway.app.db import Base, engine, ensure_task_extra_columns
 
@@ -49,6 +49,7 @@ def on_startup() -> None:
 app.include_router(v1.router, prefix="/v1", tags=["v1"])
 app.include_router(tasks.router, prefix="/api", tags=["tasks"])
 app.include_router(tasks.pages_router)
+app.include_router(files.router, tags=["files"])
 
 templates = Jinja2Templates(directory="gateway/app/templates")
 
