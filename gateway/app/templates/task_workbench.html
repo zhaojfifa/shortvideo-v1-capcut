@@ -119,7 +119,9 @@
         <a id="mobile-raw-link" class="disabled" href="#" target="_blank" rel="noopener">raw.mp4</a>
         <a id="mobile-audio-link" class="disabled" href="#" target="_blank" rel="noopener">mm_audio</a>
         <a id="mobile-mm-link" class="disabled" href="#" target="_blank" rel="noopener">mm.srt</a>
-        <a id="mobile-pack-link" class="disabled" href="#" target="_blank" rel="noopener">capcut_pack.zip</a>
+        {% if features.allow_pack_download %}
+          <a id="mobile-pack-link" class="disabled" href="#" target="_blank" rel="noopener">capcut_pack.zip</a>
+        {% endif %}
       </div>
     </div>
 
@@ -130,7 +132,9 @@
         <a id="origin-link" class="disabled" href="#" target="_blank" rel="noopener">origin.srt</a>
         <a id="mm-link" class="disabled" href="#" target="_blank" rel="noopener">mm.srt</a>
         <a id="audio-link" class="disabled" href="#" target="_blank" rel="noopener">mm_audio</a>
-        <a id="pack-link" class="disabled" href="#" target="_blank" rel="noopener">capcut_pack.zip</a>
+        {% if features.allow_pack_download %}
+          <a id="pack-link" class="disabled" href="#" target="_blank" rel="noopener">capcut_pack.zip</a>
+        {% endif %}
       </div>
       <div style="margin-top:8px;">
         <audio id="audio-preview" controls style="display:none; width: 100%; max-width: 360px;"></audio>

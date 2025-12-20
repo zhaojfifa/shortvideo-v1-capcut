@@ -1,22 +1,31 @@
 from __future__ import annotations
 
 import os
+from typing import Dict
 
 
-def _parse_bool(value: str | None, default: bool) -> bool:
-    if value is None:
-        return default
-    normalized = value.strip().lower()
-    if normalized in {"1", "true", "yes", "on"}:
-        return True
-    if normalized in {"0", "false", "no", "off"}:
-        return False
-    return default
+def _bool_env(name: str, default: str = "false") -> bool:
+    """
+    Parse env var into bool.
+    True values: 1, true, yes, on (case-insensitive).
+    """
+    val = os.getenv(name, default)
+    return str(val).strip().lower() in {"1", "true", "yes", "on"}
 
 
-def get_features() -> dict[str, bool]:
+def get_features() -> Dict[str, bool]:
+    """
+    Operational feature flags (runtime toggles).
+    Keep ALL flags centralized here to avoid scattered conditionals in templates/routers.
+    """
     return {
-        "pack_download": _parse_bool(os.getenv("FEATURE_PACK_DOWNLOAD"), True),
-        "asset_download": _parse_bool(os.getenv("FEATURE_ASSET_DOWNLOAD"), True),
-        "publish_backfill": _parse_bool(os.getenv("FEATURE_PUBLISH_BACKFILL"), False),
+        # Allow pack download link to appear in UI.
+        # For CN "ops/admin" instances you may set FEATURE_ALLOW_PACK_DOWNLOAD=false.
+        "allow_pack_download": _bool_env("FEATURE_ALLOW_PACK_DOWNLOAD", "true"),
+
+        # Optional: show Admin Tools entry points (if you add nav later).
+        "show_admin_tools": _bool_env("FEATURE_SHOW_ADMIN_TOOLS", "true"),
+
+        # Optional: allow one-click auto pipeline (if you add in UI later).
+        "enable_auto_pipeline": _bool_env("FEATURE_ENABLE_AUTO_PIPELINE", "true"),
     }

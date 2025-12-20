@@ -156,7 +156,7 @@
                 <td data-label="{{ t_primary('status') }} / {{ t_secondary('status') }}"><span class="{{ badge }}">{{ status }}</span></td>
                 <td data-label="{{ t_primary('created') }} / {{ t_secondary('created') }}">{{ t.created_at }}</td>
                 <td data-label="{{ t_primary('pack') }} / {{ t_secondary('pack') }}">
-                  {% if t.pack_path %}
+                  {% if features.allow_pack_download and t.pack_path %}
                     <a href="/files/{{ t.pack_path }}" target="_blank" rel="noopener">Download</a>
                   {% else %}
                     –
@@ -174,6 +174,7 @@
   <script>
     window.__FEATURES__ = {{ features | tojson | safe }};
     const initialTasks = {{ tasks | tojson | safe }};
+    const allowPackDownload = {{ "true" if features.allow_pack_download else "false" }};
     const tableBody = document.getElementById("task-table-body");
     const countEl = document.getElementById("task-count");
     const LABELS = {
@@ -272,7 +273,11 @@
             <td data-label="${LABELS.lang}">${lang}</td>
             <td data-label="${LABELS.status}"><span class="${statusBadgeClass(status)}">${status}</span></td>
             <td data-label="${LABELS.created}">${t.created_at || ""}</td>
-            <td data-label="${LABELS.pack}">${t.pack_path ? `<a href="/files/${t.pack_path}" target="_blank" rel="noopener">Download</a>` : "–"}</td>
+            <td data-label="${LABELS.pack}">${
+              (allowPackDownload && t.pack_path)
+                ? `<a href="/files/${t.pack_path}" target="_blank" rel="noopener">Download</a>`
+                : "–"
+            }</td>
             <td data-label="${LABELS.detail}"><a href="/tasks/${t.task_id}">Open</a> · <a href="/api/tasks/${t.task_id}" target="_blank" rel="noopener">JSON</a></td>
           `;
           tableBody.appendChild(row);

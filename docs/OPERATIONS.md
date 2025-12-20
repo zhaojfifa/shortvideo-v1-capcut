@@ -50,9 +50,9 @@ Feature flags are injected into HTML templates via `window.__FEATURES__`.
 
 Defaults:
 
-- `FEATURE_PACK_DOWNLOAD=true`
-- `FEATURE_ASSET_DOWNLOAD=true`
-- `FEATURE_PUBLISH_BACKFILL=false`
+- `FEATURE_ALLOW_PACK_DOWNLOAD=true`
+- `FEATURE_SHOW_ADMIN_TOOLS=true`
+- `FEATURE_ENABLE_AUTO_PIPELINE=true`
 
 Smoke commands:
 
