@@ -10,7 +10,7 @@ README_TEMPLATE = """CapCut 剪辑包使用说明
 
 1. 在 CapCut 新建项目，导入 zip 解压后的文件。
 2. 将 raw.mp4 放入视频轨道。
-3. 导入 subs_mm.srt，调整字体样式。
+3. 导入 subs_mm.srt（或 subs_origin.srt），调整字体样式。
 4. 将 {audio_filename} 放入音频轨道，与字幕对齐。
 5. 如需纯文本字幕，可使用 subs_mm.txt（不含时间轴）。
 6. 根据需要添加转场、贴纸等二次创作。
