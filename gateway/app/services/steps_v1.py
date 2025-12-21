@@ -138,12 +138,19 @@ async def run_pack_step(req: PackRequest):
     raw_file = raw_path(req.task_id)
     workspace = Workspace(req.task_id)
     audio_file = workspace.mm_audio_path
-    subs_file = translated_srt_path(req.task_id, "my")
-    if not subs_file.exists():
-        subs_file = translated_srt_path(req.task_id, "mm")
+    subs_mm_srt = translated_srt_path(req.task_id, "my")
+    if not subs_mm_srt.exists():
+        subs_mm_srt = translated_srt_path(req.task_id, "mm")
+    subs_mm_txt = subs_mm_srt.with_suffix(".txt")
 
     try:
-        packed = create_capcut_pack(req.task_id, raw_file, audio_file, subs_file)
+        packed = create_capcut_pack(
+            req.task_id,
+            raw_file,
+            audio_file,
+            subs_mm_srt,
+            subs_mm_txt,
+        )
     except PackError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

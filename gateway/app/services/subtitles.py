@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from fastapi import HTTPException
 
 from gateway.app.config import get_settings
 from gateway.app.core.subtitle_utils import preview_lines, segments_to_srt
-from gateway.app.core.workspace import Workspace
+from gateway.app.core.workspace import Workspace, relative_to_workspace
 from gateway.app.providers.gemini_subtitles import (
     GeminiSubtitlesError,
     translate_and_segment_with_gemini,
@@ -17,6 +18,33 @@ from gateway.app.providers.gemini_subtitles import (
 from gateway.app.services import subtitles_openai
 
 logger = logging.getLogger(__name__)
+
+
+_SRT_TIME_RE = re.compile(
+    r"\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}"
+)
+
+
+def _srt_to_txt(srt_text: str) -> str:
+    out_lines: list[str] = []
+    for line in srt_text.splitlines():
+        s = line.strip()
+        if not s:
+            if out_lines and out_lines[-1] != "":
+                out_lines.append("")
+            continue
+        if s.isdigit():
+            continue
+        if "-->" in s or _SRT_TIME_RE.search(s):
+            continue
+        out_lines.append(s)
+    while out_lines and out_lines[-1] == "":
+        out_lines.pop()
+    return "\n".join(out_lines) + "\n" if out_lines else ""
+
+
+def _write_txt_from_srt(target_path, srt_text: str) -> None:
+    target_path.write_text(_srt_to_txt(srt_text), encoding="utf-8")
 
 
 def build_preview(text: str | None) -> list[str]:
@@ -102,8 +130,12 @@ async def generate_subtitles(
             segments or [], "origin"
         )
 
-        workspace.write_origin_srt(origin_text)
-        workspace.write_mm_srt(mm_text)
+        origin_srt_path = workspace.write_origin_srt(origin_text)
+        mm_srt_path = workspace.write_mm_srt(mm_text)
+        origin_txt_path = origin_srt_path.with_suffix(".txt")
+        mm_txt_path = mm_srt_path.with_suffix(".txt")
+        _write_txt_from_srt(origin_txt_path, origin_text)
+        _write_txt_from_srt(mm_txt_path, mm_text)
 
         segments_count = len(segments) if isinstance(segments, list) else 0
         logger.info(
@@ -119,6 +151,7 @@ async def generate_subtitles(
             "task_id": task_id,
             "origin_srt": origin_text,
             "mm_srt": mm_text,
+            "mm_txt_path": relative_to_workspace(mm_txt_path),
             "segments_json": gemini_result,
             "origin_preview": build_preview(origin_text),
             "mm_preview": build_preview(mm_text),
