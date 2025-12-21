@@ -2,27 +2,21 @@ from __future__ import annotations
 
 from typing import Callable, Dict
 
-from gateway.app.config import get_settings
-from gateway.app.i18n import TRANSLATIONS
-
-
-def _t(lang: str) -> Callable[[str], str]:
-    table = TRANSLATIONS.get(lang, {})
-
-    def tr(key: str) -> str:
-        return table.get(key, key)
-
-    return tr
+from gateway.app.web.i18n import ENABLE_SECONDARY_UI, SECONDARY_UI_LANG, PRIMARY_UI_LANG
+from gateway.app.web.i18n import I18N, t_primary, t_secondary
 
 
 def get_template_globals() -> Dict[str, object]:
-    settings = get_settings()
-    primary = settings.ui_primary_lang or "en"
-    secondary = settings.ui_secondary_lang or "my"
     return {
-        "t_primary": _t(primary),
-        "t_secondary": _t(secondary),
-        "ui_primary_lang": primary,
-        "ui_secondary_lang": secondary,
-        "ui_show_secondary": settings.ui_show_secondary,
+        "t_primary": t_primary,
+        "t_secondary": t_secondary,
+        "ui_primary_lang": PRIMARY_UI_LANG,
+        "ui_secondary_lang": SECONDARY_UI_LANG,
+        "ui_show_secondary": ENABLE_SECONDARY_UI,
+        "ui_langs": {
+            "primary": PRIMARY_UI_LANG,
+            "secondary": SECONDARY_UI_LANG,
+            "secondary_enabled": ENABLE_SECONDARY_UI,
+            "available": list(I18N.keys()),
+        },
     }

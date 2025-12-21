@@ -7,9 +7,6 @@ from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy.orm import Session
-
-from gateway.app import models
 from gateway.app.config import get_settings
 from gateway.app.core.features import get_features
 from gateway.app.core.workspace import (
@@ -19,9 +16,10 @@ from gateway.app.core.workspace import (
     relative_to_workspace,
     translated_srt_path,
 )
-from gateway.app.db import get_db
+from gateway.app.deps import get_task_repository
 from gateway.app.web.templates import get_templates
 from gateway.app.schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary
+from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
 from gateway.app.services.pipeline_v1 import run_pipeline_background
 
 router = APIRouter(prefix="/tasks")
@@ -45,7 +43,9 @@ def _infer_platform_from_url(url: str) -> Optional[str]:
 
 @pages_router.get("/tasks", response_class=HTMLResponse)
 async def tasks_board_page(
-    request: Request, db: Session = Depends(get_db), limit: int = Query(50, ge=1, le=500)
+    request: Request,
+    limit: int = Query(50, ge=1, le=500),
+    repo=Depends(get_task_repository),
 ):
     """Render the task board HTML without preloading ORM tasks."""
 
@@ -72,9 +72,11 @@ async def tasks_mobile_root():
 
 @pages_router.get("/m/tasks", response_class=HTMLResponse)
 async def tasks_board_mobile(
-    request: Request, db: Session = Depends(get_db), limit: int = Query(50, ge=1, le=500)
+    request: Request,
+    limit: int = Query(50, ge=1, le=500),
+    repo=Depends(get_task_repository),
 ):
-    response = await tasks_board_page(request, db=db, limit=limit)
+    response = await tasks_board_page(request, repo=repo, limit=limit)
     response.context["is_mobile"] = True
     response.context["view"] = "mobile"
     return response
@@ -88,16 +90,17 @@ async def tasks_new_mobile(request: Request) -> HTMLResponse:
     return response
 
 
-def _resolve_paths(task: models.Task) -> dict[str, Optional[str]]:
-    workspace = Workspace(task.id)
-    raw_video = task.raw_path or None
+def _resolve_paths(task: dict) -> dict[str, Optional[str]]:
+    task_id = str(task.get("task_id") or task.get("id"))
+    workspace = Workspace(task_id)
+    raw_video = task.get("raw_path") or None
     if not raw_video and workspace.raw.exists():
         raw_video = relative_to_workspace(workspace.raw)
 
-    origin_srt = getattr(task, "origin_srt_path", None)
-    mm_srt = getattr(task, "mm_srt_path", None)
+    origin_srt = task.get("origin_srt_path")
+    mm_srt = task.get("mm_srt_path")
     if not origin_srt:
-        path = origin_srt_path(task.id)
+        path = origin_srt_path(task_id)
         if path.exists():
             origin_srt = relative_to_workspace(path)
     if not mm_srt:
@@ -105,13 +108,13 @@ def _resolve_paths(task: models.Task) -> dict[str, Optional[str]]:
         if path.exists():
             mm_srt = relative_to_workspace(path)
 
-    mm_audio = getattr(task, "mm_audio_path", None) or None
+    mm_audio = task.get("mm_audio_path") or None
     if not mm_audio and workspace.mm_audio_exists():
         mm_audio = relative_to_workspace(workspace.mm_audio_path)
 
-    pack_path = task.pack_path or None
+    pack_path = task.get("pack_path") or None
     if not pack_path:
-        pack = pack_zip_path(task.id)
+        pack = pack_zip_path(task_id)
         if pack.exists():
             pack_path = relative_to_workspace(pack)
 
@@ -133,9 +136,9 @@ def _extract_first_http_url(text: str | None) -> str | None:
 
 @pages_router.get("/tasks/{task_id}", response_class=HTMLResponse)
 async def task_workbench_page(
-    request: Request, task_id: str, db: Session = Depends(get_db)
+    request: Request, task_id: str, repo=Depends(get_task_repository)
 ) -> HTMLResponse:
-    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    task = repo.get(task_id)
     if not task:
         return templates.TemplateResponse(
             "task_not_found.html",
@@ -145,20 +148,20 @@ async def task_workbench_page(
 
     paths = _resolve_paths(task)
     task_json = {
-        "task_id": task.id,
-        "status": task.status,
-        "platform": task.platform,
-        "category_key": task.category_key,
-        "content_lang": task.content_lang,
-        "ui_lang": task.ui_lang,
-        "source_url": task.source_url,
+        "task_id": task.get("task_id") or task.get("id"),
+        "status": task.get("status"),
+        "platform": task.get("platform"),
+        "category_key": task.get("category_key"),
+        "content_lang": task.get("content_lang"),
+        "ui_lang": task.get("ui_lang"),
+        "source_url": task.get("source_url"),
         "raw_path": paths["raw_path"],
         "origin_srt_path": paths["origin_srt_path"],
         "mm_srt_path": paths["mm_srt_path"],
         "mm_audio_path": paths["mm_audio_path"],
         "pack_path": paths["pack_path"],
     }
-    task_view = {"source_url_open": _extract_first_http_url(task.source_url)}
+    task_view = {"source_url_open": _extract_first_http_url(task.get("source_url"))}
 
     app_settings = get_settings()
     env_summary = {
@@ -186,9 +189,9 @@ async def task_workbench_page(
 
 @pages_router.get("/m/tasks/{task_id}", response_class=HTMLResponse)
 async def task_workbench_mobile(
-    request: Request, task_id: str, db: Session = Depends(get_db)
+    request: Request, task_id: str, repo=Depends(get_task_repository)
 ) -> HTMLResponse:
-    response = await task_workbench_page(request, task_id=task_id, db=db)
+    response = await task_workbench_page(request, task_id=task_id, repo=repo)
     response.context["is_mobile"] = True
     response.context["view"] = "mobile"
     return response
@@ -196,7 +199,9 @@ async def task_workbench_mobile(
 
 @router.post("", response_model=TaskDetail)
 def create_task(
-    payload: TaskCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+    payload: TaskCreate,
+    background_tasks: BackgroundTasks,
+    repo=Depends(get_task_repository),
 ):
     """
     Create a Task record and kick off the V1 pipeline asynchronously.
@@ -205,107 +210,101 @@ def create_task(
     platform = payload.platform or _infer_platform_from_url(str(payload.source_url))
     task_id = uuid4().hex[:12]
 
-    db_task = models.Task(
-        id=task_id,
-        title=payload.title,
-        source_url=str(payload.source_url),
-        platform=platform,
-        account_id=payload.account_id,
-        account_name=payload.account_name,
-        video_type=payload.video_type,
-        template=payload.template,
-        category_key=payload.category_key or "beauty",
-        content_lang=payload.content_lang or "my",
-        ui_lang=payload.ui_lang or "en",
-        style_preset=payload.style_preset,
-        face_swap_enabled=bool(payload.face_swap_enabled),
-        status="pending",
-        last_step=None,
-        error_message=None,
-    )
-    db.add(db_task)
-    db.commit()
-    db.refresh(db_task)
+    task_payload = {
+        "task_id": task_id,
+        "title": payload.title,
+        "source_url": str(payload.source_url),
+        "platform": platform,
+        "account_id": payload.account_id,
+        "account_name": payload.account_name,
+        "video_type": payload.video_type,
+        "template": payload.template,
+        "category_key": payload.category_key or "beauty",
+        "content_lang": payload.content_lang or "my",
+        "ui_lang": payload.ui_lang or "en",
+        "style_preset": payload.style_preset,
+        "face_swap_enabled": bool(payload.face_swap_enabled),
+        "status": "pending",
+        "last_step": None,
+        "error_message": None,
+    }
+    task_payload = normalize_task_payload(task_payload, is_new=True)
+    repo.create(task_payload)
 
     background_tasks.add_task(run_pipeline_background, db_task.id)
 
     return TaskDetail(
-        task_id=db_task.id,
-        title=db_task.title,
-        platform=db_task.platform,
-        account_id=db_task.account_id,
-        account_name=db_task.account_name,
-        video_type=db_task.video_type,
-        template=db_task.template,
-        category_key=db_task.category_key or "beauty",
-        content_lang=db_task.content_lang or "my",
-        ui_lang=db_task.ui_lang or "en",
-        style_preset=db_task.style_preset,
-        face_swap_enabled=bool(db_task.face_swap_enabled),
-        status=db_task.status,
-        last_step=db_task.last_step,
-        duration_sec=db_task.duration_sec,
-        thumb_url=db_task.thumb_url,
-        raw_path=db_task.raw_path,
-        mm_audio_path=db_task.mm_audio_path,
-        pack_path=db_task.pack_path,
-        created_at=db_task.created_at,
-        error_message=db_task.error_message,
-        error_reason=db_task.error_reason,
+        task_id=task_payload["task_id"],
+        title=task_payload.get("title"),
+        platform=task_payload.get("platform"),
+        account_id=task_payload.get("account_id"),
+        account_name=task_payload.get("account_name"),
+        video_type=task_payload.get("video_type"),
+        template=task_payload.get("template"),
+        category_key=task_payload.get("category_key") or "beauty",
+        content_lang=task_payload.get("content_lang") or "my",
+        ui_lang=task_payload.get("ui_lang") or "en",
+        style_preset=task_payload.get("style_preset"),
+        face_swap_enabled=bool(task_payload.get("face_swap_enabled")),
+        status=task_payload.get("status"),
+        last_step=task_payload.get("last_step"),
+        duration_sec=task_payload.get("duration_sec"),
+        thumb_url=task_payload.get("thumb_url"),
+        raw_path=task_payload.get("raw_path"),
+        mm_audio_path=task_payload.get("mm_audio_path"),
+        pack_path=task_payload.get("pack_path"),
+        created_at=task_payload.get("created_at"),
+        error_message=task_payload.get("error_message"),
+        error_reason=task_payload.get("error_reason"),
     )
 
 
 @router.get("", response_model=TaskListResponse)
 def list_tasks(
-    db: Session = Depends(get_db),
     account_id: Optional[str] = Query(default=None),
     status: Optional[str] = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=500),
+    repo=Depends(get_task_repository),
 ):
     """
     List tasks ordered by creation time (newest first) with an adjustable limit.
     """
 
-    query = db.query(models.Task)
-
+    filters = {}
     if account_id:
-        query = query.filter(models.Task.account_id == account_id)
+        filters["account_id"] = account_id
     if status:
-        query = query.filter(models.Task.status == status)
+        filters["status"] = status
 
-    total = query.count()
-    items = (
-        query.order_by(models.Task.created_at.desc())
-        .offset((page - 1) * limit)
-        .limit(limit)
-        .all()
-    )
+    items = sort_tasks_by_created(repo.list(filters=filters))
+    total = len(items)
+    items = items[(page - 1) * limit : (page - 1) * limit + limit]
 
     summaries: list[TaskSummary] = []
     for t in items:
         summaries.append(
             TaskSummary(
-                task_id=t.id,
-                title=t.title,
-                platform=t.platform,
-                account_id=t.account_id,
-                account_name=t.account_name,
-                video_type=t.video_type,
-                template=t.template,
-                category_key=t.category_key or "beauty",
-                content_lang=t.content_lang or "my",
-                ui_lang=t.ui_lang or "en",
-                style_preset=t.style_preset,
-                face_swap_enabled=bool(t.face_swap_enabled),
-                status=t.status,
-                last_step=t.last_step,
-                duration_sec=t.duration_sec,
-                thumb_url=t.thumb_url,
-                pack_path=t.pack_path,
-                created_at=t.created_at,
-                error_message=t.error_message,
-                error_reason=t.error_reason,
+                task_id=t.get("task_id") or t.get("id"),
+                title=t.get("title"),
+                platform=t.get("platform"),
+                account_id=t.get("account_id"),
+                account_name=t.get("account_name"),
+                video_type=t.get("video_type"),
+                template=t.get("template"),
+                category_key=t.get("category_key") or "beauty",
+                content_lang=t.get("content_lang") or "my",
+                ui_lang=t.get("ui_lang") or "en",
+                style_preset=t.get("style_preset"),
+                face_swap_enabled=bool(t.get("face_swap_enabled")),
+                status=t.get("status"),
+                last_step=t.get("last_step"),
+                duration_sec=t.get("duration_sec"),
+                thumb_url=t.get("thumb_url"),
+                pack_path=t.get("pack_path"),
+                created_at=t.get("created_at"),
+                error_message=t.get("error_message"),
+                error_reason=t.get("error_reason"),
             )
         )
 
@@ -313,36 +312,36 @@ def list_tasks(
 
 
 @router.get("/{task_id}", response_model=TaskDetail)
-def get_task(task_id: str, db: Session = Depends(get_db)):
+def get_task(task_id: str, repo=Depends(get_task_repository)):
     """Retrieve a single task by id."""
 
-    t = db.query(models.Task).filter(models.Task.id == task_id).first()
+    t = repo.get(task_id)
     if not t:
         raise HTTPException(status_code=404, detail="Task not found")
 
     return TaskDetail(
-        task_id=t.id,
-        title=t.title,
-        platform=t.platform,
-        account_id=t.account_id,
-        account_name=t.account_name,
-        video_type=t.video_type,
-        template=t.template,
-        category_key=t.category_key or "beauty",
-        content_lang=t.content_lang or "my",
-        ui_lang=t.ui_lang or "en",
-        style_preset=t.style_preset,
-        face_swap_enabled=bool(t.face_swap_enabled),
-        status=t.status,
-        last_step=t.last_step,
-        duration_sec=t.duration_sec,
-        thumb_url=t.thumb_url,
-        raw_path=t.raw_path,
-        mm_audio_path=t.mm_audio_path,
-        pack_path=t.pack_path,
-        created_at=t.created_at,
-        error_message=t.error_message,
-        error_reason=t.error_reason,
+        task_id=t.get("task_id") or t.get("id"),
+        title=t.get("title"),
+        platform=t.get("platform"),
+        account_id=t.get("account_id"),
+        account_name=t.get("account_name"),
+        video_type=t.get("video_type"),
+        template=t.get("template"),
+        category_key=t.get("category_key") or "beauty",
+        content_lang=t.get("content_lang") or "my",
+        ui_lang=t.get("ui_lang") or "en",
+        style_preset=t.get("style_preset"),
+        face_swap_enabled=bool(t.get("face_swap_enabled")),
+        status=t.get("status"),
+        last_step=t.get("last_step"),
+        duration_sec=t.get("duration_sec"),
+        thumb_url=t.get("thumb_url"),
+        raw_path=t.get("raw_path"),
+        mm_audio_path=t.get("mm_audio_path"),
+        pack_path=t.get("pack_path"),
+        created_at=t.get("created_at"),
+        error_message=t.get("error_message"),
+        error_reason=t.get("error_reason"),
     )
 
 
