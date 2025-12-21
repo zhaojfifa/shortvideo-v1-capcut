@@ -11,8 +11,7 @@ from gateway.app.core.workspace import (
     relative_to_workspace,
     translated_srt_path,
 )
-from gateway.app.db import SessionLocal
-from gateway.app import models
+from gateway.app.deps import get_task_repository
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.pack import PackError, create_capcut_pack
 from gateway.app.services.parse import detect_platform, parse_douyin_video
@@ -170,14 +169,7 @@ async def run_pack_step(req: PackRequest):
 
 
 def _update_task(task_id: str, **fields) -> None:
-    db = SessionLocal()
-    try:
-        task = db.query(models.Task).filter(models.Task.id == task_id).first()
-        if not task:
-            return
-        for key, value in fields.items():
-            if value is not None and hasattr(task, key):
-                setattr(task, key, value)
-        db.commit()
-    finally:
-        db.close()
+    repo = get_task_repository()
+    patch = {key: value for key, value in fields.items() if value is not None}
+    if patch:
+        repo.update(task_id, patch)
