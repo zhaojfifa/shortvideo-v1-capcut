@@ -12,7 +12,7 @@ README_TEMPLATE = """CapCut 剪辑包使用说明
 2. 将 raw.mp4 放入视频轨道。
 3. 导入 subs_mm.srt（或 subs_origin.srt），调整字体样式。
 4. 将 {audio_filename} 放入音频轨道，与字幕对齐。
-5. 如需纯文本字幕，可使用 subs_mm.txt / subs_origin.txt（不含时间轴）。
+5. 如需纯文本字幕，可使用 subs_mm.txt（不含时间轴）。
 6. 根据需要添加转场、贴纸等二次创作。
 """
 
@@ -53,12 +53,10 @@ def create_capcut_pack(
     task_id: str,
     raw_path: Path,
     audio_path: Path,
-    subs_origin_srt_path: Path,
-    subs_mm_srt_path: Path,
-    subs_origin_txt_path: Path | None = None,
-    subs_mm_txt_path: Path | None = None,
+    subs_path: Path,
+    txt_path: Path | None = None,
 ) -> dict:
-    required = [raw_path, audio_path, subs_origin_srt_path, subs_mm_srt_path]
+    required = [raw_path, audio_path, subs_path]
     missing = [p for p in required if not p.exists()]
     if missing:
         names = ", ".join(str(p) for p in missing)
@@ -75,21 +73,14 @@ def create_capcut_pack(
         shutil.copy(raw_path, tmp_path / "raw.mp4")
         shutil.copy(audio_path, tmp_path / audio_filename)
 
-        shutil.copy(subs_origin_srt_path, tmp_path / "subs_origin.srt")
-        shutil.copy(subs_mm_srt_path, tmp_path / "subs_mm.srt")
+        shutil.copy(subs_path, tmp_path / "subs_mm.srt")
 
-        origin_txt_dst = tmp_path / "subs_origin.txt"
-        mm_txt_dst = tmp_path / "subs_mm.txt"
-
-        if subs_origin_txt_path and subs_origin_txt_path.exists():
-            shutil.copy(subs_origin_txt_path, origin_txt_dst)
+        txt_dst = tmp_path / "subs_mm.txt"
+        resolved_txt = txt_path if txt_path and txt_path.exists() else subs_path.with_suffix(".txt")
+        if resolved_txt.exists():
+            shutil.copy(resolved_txt, txt_dst)
         else:
-            _ensure_txt_from_srt(origin_txt_dst, subs_origin_srt_path)
-
-        if subs_mm_txt_path and subs_mm_txt_path.exists():
-            shutil.copy(subs_mm_txt_path, mm_txt_dst)
-        else:
-            _ensure_txt_from_srt(mm_txt_dst, subs_mm_srt_path)
+            _ensure_txt_from_srt(txt_dst, subs_path)
 
         (tmp_path / "README.txt").write_text(
             README_TEMPLATE.format(audio_filename=audio_filename),
@@ -103,9 +94,7 @@ def create_capcut_pack(
     files = [
         "raw.mp4",
         audio_filename,
-        "subs_origin.srt",
         "subs_mm.srt",
-        "subs_origin.txt",
         "subs_mm.txt",
         "README.txt",
     ]

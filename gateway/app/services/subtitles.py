@@ -9,7 +9,7 @@ from fastapi import HTTPException
 
 from gateway.app.config import get_settings
 from gateway.app.core.subtitle_utils import preview_lines, segments_to_srt
-from gateway.app.core.workspace import Workspace
+from gateway.app.core.workspace import Workspace, relative_to_workspace
 from gateway.app.providers.gemini_subtitles import (
     GeminiSubtitlesError,
     translate_and_segment_with_gemini,
@@ -132,8 +132,10 @@ async def generate_subtitles(
 
         origin_srt_path = workspace.write_origin_srt(origin_text)
         mm_srt_path = workspace.write_mm_srt(mm_text)
-        _write_txt_from_srt(origin_srt_path.with_suffix(".txt"), origin_text)
-        _write_txt_from_srt(mm_srt_path.with_suffix(".txt"), mm_text)
+        origin_txt_path = origin_srt_path.with_suffix(".txt")
+        mm_txt_path = mm_srt_path.with_suffix(".txt")
+        _write_txt_from_srt(origin_txt_path, origin_text)
+        _write_txt_from_srt(mm_txt_path, mm_text)
 
         segments_count = len(segments) if isinstance(segments, list) else 0
         logger.info(
@@ -149,6 +151,7 @@ async def generate_subtitles(
             "task_id": task_id,
             "origin_srt": origin_text,
             "mm_srt": mm_text,
+            "mm_txt_path": relative_to_workspace(mm_txt_path),
             "segments_json": gemini_result,
             "origin_preview": build_preview(origin_text),
             "mm_preview": build_preview(mm_text),

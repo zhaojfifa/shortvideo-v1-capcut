@@ -192,6 +192,9 @@ async def generate_with_openai(
         "task_id": task_id,
         "origin_srt": relative_to_workspace(origin_srt),
         "mm_srt": relative_to_workspace(translated_srt) if translated_srt else None,
+        "mm_txt_path": relative_to_workspace(translated_srt.with_suffix(".txt"))
+        if translated_srt
+        else None,
         "wav": relative_to_workspace(audio_path) if audio_path else None,
         "segments_json": None,
         "origin_preview": _preview(origin_srt),

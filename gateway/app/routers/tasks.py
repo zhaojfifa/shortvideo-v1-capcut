@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 from ..config import get_settings
 from ..core.features import get_features
 from gateway.app.web.templates import get_templates
@@ -24,6 +25,7 @@ from ..schemas import (
     TaskSummary,
 )
 from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
+from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from ..services.steps_v1 import (
     run_dub_step,
     run_pack_step,
@@ -39,6 +41,11 @@ from ..core.workspace import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class DubProviderRequest(BaseModel):
+    provider: str | None = None
+    voice_id: str | None = None
 
 
 pages_router = APIRouter()
@@ -133,6 +140,13 @@ def _resolve_paths(task: dict) -> dict[str, Optional[str]]:
         if not mm_audio:
             mm_audio = f"audio/{workspace.mm_audio_path.name}"
 
+    mm_txt = None
+    mm_srt_path = workspace.mm_srt_path
+    if mm_srt_path.exists():
+        mm_txt_path = mm_srt_path.with_suffix(".txt")
+        if mm_txt_path.exists():
+            mm_txt = relative_to_workspace(mm_txt_path)
+
     pack_path = task.get("pack_path") or None
     if not pack_path:
         pack = pack_zip_path(task_id)
@@ -144,6 +158,7 @@ def _resolve_paths(task: dict) -> dict[str, Optional[str]]:
         "origin_srt_path": origin_srt,
         "mm_srt_path": translated_srt,
         "mm_audio_path": mm_audio,
+        "mm_txt_path": mm_txt,
         "pack_path": pack_path,
     }
 
@@ -352,6 +367,7 @@ async def task_workbench_page(
     except Exception:
         env_summary["defaults"] = {}
 
+    paths = _resolve_paths(task)
     detail = _task_to_detail(task)
     task_json = {
         "task_id": detail.task_id,
@@ -365,6 +381,7 @@ async def task_workbench_page(
         "origin_srt_path": detail.origin_srt_path,
         "mm_srt_path": detail.mm_srt_path,
         "mm_audio_path": detail.mm_audio_path,
+        "mm_txt_path": paths.get("mm_txt_path"),
         "pack_path": detail.pack_path,
         "publish_status": detail.publish_status,
         "publish_provider": detail.publish_provider,
@@ -505,6 +522,52 @@ def list_tasks(
         )
 
     return TaskListResponse(items=summaries, page=page, page_size=page_size, total=total)
+
+
+@api_router.post("/tasks/{task_id}/dub", response_model=TaskDetail)
+def rerun_dub(
+    task_id: str,
+    payload: DubProviderRequest,
+    repo=Depends(get_task_repository),
+):
+    """Re-run dubbing for a task with a selected provider."""
+
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    provider = (payload.provider or "edge-tts").lower()
+    if provider == "edge":
+        provider = "edge-tts"
+    if provider not in {"edge-tts", "lovo"}:
+        raise HTTPException(status_code=400, detail="Unsupported dub provider")
+
+    settings = get_settings()
+    if provider == "lovo" and not settings.lovo_api_key:
+        raise HTTPException(status_code=400, detail="LOVO_API_KEY is not configured")
+
+    try:
+        result = asyncio.run(
+            synthesize_voice(
+                task_id=task_id,
+                target_lang=task.get("content_lang") or "my",
+                voice_id=payload.voice_id,
+                force=True,
+                provider=provider,
+            )
+        )
+    except DubbingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    repo.update(
+        task_id,
+        {
+            "mm_audio_path": result.get("audio_path"),
+            "dub_provider": provider,
+        },
+    )
+    stored = repo.get(task_id) or task
+    return _task_to_detail(stored)
 
 
 @api_router.get("/tasks/{task_id}", response_model=TaskDetail)

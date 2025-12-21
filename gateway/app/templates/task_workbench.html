@@ -119,6 +119,7 @@
         <a id="mobile-raw-link" class="disabled" href="#" target="_blank" rel="noopener">raw.mp4</a>
         <a id="mobile-audio-link" class="disabled" href="#" target="_blank" rel="noopener">mm_audio</a>
         <a id="mobile-mm-link" class="disabled" href="#" target="_blank" rel="noopener">mm.srt</a>
+        <a id="mobile-mm-txt-link" class="disabled" href="#" target="_blank" rel="noopener">mm.txt</a>
         {% if features.allow_pack_download %}
           <a id="mobile-pack-link" class="disabled" href="#" target="_blank" rel="noopener">capcut_pack.zip</a>
         {% endif %}
@@ -131,6 +132,7 @@
         <a id="raw-link" class="disabled" href="#" target="_blank" rel="noopener">raw.mp4</a>
         <a id="origin-link" class="disabled" href="#" target="_blank" rel="noopener">origin.srt</a>
         <a id="mm-link" class="disabled" href="#" target="_blank" rel="noopener">mm.srt</a>
+        <a id="mm-txt-link" class="disabled" href="#" target="_blank" rel="noopener">mm.txt</a>
         <a id="audio-link" class="disabled" href="#" target="_blank" rel="noopener">mm_audio</a>
         {% if features.allow_pack_download %}
           <a id="pack-link" class="disabled" href="#" target="_blank" rel="noopener">capcut_pack.zip</a>
@@ -196,6 +198,13 @@
             <option value="mm_female_1">mm_female_1</option>
             <option value="mm_male_1">mm_male_1</option>
             <option value="mm_female_2">mm_female_2</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="dub-provider">Dub provider</label>
+          <select id="dub-provider">
+            <option value="edge-tts">edge-tts</option>
+            <option value="lovo">lovo</option>
           </select>
         </div>
         <div class="field" style="justify-content:flex-end;">
@@ -267,15 +276,23 @@
       return null;
     }
 
+    function mmTxtLink(data) {
+      if (!data.mm_srt_path) return null;
+      const txtPath = data.mm_srt_path.replace(/\.srt$/i, ".txt");
+      return `/files/${encodeURI(txtPath)}`;
+    }
+
     function updateDownloadsFromTask(data) {
       setDownloadLink("raw-link", data.raw_path ? taskEndpoint(data.task_id, "raw") : null);
       setDownloadLink("origin-link", data.origin_srt_path ? taskEndpoint(data.task_id, "origin") : null);
       setDownloadLink("mm-link", data.mm_srt_path ? taskEndpoint(data.task_id, "mm") : null);
+      setDownloadLink("mm-txt-link", data.mm_srt_path ? mmTxtLink(data) : null);
       setDownloadLink("audio-link", data.mm_audio_path ? taskEndpoint(data.task_id, "audio") : null);
       setDownloadLink("pack-link", data.pack_path ? taskEndpoint(data.task_id, "pack") : null);
       setDownloadLink("mobile-raw-link", data.raw_path ? taskEndpoint(data.task_id, "raw") : null);
       setDownloadLink("mobile-audio-link", data.mm_audio_path ? taskEndpoint(data.task_id, "audio") : null);
       setDownloadLink("mobile-mm-link", data.mm_srt_path ? taskEndpoint(data.task_id, "mm") : null);
+      setDownloadLink("mobile-mm-txt-link", data.mm_srt_path ? mmTxtLink(data) : null);
       setDownloadLink("mobile-pack-link", data.pack_path ? taskEndpoint(data.task_id, "pack") : null);
 
       const audioEl = document.getElementById("audio-preview");
@@ -421,15 +438,17 @@
     document.getElementById("btn-dub").addEventListener("click", async () => {
       const taskId = window.currentTask.task_id;
       const voiceId = document.getElementById("voice-id").value;
-      appendLog(`Calling /v1/dub for ${taskId} (voice=${voiceId})...`);
-      const payload = { task_id: taskId, voice_id: voiceId };
-      const resp = await fetch("/v1/dub", {
+      const provider = document.getElementById("dub-provider").value || "edge-tts";
+      appendLog(`Calling /api/tasks/${taskId}/dub (provider=${provider}, voice=${voiceId})...`);
+      const payload = { provider, voice_id: voiceId };
+      const resp = await fetch(`/api/tasks/${taskId}/dub`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       if (!resp.ok) {
-        appendLog(`Dub failed: HTTP ${resp.status}`);
+        const detail = await resp.text();
+        appendLog(`Dub failed: HTTP ${resp.status} ${detail}`);
         return;
       }
       appendLog("Dub audio ready.");
