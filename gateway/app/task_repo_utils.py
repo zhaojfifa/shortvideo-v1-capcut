@@ -35,13 +35,19 @@ def normalize_task_payload(
 
     task_id = _coalesce(payload.get("task_id"), payload.get("id"))
     if task_id is not None:
-        payload["task_id"] = task_id
-        payload["id"] = task_id
+        task_id_str = str(task_id)
+        payload["task_id"] = task_id_str
+        payload["id"] = task_id_str
+
+    tenant = _coalesce(payload.get("tenant"), payload.get("account_id"))
+    if tenant is not None:
+        payload["tenant"] = str(tenant)
 
     category_key = _coalesce(payload.get("category_key"), payload.get("category"))
     if category_key is not None:
-        payload["category_key"] = category_key
-        payload["category"] = category_key
+        category_str = str(category_key)
+        payload["category_key"] = category_str
+        payload["category"] = category_str
 
     created_at = _coalesce(payload.get("created_at"), payload.get("created"))
     parsed_created = _parse_created_at(created_at)
