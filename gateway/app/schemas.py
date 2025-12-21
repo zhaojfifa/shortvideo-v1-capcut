@@ -1,6 +1,6 @@
 from datetime import datetime
 import re
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, constr, root_validator, validator
 
@@ -53,6 +53,20 @@ class PackRequest(BaseModel):
     task_id: str
 
 
+class PublishRequest(BaseModel):
+    task_id: str
+    provider: Optional[Literal["r2", "local"]] = None
+    force: bool = False
+
+
+class PublishResponse(BaseModel):
+    task_id: str
+    provider: str
+    publish_key: str
+    download_url: str
+    published_at: str
+
+
 class TaskCreate(BaseModel):
     source_url: constr(strip_whitespace=True, min_length=1)
     platform: Optional[str] = None
@@ -98,6 +112,14 @@ class TaskSummary(BaseModel):
     dub_provider: Optional[str] = None
     pack_provider: Optional[str] = None
     face_swap_provider: Optional[str] = None
+    publish_status: Optional[str] = None
+    publish_provider: Optional[str] = None
+    publish_key: Optional[str] = None
+    publish_url: Optional[str] = None
+    published_at: Optional[str] = None
+    priority: Optional[int] = None
+    assignee: Optional[str] = None
+    ops_notes: Optional[str] = None
 
     class Config:
         orm_mode = True
