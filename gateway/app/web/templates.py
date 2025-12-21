@@ -3,9 +3,13 @@ from __future__ import annotations
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
+from gateway.app.web.i18n import t_primary, t_secondary, ui_langs
 from gateway.app.web.template_helpers import get_template_globals
 
 templates = Jinja2Templates(directory="gateway/app/templates")
+templates.env.globals["t_primary"] = t_primary
+templates.env.globals["t_secondary"] = t_secondary
+templates.env.globals["ui_langs"] = ui_langs
 
 
 def _template_context(_: Request) -> dict[str, object]:

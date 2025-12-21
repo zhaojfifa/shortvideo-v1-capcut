@@ -17,7 +17,7 @@ from gateway.app.core.workspace import (
 )
 from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
 from gateway.app import models
-from gateway.app.routers import tasks as tasks_router
+from gateway.app.routers import admin_publish, publish as publish_router, tasks as tasks_router
 from gateway.routes import admin_tools
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
 from gateway.app.services.steps_v1 import (
@@ -35,7 +35,7 @@ AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 WORKSPACE_ROOT = Path(
     os.environ.get("VIDEO_WORKSPACE", "/opt/render/project/src/video_workspace")
 ).resolve()
-ALLOWED_TOP_DIRS = {"raw", "tasks", "audio", "pack"}
+ALLOWED_TOP_DIRS = {"raw", "tasks", "audio", "pack", "published"}
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -57,6 +57,8 @@ def on_startup() -> None:
 
 app.include_router(tasks_router.pages_router)
 app.include_router(tasks_router.api_router)
+app.include_router(publish_router.router)
+app.include_router(admin_publish.router, tags=["admin"])
 app.include_router(admin_tools.router, tags=["admin"])
 app.include_router(admin_tools.pages_router)
 
@@ -168,10 +170,3 @@ async def pack(request: PackRequest):
             db.close()
     return result
 
-
-@app.get("/v1/tasks/{task_id}/pack")
-async def download_pack(task_id: str):
-    pack_file = pack_zip_path(task_id)
-    if not pack_file.exists():
-        raise HTTPException(status_code=404, detail="pack not found")
-    return FileResponse(pack_file, media_type="application/zip", filename=pack_file.name)
