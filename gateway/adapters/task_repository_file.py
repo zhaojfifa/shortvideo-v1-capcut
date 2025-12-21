@@ -115,3 +115,6 @@ class FileTaskRepository(ITaskRepository):
 
     def update(self, task_id: str, patch: dict[str, Any]) -> Optional[Any]:
         return self.upsert_task(task_id, patch)
+
+    def upsert(self, task_id: str, payload: dict[str, Any]) -> Optional[Any]:
+        return self.upsert_task(task_id, payload)
