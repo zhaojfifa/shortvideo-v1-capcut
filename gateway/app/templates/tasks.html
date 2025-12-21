@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <title>Task Board · ShortVideo</title>
+  <link rel="stylesheet" href="/static/tasks_board.css">
   <style>
     :root { color-scheme: light; }
     body {
@@ -93,7 +94,7 @@
   </style>
 </head>
 <body class="{{ 'mobile' if is_mobile else 'desktop' }}">
-  <div class="page">
+  <div class="page tasks-board">
     <div class="card">
       <div class="header">
         <div>
@@ -161,7 +162,7 @@
       </div>
 
       <div class="table-wrapper">
-        <table>
+        <table class="tasks-table">
           <thead>
             <tr>
               <th class="bilingual">

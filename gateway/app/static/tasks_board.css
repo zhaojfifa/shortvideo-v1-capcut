@@ -1,0 +1,125 @@
+/* PR-4: /tasks desktop layout fix
+   Scope: .tasks-board only
+*/
+
+.tasks-board {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.tasks-board .card {
+  width: 100%;
+}
+
+.tasks-board .header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.tasks-board .legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-top: 10px;
+}
+
+.tasks-board .table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 12px;
+}
+
+/* Base table (desktop) */
+.tasks-board table.tasks-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  min-width: 980px; /* prevents squeeze on desktop */
+}
+
+.tasks-board table.tasks-table thead th {
+  text-align: left;
+  font-weight: 600;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+.tasks-board table.tasks-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+/* Allow long text to wrap */
+.tasks-board table.tasks-table td.truncate,
+.tasks-board table.tasks-table td .source-text {
+  display: inline-block;
+  max-width: 420px;
+  white-space: normal;
+  word-break: break-all;
+}
+
+.tasks-board .secondary {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+/* --- CRITICAL: revert any "mobile table -> block" rules coming from pipeline_lab.css --- */
+@media (min-width: 769px) {
+  .tasks-board table.tasks-table { display: table !important; }
+  .tasks-board table.tasks-table thead { display: table-header-group !important; }
+  .tasks-board table.tasks-table tbody { display: table-row-group !important; }
+  .tasks-board table.tasks-table tr { display: table-row !important; }
+  .tasks-board table.tasks-table th,
+  .tasks-board table.tasks-table td { display: table-cell !important; }
+
+  /* ensure header stays visible */
+  .tasks-board table.tasks-table thead { visibility: visible !important; }
+}
+
+/* Mobile cards (use your existing data-label="中文 / 缅语") */
+@media (max-width: 768px) {
+  .tasks-board table.tasks-table thead {
+    display: none !important;
+  }
+
+  .tasks-board table.tasks-table,
+  .tasks-board table.tasks-table tbody,
+  .tasks-board table.tasks-table tr,
+  .tasks-board table.tasks-table td {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .tasks-board table.tasks-table {
+    min-width: 0;
+  }
+
+  .tasks-board table.tasks-table tr {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 12px 12px 8px;
+    margin-bottom: 12px;
+  }
+
+  .tasks-board table.tasks-table tbody td {
+    border: none;
+    padding: 8px 0;
+    white-space: normal;
+  }
+
+  .tasks-board table.tasks-table tbody td::before {
+    content: attr(data-label);
+    display: block;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 2px;
+  }
+}
