@@ -6,6 +6,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Tuple
 
+from sqlalchemy.orm import Session
+
+from gateway.app import models
 from gateway.app.core.workspace import pack_zip_path, relative_to_workspace, workspace_root
 
 PUBLISH_PROVIDER_DEFAULT = os.getenv("PUBLISH_PROVIDER", "local")
@@ -69,11 +72,11 @@ def _local_publish_copy(task_id: str, src_zip: Path) -> Tuple[str, str]:
 
 def publish_task_pack(
     task_id: str,
-    repo,
+    db: Session,
     provider: Optional[str] = None,
     force: bool = False,
 ) -> dict[str, str]:
-    task = repo.get(task_id)
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         raise RuntimeError(f"Task not found: {task_id}")
 
@@ -81,18 +84,18 @@ def publish_task_pack(
     if not zip_path.exists():
         raise RuntimeError(f"Pack zip not found for task {task_id}: {zip_path}")
 
-    chosen = (provider or task.get("publish_provider") or PUBLISH_PROVIDER_DEFAULT).lower()
+    chosen = (provider or task.publish_provider or PUBLISH_PROVIDER_DEFAULT).lower()
     if (
-        task.get("publish_status") == "published"
-        and task.get("publish_key")
+        task.publish_status == "published"
+        and task.publish_key
         and not force
-        and chosen == (task.get("publish_provider") or chosen)
+        and chosen == (task.publish_provider or chosen)
     ):
         return {
-            "provider": task.get("publish_provider") or chosen,
-            "publish_key": task.get("publish_key"),
-            "download_url": task.get("publish_url") or "",
-            "published_at": task.get("published_at") or "",
+            "provider": task.publish_provider or chosen,
+            "publish_key": task.publish_key,
+            "download_url": task.publish_url or "",
+            "published_at": task.published_at or "",
         }
 
     published_at = datetime.utcnow().isoformat()
@@ -105,16 +108,12 @@ def publish_task_pack(
             download_url = f"{R2_PUBLIC_BASE_URL.rstrip('/')}/{key}"
         else:
             download_url = ""
-        repo.update(
-            task_id,
-            {
-                "publish_provider": "r2",
-                "publish_key": key,
-                "publish_url": download_url,
-                "publish_status": "published",
-                "published_at": published_at,
-            },
-        )
+        task.publish_provider = "r2"
+        task.publish_key = key
+        task.publish_url = download_url
+        task.publish_status = "published"
+        task.published_at = published_at
+        db.commit()
         return {
             "provider": "r2",
             "publish_key": key,
@@ -123,16 +122,12 @@ def publish_task_pack(
         }
 
     publish_key, rel = _local_publish_copy(task_id, zip_path)
-    repo.update(
-        task_id,
-        {
-            "publish_provider": "local",
-            "publish_key": publish_key,
-            "publish_url": "",
-            "publish_status": "published",
-            "published_at": published_at,
-        },
-    )
+    task.publish_provider = "local"
+    task.publish_key = publish_key
+    task.publish_url = ""
+    task.publish_status = "published"
+    task.published_at = published_at
+    db.commit()
     return {
         "provider": "local",
         "publish_key": publish_key,
@@ -141,20 +136,20 @@ def publish_task_pack(
     }
 
 
-def resolve_download_url(task: dict) -> str:
-    if task.get("publish_provider") == "r2" and task.get("publish_key"):
-        if task.get("publish_url"):
-            return task.get("publish_url")
-        return _r2_presign_get(task.get("publish_key"), expires_sec=3600)
+def resolve_download_url(task: models.Task) -> str:
+    if task.publish_provider == "r2" and task.publish_key:
+        if task.publish_url:
+            return task.publish_url
+        return _r2_presign_get(task.publish_key, expires_sec=3600)
 
-    if task.get("publish_key"):
-        p = Path(task.get("publish_key"))
+    if task.publish_key:
+        p = Path(task.publish_key)
         try:
             rel = relative_to_workspace(p)
             return f"/files/{rel}"
         except Exception:
             pass
 
-    if task.get("pack_path"):
-        return f"/files/{task.get('pack_path')}"
+    if task.pack_path:
+        return f"/files/{task.pack_path}"
     return ""
