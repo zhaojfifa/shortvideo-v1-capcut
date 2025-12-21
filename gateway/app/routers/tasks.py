@@ -284,10 +284,16 @@ def create_task(
     }
     task_payload = normalize_task_payload(task_payload, is_new=True)
     repo.create(task_payload)
+    stored_task = repo.get(task_id)
+    if not stored_task:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Task persistence failed for task_id={task_id}",
+        )
 
     background_tasks.add_task(run_pipeline_background, task_id)
 
-    return _task_to_detail(task_payload)
+    return _task_to_detail(stored_task)
 
 
 @api_router.get("/tasks", response_model=TaskListResponse)
