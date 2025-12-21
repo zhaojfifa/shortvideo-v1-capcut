@@ -1,66 +1,70 @@
-# gateway/app/task_repo_utils.py
+"""Helpers for normalizing task payloads and ordering task lists."""
+
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, Iterable, List
 
 
-def normalize_task_payload(task: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Normalize task payload coming from different repositories / legacy formats.
-    Must NEVER raise for missing optional fields (startup safety).
-    """
-    if not isinstance(task, dict):
-        return {"raw": task}
-
-    # id/task_id兼容
-    task_id = task.get("task_id") or task.get("id")
-    if task_id is not None:
-        task["task_id"] = str(task_id)
-
-    # created/created_at兼容（字符串保留原样，排序时处理）
-    created = task.get("created_at") or task.get("created")
-    if created is not None:
-        task["created_at"] = created
-
-    # title兜底
-    if "title" not in task and "name" in task:
-        task["title"] = task.get("name")
-
-    return task
+def _coalesce(*values: Any) -> Any:
+    for value in values:
+        if value is not None:
+            return value
+    return None
 
 
-def _parse_dt(v: Any) -> Optional[datetime]:
-    if v is None:
-        return None
-    if isinstance(v, datetime):
-        return v
-    if isinstance(v, (int, float)):
-        # unix seconds
+def _parse_created_at(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str) and value:
         try:
-            return datetime.fromtimestamp(v)
-        except Exception:
-            return None
-    if isinstance(v, str):
-        # try isoformat / common patterns
-        try:
-            return datetime.fromisoformat(v.replace("Z", "+00:00"))
-        except Exception:
+            return datetime.fromisoformat(value)
+        except ValueError:
             return None
     return None
 
 
-def sort_tasks_by_created(items: List[Dict[str, Any]], descending: bool = True) -> List[Dict[str, Any]]:
-    """
-    Sort tasks by created_at/created. Must be stable and tolerant of bad values.
-    """
-    def key_fn(t: Dict[str, Any]) -> float:
-        dt = _parse_dt(t.get("created_at") or t.get("created"))
-        if dt is None:
-            return 0.0
-        try:
-            return dt.timestamp()
-        except Exception:
-            return 0.0
+def normalize_task_payload(
+    task: Dict[str, Any],
+    is_new: bool = False,
+    **_ignored: Any,
+) -> Dict[str, Any]:
+    """Normalize task payload fields without raising on missing values."""
 
-    return sorted(items, key=key_fn, reverse=descending)
+    payload = dict(task or {})
+
+    task_id = _coalesce(payload.get("task_id"), payload.get("id"))
+    if task_id is not None:
+        payload["task_id"] = task_id
+        payload["id"] = task_id
+
+    category_key = _coalesce(payload.get("category_key"), payload.get("category"))
+    if category_key is not None:
+        payload["category_key"] = category_key
+        payload["category"] = category_key
+
+    created_at = _coalesce(payload.get("created_at"), payload.get("created"))
+    parsed_created = _parse_created_at(created_at)
+    if parsed_created is not None:
+        payload["created_at"] = parsed_created.isoformat()
+    elif created_at is not None:
+        payload["created_at"] = str(created_at)
+
+    if is_new:
+        if not payload.get("created_at"):
+            payload["created_at"] = datetime.now(timezone.utc).isoformat()
+        if not payload.get("status"):
+            payload["status"] = "queued"
+
+    return payload
+
+
+def sort_tasks_by_created(tasks: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Return tasks sorted by created_at descending, defensive against bad data."""
+
+    def sort_key(item: Dict[str, Any]) -> datetime:
+        created_at = _coalesce(item.get("created_at"), item.get("created"))
+        parsed = _parse_created_at(created_at)
+        return parsed or datetime.min.replace(tzinfo=timezone.utc)
+
+    return sorted(list(tasks or []), key=sort_key, reverse=True)
