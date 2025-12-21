@@ -1,0 +1,34 @@
+name: PR Guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check frozen paths
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          head_sha="${{ github.event.pull_request.head.sha }}"
+          changed_files=$(git diff --name-only "$base_sha" "$head_sha")
+
+          if echo "$changed_files" | grep -E '^(static/templates/|gateway/app/static/ui.html)'; then
+            if echo "$PR_TITLE" | grep -qiE '\[template-change\]|\[v1-ui-change\]'; then
+              echo "Override tag found in PR title; allowing template/ui changes."
+              exit 0
+            fi
+            echo "Error: frozen paths modified (static/templates/** or gateway/app/static/ui.html)."
+            echo "Add [template-change] or [v1-ui-change] to the PR title to override."
+            exit 1
+          fi
+
+          echo "PR guard: no frozen path changes detected."

@@ -18,8 +18,8 @@ def get_task_repository() -> ITaskRepository:
     """Return the task repository implementation (Phase0 selector)."""
     backend = os.getenv("TASK_REPO_BACKEND", "").lower()
     backend_label = backend or "file"
-    logger.info("TaskRepository backend=%s", backend_label)
-    if backend == "s3":
+    logger.info("TASK_REPO_BACKEND=%s", backend_label)
+    if backend in {"s3", "r2"}:
         return S3TaskRepository()
     return FileTaskRepository()
 

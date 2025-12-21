@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from fastapi import HTTPException
 
@@ -17,6 +18,33 @@ from gateway.app.providers.gemini_subtitles import (
 from gateway.app.services import subtitles_openai
 
 logger = logging.getLogger(__name__)
+
+
+_SRT_TIME_RE = re.compile(
+    r"\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}"
+)
+
+
+def _srt_to_txt(srt_text: str) -> str:
+    out_lines: list[str] = []
+    for line in srt_text.splitlines():
+        s = line.strip()
+        if not s:
+            if out_lines and out_lines[-1] != "":
+                out_lines.append("")
+            continue
+        if s.isdigit():
+            continue
+        if "-->" in s or _SRT_TIME_RE.search(s):
+            continue
+        out_lines.append(s)
+    while out_lines and out_lines[-1] == "":
+        out_lines.pop()
+    return "\n".join(out_lines) + "\n" if out_lines else ""
+
+
+def _write_txt_from_srt(target_path, srt_text: str) -> None:
+    target_path.write_text(_srt_to_txt(srt_text), encoding="utf-8")
 
 
 def build_preview(text: str | None) -> list[str]:
@@ -102,8 +130,10 @@ async def generate_subtitles(
             segments or [], "origin"
         )
 
-        workspace.write_origin_srt(origin_text)
-        workspace.write_mm_srt(mm_text)
+        origin_srt_path = workspace.write_origin_srt(origin_text)
+        mm_srt_path = workspace.write_mm_srt(mm_text)
+        _write_txt_from_srt(origin_srt_path.with_suffix(".txt"), origin_text)
+        _write_txt_from_srt(mm_srt_path.with_suffix(".txt"), mm_text)
 
         segments_count = len(segments) if isinstance(segments, list) else 0
         logger.info(

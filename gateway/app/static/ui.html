@@ -12,38 +12,31 @@
       <header class="hero">
         <div class="hero-title bilingual">
           <h1>Shortvideo V1 · Pipeline Lab</h1>
-          <p class="secondary">Shortvideo V1 · Pipeline Lab</p>
         </div>
-        <p class="hero-subtitle bilingual">
-          <span>Bilingual admin for the V1 shortvideo pipeline.</span>
-          <span class="secondary">V1 pipeline အတွက် ဘာသာနှစ်ခုအုပ်ချုပ်ရေး</span>
-        </p>
+        <p class="hero-subtitle">Admin for the V1 shortvideo pipeline.</p>
       </header>
 
       <section id="task" class="panel">
         <div class="section-title">
           <h2 class="bilingual">
             <span>Task</span>
-            <span class="secondary">အလုပ်</span>
           </h2>
           <div class="action-row">
-            <button class="ghost" type="button" onclick="generateTaskId()">Generate Task ID<span class="secondary">Task ID ဖန်တီးရန်</span></button>
-            <button class="ghost" type="button" onclick="generateFromLink()">Generate from link<span class="secondary">လင့်မှ ဖန်တီးရန်</span></button>
-            <button class="ghost" type="button" onclick="resetTaskForm()">Reset<span class="secondary">ပြန်သတ်မှတ်</span></button>
+            <button class="ghost" type="button" onclick="generateTaskId()">Generate Task ID</button>
+            <button class="ghost" type="button" onclick="generateFromLink()">Generate from link</button>
+            <button class="ghost" type="button" onclick="resetTaskForm()">Reset</button>
           </div>
         </div>
         <div class="form-grid">
           <div class="field">
             <label class="bilingual" for="taskId">
               <span>Task ID</span>
-              <span class="secondary">အလုပ် ID</span>
             </label>
             <input id="taskId" value="demo_v1" />
           </div>
           <div class="field">
             <label class="bilingual" for="platform">
               <span>Platform</span>
-              <span class="secondary">ပလက်ဖောင်း</span>
             </label>
             <select id="platform">
               <option value="douyin">douyin</option>
@@ -54,22 +47,20 @@
           <div class="field span-2">
             <label class="bilingual" for="link">
               <span>Video Link</span>
-              <span class="secondary">ဗီဒီယိုလင့်</span>
             </label>
             <input id="link" placeholder="https://www.douyin.com/video/..." />
           </div>
         </div>
         <div class="button-row">
-          <button onclick="runParse()">Step 1<span class="secondary">အဆင့် ၁</span></button>
-          <button onclick="runSubtitles()">Step 2<span class="secondary">အဆင့် ၂</span></button>
-          <button onclick="runDub()">Step 3<span class="secondary">အဆင့် ၃</span></button>
-          <button onclick="runPack()">Step 4<span class="secondary">အဆင့် ၄</span></button>
-          <button class="primary" onclick="runFullPipeline()">Run full pipeline<span class="secondary">Pipeline အပြည့် အလုပ်လုပ်ရန်</span></button>
+          <button onclick="runParse()">Step 1</button>
+          <button onclick="runSubtitles()">Step 2</button>
+          <button onclick="runDub()">Step 3</button>
+          <button onclick="runPack()">Step 4</button>
+          <button class="primary" onclick="runFullPipeline()">Run full pipeline</button>
         </div>
         <div class="downloads">
           <span class="downloads-title bilingual">
             <span>Downloads</span>
-            <span class="secondary">ဒေါင်းလုဒ်များ</span>
           </span>
           <div class="downloads-links">
             <a id="rawLink" href="#" target="_blank">Raw Video</a>
@@ -85,34 +76,30 @@
         <div class="section-title">
           <h2 class="bilingual">
             <span>Parse & Download</span>
-            <span class="secondary">ခွဲခြမ်း & ဒေါင်းလုဒ်</span>
           </h2>
-          <button class="ghost" onclick="runParse()">Execute<span class="secondary">အလုပ်လုပ်ရန်</span></button>
+          <button class="ghost" onclick="runParse()">Execute</button>
         </div>
-        <pre id="parseOutput" class="output">Response / ပြန်လာသည့် အချက်အလက်</pre>
+        <pre id="parseOutput" class="output">Response</pre>
       </section>
 
       <section class="panel">
         <div class="section-title">
           <h2 class="bilingual">
             <span>Transcribe & Translate</span>
-            <span class="secondary">စာသားထုတ် & ဘာသာပြန်</span>
           </h2>
-          <button class="ghost" onclick="runSubtitles()">Execute<span class="secondary">အလုပ်လုပ်ရန်</span></button>
+          <button class="ghost" onclick="runSubtitles()">Execute</button>
         </div>
-        <pre id="subsOutput" class="output">(Output / ထုတ်ယူချက်)</pre>
+        <pre id="subsOutput" class="output">(Output)</pre>
         <div class="section-grid">
           <div>
             <strong class="bilingual">
               <span>Original subtitles</span>
-              <span class="secondary">မူလစာတန်းထိုး</span>
             </strong>
             <pre id="originPreview" class="output">(empty)</pre>
           </div>
           <div>
             <strong class="bilingual">
               <span>Translated subtitles</span>
-              <span class="secondary">ဘာသာပြန် စာတန်းထိုး</span>
             </strong>
             <pre id="mmPreview" class="output">(empty)</pre>
           </div>
@@ -123,14 +110,12 @@
         <div class="section-title">
           <h2 class="bilingual">
             <span>Burmese Voiceover</span>
-            <span class="secondary">မြန်မာအသံ</span>
           </h2>
-          <button class="ghost" onclick="runDub()">Execute<span class="secondary">အလုပ်လုပ်ရန်</span></button>
+          <button class="ghost" onclick="runDub()">Execute</button>
         </div>
         <div class="field">
           <label class="bilingual" for="voiceId">
             <span>Voice ID</span>
-            <span class="secondary">အသံ ID</span>
           </label>
           <input id="voiceId" value="mm_female_1" />
         </div>
@@ -142,9 +127,8 @@
         <div class="section-title">
           <h2 class="bilingual">
             <span>Pack for CapCut</span>
-            <span class="secondary">CapCut အတွက် ပက်</span>
           </h2>
-          <button class="ghost" onclick="runPack()">Execute<span class="secondary">အလုပ်လုပ်ရန်</span></button>
+          <button class="ghost" onclick="runPack()">Execute</button>
         </div>
         <pre id="packOutput" class="output">(empty)</pre>
       </section>
@@ -153,11 +137,10 @@
         <div class="section-title">
           <h2 class="bilingual">
             <span>Log</span>
-            <span class="secondary">မှတ်တမ်း</span>
           </h2>
-          <button class="ghost" onclick="clearLog()">Reset<span class="secondary">ပြန်သတ်မှတ်</span></button>
+          <button class="ghost" onclick="clearLog()">Reset</button>
         </div>
-        <pre id="log" class="output">Ready. / အဆင်သင့်</pre>
+        <pre id="log" class="output">Ready.</pre>
       </section>
     </main>
   </div>
@@ -172,7 +155,7 @@
 
     function clearLog() {
       logEl.textContent = '';
-      log('Ready / အဆင်သင့်');
+      log('Ready');
     }
 
     function taskId() { return document.getElementById('taskId').value.trim(); }
@@ -189,20 +172,37 @@
     }
 
     function generateTaskId() {
-      const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
-      document.getElementById('taskId').value = `task_${stamp}`;
-      log('Task ID updated / Task ID ပြောင်းပြီး');
+      const stamp = new Date().toISOString().slice(0, 19);
+      const compactStamp = stamp.replaceAll('-', '').replaceAll(':', '').replace('T', '');
+      document.getElementById('taskId').value = `task_${compactStamp}`;
+      log('Task ID updated');
     }
 
     function generateFromLink() {
       const rawLink = link();
       if (!rawLink) {
-        log('Missing link / လင့်မရှိပါ');
+        log('Missing link');
         return;
       }
-      const safe = rawLink.replace(/https?:\\/\\//, '').split(/[/?#]/)[0];
+      let safe = rawLink;
+      if (safe.startsWith('https://')) {
+        safe = safe.slice('https://'.length);
+      } else if (safe.startsWith('http://')) {
+        safe = safe.slice('http://'.length);
+      }
+      const stopChars = ['/', '?', '#'];
+      const stopIndex = stopChars.reduce((idx, ch) => {
+        const found = safe.indexOf(ch);
+        if (found === -1) {
+          return idx;
+        }
+        return idx === -1 ? found : Math.min(idx, found);
+      }, -1);
+      if (stopIndex >= 0) {
+        safe = safe.slice(0, stopIndex);
+      }
       document.getElementById('taskId').value = `task_${safe.slice(0, 16)}`;
-      log('Task ID generated / Task ID ဖန်တီးပြီး');
+      log('Task ID generated');
     }
 
     function resetTaskForm() {
@@ -211,12 +211,12 @@
       document.getElementById('link').value = '';
       document.getElementById('voiceId').value = 'mm_female_1';
       updateDownloadLinks('demo_v1');
-      log('Form reset / ဖောင်ပြန်သတ်မှတ်ပြီး');
+      log('Form reset');
     }
 
     async function runParse() {
       const body = { task_id: taskId(), platform: platform(), link: link() };
-      log(`Calling /v1/parse for ${body.task_id} / Parse ပြုလုပ်နေ`);
+      log(`Calling /v1/parse for ${body.task_id}`);
       const res = await fetch('/v1/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -225,17 +225,17 @@
       const json = await res.json();
       document.getElementById('parseOutput').textContent = JSON.stringify(json, null, 2);
       if (!res.ok) {
-        log(`Parse failed: ${json.detail || res.status} / Parse မအောင်မြင်`);
+        log(`Parse failed: ${json.detail || res.status}`);
         return json;
       }
       updateDownloadLinks(body.task_id);
-      log('Parse done, raw downloaded. / Parse ပြီးစီးသည်');
+      log('Parse done, raw downloaded.');
       return json;
     }
 
     async function runSubtitles() {
       const body = { task_id: taskId(), target_lang: 'my', force: false, translate: true, with_scenes: true };
-      log(`Calling /v1/subtitles for ${body.task_id} / စာတန်းထိုး`);
+      log(`Calling /v1/subtitles for ${body.task_id}`);
       const res = await fetch('/v1/subtitles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -244,17 +244,17 @@
       const json = await res.json();
       document.getElementById('subsOutput').textContent = JSON.stringify(json, null, 2);
       if (!res.ok) {
-        log(`Subtitles failed: ${json.detail || res.status} / စာတန်းထိုး မအောင်မြင်`);
+        log(`Subtitles failed: ${json.detail || res.status}`);
       }
       document.getElementById('originPreview').textContent = (json.origin_preview || []).join('\n') || '(empty)';
       document.getElementById('mmPreview').textContent = (json.mm_preview || []).join('\n') || '(empty)';
-      log('Subtitles generated. / စာတန်းထိုး ပြီးစီး');
+      log('Subtitles generated.');
       return json;
     }
 
     async function runDub() {
       const body = { task_id: taskId(), voice_id: voiceId(), target_lang: 'my', force: false };
-      log(`Calling /v1/dub for ${body.task_id} / အသံ`);
+      log(`Calling /v1/dub for ${body.task_id}`);
       const res = await fetch('/v1/dub', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -263,20 +263,20 @@
       const json = await res.json();
       document.getElementById('dubOutput').textContent = JSON.stringify(json, null, 2);
       if (!res.ok) {
-        log(`Dub failed: ${json.detail || res.status} / အသံ မအောင်မြင်`);
+        log(`Dub failed: ${json.detail || res.status}`);
         return json;
       }
       const audioUrl = `/v1/tasks/${body.task_id}/audio_mm`;
       const audioEl = document.getElementById('audioPlayer');
       audioEl.src = audioUrl;
       audioEl.style.display = 'block';
-      log('Dub audio ready. / အသံ ဖိုင် ပြီးစီး');
+      log('Dub audio ready.');
       return json;
     }
 
     async function runPack() {
       const body = { task_id: taskId() };
-      log(`Calling /v1/pack for ${body.task_id} / ပက်`);
+      log(`Calling /v1/pack for ${body.task_id}`);
       const res = await fetch('/v1/pack', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -285,11 +285,11 @@
       const json = await res.json();
       document.getElementById('packOutput').textContent = JSON.stringify(json, null, 2);
       if (!res.ok) {
-        log(`Pack failed: ${json.detail || res.status} / ပက် မအောင်မြင်`);
+        log(`Pack failed: ${json.detail || res.status}`);
         return json;
       }
       updateDownloadLinks(body.task_id);
-      log('Pack created. / ပက် ပြီးစီး');
+      log('Pack created.');
       return json;
     }
 
@@ -298,7 +298,7 @@
       await runSubtitles();
       await runDub();
       await runPack();
-      log('Full pipeline completed. / Pipeline ပြီးစီး');
+      log('Full pipeline completed.');
     }
   </script>
 </body>
