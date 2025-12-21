@@ -16,6 +16,15 @@ Refer to `.env.example` for all environment variables. Key ones:
 - `FEATURE_PACK_DOWNLOAD` (default `true`)
 - `FEATURE_ASSET_DOWNLOAD` (default `true`)
 - `FEATURE_PUBLISH_BACKFILL` (default `false`)
+- `PUBLISH_PROVIDER` (default `local`)
+
+R2 publish configuration (required when `PUBLISH_PROVIDER=r2`):
+
+- `R2_ENDPOINT_URL`
+- `R2_BUCKET`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_PUBLIC_BASE_URL` (optional; if unset, presigned URLs are used)
 
 ## Persistence Strategy
 
@@ -35,6 +44,16 @@ Refer to `.env.example` for all environment variables. Key ones:
 - `GET /api/tasks?limit=1` returns JSON
 - `POST /v1/parse` returns JSON
 - `POST /v1/pack` eventually yields `status: ready` in `/api/tasks/<task_id>`
+- `POST /v1/publish` returns JSON
+- `GET /v1/tasks/<task_id>/pack` returns a 302 redirect
+
+## Publish backfill
+
+To backfill existing tasks with pack artifacts:
+
+```bash
+python -m gateway.app.scripts.backfill_publish --limit 5
+```
 
 ## Mobile access
 

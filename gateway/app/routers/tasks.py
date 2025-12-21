@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..core.features import get_features
-from gateway.app.web.templates import templates
+from gateway.app.web.templates import get_templates
 from .. import models
 from ..db import get_db
 from ..schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary
@@ -27,6 +27,7 @@ from ..core.workspace import (
 
 pages_router = APIRouter()
 api_router = APIRouter(prefix="/api", tags=["tasks"])
+templates = get_templates()
 
 
 def _infer_platform_from_url(url: str) -> Optional[str]:
@@ -170,6 +171,14 @@ def _task_to_detail(task: models.Task) -> TaskDetail:
         dub_provider=task.dub_provider,
         pack_provider=task.pack_provider,
         face_swap_provider=task.face_swap_provider,
+        publish_status=task.publish_status,
+        publish_provider=task.publish_provider,
+        publish_key=task.publish_key,
+        publish_url=task.publish_url,
+        published_at=task.published_at,
+        priority=task.priority,
+        assignee=task.assignee,
+        ops_notes=task.ops_notes,
     )
 
 
@@ -225,6 +234,11 @@ async def task_workbench_page(
         "mm_srt_path": detail.mm_srt_path,
         "mm_audio_path": detail.mm_audio_path,
         "pack_path": detail.pack_path,
+        "publish_status": detail.publish_status,
+        "publish_provider": detail.publish_provider,
+        "publish_key": detail.publish_key,
+        "publish_url": detail.publish_url,
+        "published_at": detail.published_at,
     }
     task_view = {"source_url_open": _extract_first_http_url(task.source_url)}
 
@@ -338,6 +352,14 @@ def list_tasks(
                 dub_provider=t.dub_provider,
                 pack_provider=t.pack_provider,
                 face_swap_provider=t.face_swap_provider,
+                publish_status=t.publish_status,
+                publish_provider=t.publish_provider,
+                publish_key=t.publish_key,
+                publish_url=t.publish_url,
+                published_at=t.published_at,
+                priority=t.priority,
+                assignee=t.assignee,
+                ops_notes=t.ops_notes,
             )
         )
 
