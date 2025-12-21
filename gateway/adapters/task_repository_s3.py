@@ -18,12 +18,12 @@ def _task_id_from_payload(task: dict[str, Any]) -> str:
     return str(task_id)
 
 
-def _tenant_from_payload(task: dict[str, Any]) -> str:
-    return str(task.get("tenant") or task.get("account_id") or "default")
+def _tenant_from_payload(_: dict[str, Any]) -> str:
+    return "default"
 
 
-def _task_key(tenant: str, task_id: str) -> str:
-    return f"tasks/{tenant}/{task_id}.json"
+def _task_key(task_id: str) -> str:
+    return f"tasks/default/{task_id}.json"
 
 
 def _matches_filters(task: dict[str, Any], filters: dict[str, Any]) -> bool:
@@ -48,7 +48,7 @@ class S3TaskRepository(ITaskRepository):
         task_id = _task_id_from_payload(payload)
         tenant = _tenant_from_payload(payload)
         self._tenant = tenant
-        key = _task_key(tenant, task_id)
+        key = _task_key(task_id)
         self._client.put_object(
             Bucket=self._bucket,
             Key=key,
@@ -58,8 +58,7 @@ class S3TaskRepository(ITaskRepository):
         return payload
 
     def get_task(self, task_id: str) -> Optional[Any]:
-        tenant = self._tenant
-        key = _task_key(tenant, task_id)
+        key = _task_key(task_id)
         try:
             obj = self._client.get_object(Bucket=self._bucket, Key=key)
         except ClientError as exc:
@@ -74,8 +73,7 @@ class S3TaskRepository(ITaskRepository):
 
     def list_tasks(self, filters: Optional[dict[str, Any]] = None) -> list[Any]:
         filters = filters or {}
-        tenant = str(filters.get("tenant") or filters.get("account_id") or self._tenant or "default")
-        prefix = f"tasks/{tenant}/"
+        prefix = "tasks/default/"
         results: list[Any] = []
         token: Optional[str] = None
         while True:
@@ -104,7 +102,8 @@ class S3TaskRepository(ITaskRepository):
         updated = dict(current)
         updated.update(patch)
         tenant = _tenant_from_payload(updated)
-        key = _task_key(tenant, task_id)
+        self._tenant = tenant
+        key = _task_key(task_id)
         self._client.put_object(
             Bucket=self._bucket,
             Key=key,
@@ -126,7 +125,7 @@ class S3TaskRepository(ITaskRepository):
         return self.upsert_task(task_id, patch)
 
     def _find_task_key(self, task_id: str) -> Optional[str]:
-        prefix = "tasks/"
+        prefix = "tasks/default/"
         token: Optional[str] = None
         while True:
             params = {"Bucket": self._bucket, "Prefix": prefix}

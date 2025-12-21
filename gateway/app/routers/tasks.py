@@ -1,5 +1,7 @@
 """Task API and HTML routers for the gateway application."""
 
+import logging
+import os
 import re
 from typing import Optional
 from uuid import uuid4
@@ -21,6 +23,7 @@ from ..core.workspace import (
     translated_srt_path,
 )
 
+logger = logging.getLogger(__name__)
 
 
 pages_router = APIRouter()
@@ -284,6 +287,13 @@ def create_task(
     }
     task_payload = normalize_task_payload(task_payload, is_new=True)
     repo.create(task_payload)
+    backend = os.getenv("TASK_REPO_BACKEND", "").lower() or "file"
+    logger.info(
+        "created task_id=%s tenant=%s backend=%s",
+        task_id,
+        task_payload.get("tenant", "default"),
+        backend,
+    )
     stored_task = repo.get(task_id)
     if not stored_task:
         raise HTTPException(

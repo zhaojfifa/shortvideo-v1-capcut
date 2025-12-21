@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List
 
@@ -25,13 +26,13 @@ def _parse_created_at(value: Any) -> datetime | None:
 
 
 def normalize_task_payload(
-    task: Dict[str, Any],
+    payload: Dict[str, Any],
+    *,
     is_new: bool = False,
-    **_ignored: Any,
 ) -> Dict[str, Any]:
     """Normalize task payload fields without raising on missing values."""
 
-    payload = dict(task or {})
+    payload = dict(payload or {})
 
     task_id = _coalesce(payload.get("task_id"), payload.get("id"))
     if task_id is not None:
@@ -39,9 +40,7 @@ def normalize_task_payload(
         payload["task_id"] = task_id_str
         payload["id"] = task_id_str
 
-    tenant = _coalesce(payload.get("tenant"), payload.get("account_id"))
-    if tenant is not None:
-        payload["tenant"] = str(tenant)
+    payload["tenant"] = "default"
 
     category_key = _coalesce(payload.get("category_key"), payload.get("category"))
     if category_key is not None:
@@ -56,11 +55,8 @@ def normalize_task_payload(
     elif created_at is not None:
         payload["created_at"] = str(created_at)
 
-    if is_new:
-        if not payload.get("created_at"):
-            payload["created_at"] = datetime.now(timezone.utc).isoformat()
-        if not payload.get("status"):
-            payload["status"] = "queued"
+    if is_new and payload.get("created_at") is None:
+        payload["created_at"] = int(time.time())
 
     return payload
 
