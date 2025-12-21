@@ -15,8 +15,8 @@ from gateway.app.core.workspace import (
     translated_srt_path,
     workspace_root,
 )
-from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
-from gateway.app import models
+from gateway.app.db import Base, engine, ensure_provider_config_table, ensure_task_extra_columns
+from gateway.app.deps import get_task_repository
 from gateway.app.routers import admin_publish, publish as publish_router, tasks as tasks_router
 from gateway.routes import admin_tools
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
@@ -91,20 +91,16 @@ async def parse(request: ParseRequest):
     try:
         return await run_parse_step(request)
     except HTTPException as exc:
-        from gateway.app.db import SessionLocal
-        from gateway.app import models
-
-        db = SessionLocal()
-        try:
-            task = db.query(models.Task).filter(models.Task.id == request.task_id).first()
-            if task:
-                task.status = "error"
-                task.last_step = "parse"
-                task.error_reason = "parse_failed"
-                task.error_message = str(exc.detail)
-                db.commit()
-        finally:
-            db.close()
+        repo = get_task_repository()
+        repo.update(
+            request.task_id,
+            {
+                "status": "error",
+                "last_step": "parse",
+                "error_reason": "parse_failed",
+                "error_message": str(exc.detail),
+            },
+        )
         raise
 
 
@@ -158,15 +154,13 @@ async def pack(request: PackRequest):
     result = await run_pack_step(request)
     pack_file = pack_zip_path(request.task_id)
     if pack_file.exists():
-        db = SessionLocal()
-        try:
-            task = db.query(models.Task).filter(models.Task.id == request.task_id).first()
-            if task:
-                task.pack_path = relative_to_workspace(pack_file)
-                task.status = "ready"
-                task.last_step = "pack"
-                db.commit()
-        finally:
-            db.close()
+        repo = get_task_repository()
+        repo.update(
+            request.task_id,
+            {
+                "pack_path": relative_to_workspace(pack_file),
+                "status": "ready",
+                "last_step": "pack",
+            },
+        )
     return result
-

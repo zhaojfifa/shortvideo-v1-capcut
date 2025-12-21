@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter
-from sqlalchemy.orm import Session
-
-from gateway.app import models
-from gateway.app.db import SessionLocal
+from gateway.app.deps import get_task_repository
 from gateway.app.services.publish_service import publish_task_pack
 
 router = APIRouter()
@@ -12,32 +9,28 @@ router = APIRouter()
 
 @router.post("/api/admin/publish/backfill")
 def backfill(limit: int = 50, provider: str | None = None, force: bool = False):
-    db: Session = SessionLocal()
-    try:
-        tasks = (
-            db.query(models.Task)
-            .filter(models.Task.pack_path.isnot(None))
-            .filter((models.Task.publish_key.is_(None)) | (models.Task.publish_key == ""))
-            .order_by(models.Task.created_at.desc())
-            .limit(limit)
-            .all()
-        )
-        out = []
-        for task in tasks:
-            try:
-                res = publish_task_pack(task.id, db, provider=provider, force=force)
-                out.append(
-                    {
-                        "task_id": task.id,
-                        "ok": True,
-                        "provider": res["provider"],
-                        "key": res["publish_key"],
-                    }
-                )
-            except Exception as exc:
-                task.publish_status = "error"
-                db.commit()
-                out.append({"task_id": task.id, "ok": False, "error": str(exc)})
-        return {"count": len(out), "results": out}
-    finally:
-        db.close()
+    repo = get_task_repository()
+    tasks = [
+        task
+        for task in repo.list()
+        if task.get("pack_path")
+        and (task.get("publish_key") is None or task.get("publish_key") == "")
+    ]
+    tasks = tasks[:limit]
+    out = []
+    for task in tasks:
+        task_id = task.get("task_id") or task.get("id")
+        try:
+            res = publish_task_pack(task_id, repo, provider=provider, force=force)
+            out.append(
+                {
+                    "task_id": task_id,
+                    "ok": True,
+                    "provider": res["provider"],
+                    "key": res["publish_key"],
+                }
+            )
+        except Exception as exc:
+            repo.update(task_id, {"publish_status": "error"})
+            out.append({"task_id": task_id, "ok": False, "error": str(exc)})
+    return {"count": len(out), "results": out}

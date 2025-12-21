@@ -1,24 +1,27 @@
-"""Dependency provider stubs for Phase0 ports (no runtime behavior change)."""
+"""Dependency provider stubs for Phase0 ports (TaskRepository wiring)."""
 
 from __future__ import annotations
 
+import logging
 import os
 
+from gateway.adapters.task_repository_file import FileTaskRepository
+from gateway.adapters.task_repository_s3 import S3TaskRepository
 from gateway.ports.pipeline_runner import IPipelineRunner
 from gateway.ports.storage_service import IStorageService
 from gateway.ports.task_repository import ITaskRepository
 
-
-TASK_REPO_BACKEND = os.getenv("TASK_REPO_BACKEND", "").lower()
+logger = logging.getLogger(__name__)
 
 
 def get_task_repository() -> ITaskRepository:
-    """Return the task repository implementation (Phase0 stub)."""
-    if TASK_REPO_BACKEND == "s3":
-        from gateway.adapters.task_repository_s3 import S3TaskRepository
-
+    """Return the task repository implementation (Phase0 selector)."""
+    backend = os.getenv("TASK_REPO_BACKEND", "").lower()
+    if backend == "s3":
+        logger.info("TaskRepository backend=s3")
         return S3TaskRepository()
-    raise RuntimeError("Task repository provider not wired yet (Phase0 stub)")
+    logger.info("TaskRepository backend=file")
+    return FileTaskRepository()
 
 
 def get_storage_service() -> IStorageService:
