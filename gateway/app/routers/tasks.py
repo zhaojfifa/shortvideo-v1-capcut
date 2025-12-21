@@ -1,5 +1,6 @@
 """Task API and HTML routers for the gateway application."""
 
+import asyncio
 import logging
 import os
 import re
@@ -12,9 +13,23 @@ from ..config import get_settings
 from ..core.features import get_features
 from gateway.app.web.templates import get_templates
 from gateway.app.deps import get_task_repository
-from ..schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary
+from ..schemas import (
+    DubRequest,
+    PackRequest,
+    ParseRequest,
+    SubtitlesRequest,
+    TaskCreate,
+    TaskDetail,
+    TaskListResponse,
+    TaskSummary,
+)
 from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
-from ..services.pipeline_v1 import run_pipeline_background
+from ..services.steps_v1 import (
+    run_dub_step,
+    run_pack_step,
+    run_parse_step,
+    run_subtitles_step,
+)
 from ..core.workspace import (
     Workspace,
     origin_srt_path,
@@ -189,6 +204,123 @@ def _extract_first_http_url(text: str | None) -> str | None:
     return match.group(0) if match else None
 
 
+def _repo_upsert(repo, task_id: str, patch: dict) -> None:
+    repo.upsert(task_id, patch)
+
+
+def _run_pipeline_background(task_id: str, repo) -> None:
+    task = repo.get(task_id)
+    if not task:
+        logger.error("Task %s not found in repository, abort pipeline", task_id)
+        return
+
+    status_update = {
+        "status": "processing",
+        "error_message": None,
+        "error_reason": None,
+    }
+
+    default_lang = os.getenv("DEFAULT_MM_LANG", "my")
+    default_voice = os.getenv("DEFAULT_MM_VOICE_ID", "mm_female_1")
+    target_lang = task.get("content_lang") or default_lang
+    voice_id = task.get("voice_id") or default_voice
+
+    current_step = "parse"
+    try:
+        _repo_upsert(repo, task_id, {**status_update, "last_step": current_step})
+        parse_req = ParseRequest(
+            task_id=task_id,
+            platform=task.get("platform"),
+            link=task.get("source_url") or task.get("link") or "",
+        )
+        parse_res = asyncio.run(run_parse_step(parse_req))
+        if isinstance(parse_res, dict):
+            _repo_upsert(
+                repo,
+                task_id,
+                {
+                    **status_update,
+                    "last_step": current_step,
+                    "raw_path": parse_res.get("raw_path"),
+                    "duration_sec": parse_res.get("duration_sec"),
+                },
+            )
+
+        current_step = "subtitles"
+        _repo_upsert(repo, task_id, {**status_update, "last_step": current_step})
+        subs_req = SubtitlesRequest(
+            task_id=task_id,
+            target_lang=target_lang,
+            force=False,
+            translate=True,
+            with_scenes=True,
+        )
+        subs_res = asyncio.run(run_subtitles_step(subs_req))
+        if isinstance(subs_res, dict):
+            _repo_upsert(
+                repo,
+                task_id,
+                {
+                    **status_update,
+                    "last_step": current_step,
+                    "origin_srt_path": subs_res.get("origin_srt"),
+                    "mm_srt_path": subs_res.get("mm_srt"),
+                },
+            )
+
+        current_step = "dub"
+        _repo_upsert(repo, task_id, {**status_update, "last_step": current_step})
+        dub_req = DubRequest(
+            task_id=task_id,
+            voice_id=voice_id,
+            force=False,
+            target_lang=target_lang,
+        )
+        dub_res = asyncio.run(run_dub_step(dub_req))
+        if isinstance(dub_res, dict):
+            _repo_upsert(
+                repo,
+                task_id,
+                {
+                    **status_update,
+                    "last_step": current_step,
+                    "mm_audio_path": dub_res.get("audio_path"),
+                },
+            )
+
+        current_step = "pack"
+        _repo_upsert(repo, task_id, {**status_update, "last_step": current_step})
+        pack_req = PackRequest(task_id=task_id)
+        pack_res = asyncio.run(run_pack_step(pack_req))
+        pack_path = None
+        if isinstance(pack_res, dict):
+            pack_path = pack_res.get("zip_path") or pack_res.get("pack_path")
+
+        _repo_upsert(
+            repo,
+            task_id,
+            {
+                "status": "done",
+                "last_step": current_step,
+                "pack_path": pack_path,
+                "error_message": None,
+                "error_reason": None,
+            },
+        )
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.exception("Pipeline failed for task %s", task_id)
+        _repo_upsert(
+            repo,
+            task_id,
+            {
+                "status": "failed",
+                "last_step": current_step,
+                "error_message": str(exc),
+                "error_reason": "pipeline_failed",
+            },
+        )
+
+
 @pages_router.get("/tasks/{task_id}", response_class=HTMLResponse)
 async def task_workbench_page(
     request: Request, task_id: str, repo=Depends(get_task_repository)
@@ -301,7 +433,7 @@ def create_task(
             detail=f"Task persistence failed for task_id={task_id}",
         )
 
-    background_tasks.add_task(run_pipeline_background, task_id)
+    background_tasks.add_task(_run_pipeline_background, task_id, repo)
 
     return _task_to_detail(stored_task)
 

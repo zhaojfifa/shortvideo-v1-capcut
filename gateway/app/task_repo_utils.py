@@ -17,6 +17,11 @@ def _coalesce(*values: Any) -> Any:
 def _parse_created_at(value: Any) -> datetime | None:
     if isinstance(value, datetime):
         return value
+    if isinstance(value, (int, float)):
+        try:
+            return datetime.fromtimestamp(float(value), tz=timezone.utc)
+        except (OSError, OverflowError, ValueError):
+            return None
     if isinstance(value, str) and value:
         try:
             return datetime.fromisoformat(value)
@@ -25,11 +30,7 @@ def _parse_created_at(value: Any) -> datetime | None:
     return None
 
 
-def normalize_task_payload(
-    payload: Dict[str, Any],
-    *,
-    is_new: bool = False,
-) -> Dict[str, Any]:
+def normalize_task_payload(payload: Dict[str, Any], *, is_new: bool = False) -> Dict[str, Any]:
     """Normalize task payload fields without raising on missing values."""
 
     payload = dict(payload or {})

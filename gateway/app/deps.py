@@ -19,7 +19,7 @@ def get_task_repository() -> ITaskRepository:
     backend = (os.getenv("TASK_REPO_BACKEND") or os.getenv("STORAGE_BACKEND") or "").lower()
     backend_label = backend or "file"
     logger.info("TASK_REPO_BACKEND=%s", backend_label)
-    if backend == "s3":
+    if backend in {"s3", "r2"}:
         return S3TaskRepository()
     return FileTaskRepository()
 
