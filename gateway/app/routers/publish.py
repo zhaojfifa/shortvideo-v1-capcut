@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from gateway.app import models, schemas
 from gateway.app.db import get_db
-from gateway.app.core.workspace import pack_zip_path
+from gateway.app.services.artifact_storage import get_download_url
 from gateway.app.services.publish_service import publish_task_pack, resolve_download_url
 
 router = APIRouter()
@@ -33,12 +33,8 @@ def publish(req: schemas.PublishRequest, db: Session = Depends(get_db)):
 
 @router.get("/v1/tasks/{task_id}/pack")
 def download_pack(task_id: str, db: Session = Depends(get_db)):
-    pack_path = pack_zip_path(task_id)
-    if not pack_path.exists():
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task or not task.pack_path:
         raise HTTPException(status_code=404, detail="Pack not found")
-
-    return FileResponse(
-        path=pack_path,
-        media_type="application/zip",
-        filename="capcut_pack.zip",
-    )
+    url = get_download_url(task.pack_path)
+    return RedirectResponse(url=url, status_code=302)

@@ -3,20 +3,13 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from gateway.app.core.workspace import (
-    Workspace,
-    origin_srt_path,
-    pack_zip_path,
-    raw_path,
-    relative_to_workspace,
-    translated_srt_path,
-    workspace_root,
-)
+from gateway.app.core.workspace import workspace_root
 from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
 from gateway.app import models
+from gateway.app.services.artifact_storage import get_download_url
 from gateway.app.routers import admin_publish, publish as publish_router, tasks as tasks_router
 from gateway.routes import admin_tools
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
@@ -110,10 +103,15 @@ async def parse(request: ParseRequest):
 
 @app.get("/v1/tasks/{task_id}/raw")
 async def get_raw(task_id: str):
-    path = raw_path(task_id)
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="raw video not found")
-    return FileResponse(path, media_type="video/mp4", filename=f"{task_id}.mp4")
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if not task or not task.raw_path:
+            raise HTTPException(status_code=404, detail="raw video not found")
+        url = get_download_url(task.raw_path)
+    finally:
+        db.close()
+    return RedirectResponse(url=url, status_code=302)
 
 
 @app.post("/v1/subtitles")
@@ -123,20 +121,28 @@ async def subtitles(request: SubtitlesRequest):
 
 @app.get("/v1/tasks/{task_id}/subs_origin")
 async def get_origin_subs(task_id: str):
-    origin = origin_srt_path(task_id)
-    if not origin.exists():
-        raise HTTPException(status_code=404, detail="origin subtitles not found")
-    return FileResponse(origin, media_type="text/plain", filename=f"{task_id}_origin.srt")
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if not task or not task.origin_srt_path:
+            raise HTTPException(status_code=404, detail="origin subtitles not found")
+        url = get_download_url(task.origin_srt_path)
+    finally:
+        db.close()
+    return RedirectResponse(url=url, status_code=302)
 
 
 @app.get("/v1/tasks/{task_id}/subs_mm")
 async def get_mm_subs(task_id: str):
-    subs = translated_srt_path(task_id, "my")
-    if not subs.exists():
-        subs = translated_srt_path(task_id, "mm")
-    if not subs.exists():
-        raise HTTPException(status_code=404, detail="burmese subtitles not found")
-    return FileResponse(subs, media_type="text/plain", filename=subs.name)
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if not task or not task.mm_srt_path:
+            raise HTTPException(status_code=404, detail="burmese subtitles not found")
+        url = get_download_url(task.mm_srt_path)
+    finally:
+        db.close()
+    return RedirectResponse(url=url, status_code=302)
 
 
 @app.post("/v1/dub")
@@ -146,27 +152,36 @@ async def dub(request: DubRequest):
 
 @app.get("/v1/tasks/{task_id}/audio_mm")
 async def get_audio(task_id: str):
-    workspace = Workspace(task_id)
-    audio = workspace.mm_audio_path
-    if not audio.exists():
-        raise HTTPException(status_code=404, detail="dubbed audio not found")
-    return FileResponse(audio, media_type=workspace.mm_audio_media_type(), filename=audio.name)
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if not task or not task.mm_audio_path:
+            raise HTTPException(status_code=404, detail="dubbed audio not found")
+        url = get_download_url(task.mm_audio_path)
+    finally:
+        db.close()
+    return RedirectResponse(url=url, status_code=302)
+
+
+@app.get("/v1/tasks/{task_id}/mm_txt")
+async def get_mm_txt(task_id: str):
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if not task or not task.mm_srt_path:
+            raise HTTPException(status_code=404, detail="mm txt not found")
+        key = str(task.mm_srt_path)
+        if key.endswith(".srt"):
+            key = key[:-4] + ".txt"
+        else:
+            key = f"{key}.txt"
+        url = get_download_url(key)
+    finally:
+        db.close()
+    return RedirectResponse(url=url, status_code=302)
 
 
 @app.post("/v1/pack")
 async def pack(request: PackRequest):
     result = await run_pack_step(request)
-    pack_file = pack_zip_path(request.task_id)
-    if pack_file.exists():
-        db = SessionLocal()
-        try:
-            task = db.query(models.Task).filter(models.Task.id == request.task_id).first()
-            if task:
-                task.pack_path = relative_to_workspace(pack_file)
-                task.status = "ready"
-                task.last_step = "pack"
-                db.commit()
-        finally:
-            db.close()
     return result
-
