@@ -1,18 +1,37 @@
 """Task API and HTML routers for the gateway application."""
 
+import asyncio
+import logging
+import os
 import re
 from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
+from pydantic import BaseModel
 from ..config import get_settings
 from ..core.features import get_features
 from gateway.app.web.templates import get_templates
 from gateway.app.deps import get_task_repository
-from ..schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary
+from ..schemas import (
+    DubRequest,
+    PackRequest,
+    ParseRequest,
+    SubtitlesRequest,
+    TaskCreate,
+    TaskDetail,
+    TaskListResponse,
+    TaskSummary,
+)
 from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
-from ..services.pipeline_v1 import run_pipeline_background
+from gateway.app.services.dubbing import DubbingError, synthesize_voice
+from ..services.steps_v1 import (
+    run_dub_step,
+    run_pack_step,
+    run_parse_step,
+    run_subtitles_step,
+)
 from ..core.workspace import (
     Workspace,
     origin_srt_path,
@@ -21,6 +40,12 @@ from ..core.workspace import (
     translated_srt_path,
 )
 
+logger = logging.getLogger(__name__)
+
+
+class DubProviderRequest(BaseModel):
+    provider: str | None = None
+    voice_id: str | None = None
 
 
 pages_router = APIRouter()
@@ -115,6 +140,13 @@ def _resolve_paths(task: dict) -> dict[str, Optional[str]]:
         if not mm_audio:
             mm_audio = f"audio/{workspace.mm_audio_path.name}"
 
+    mm_txt = None
+    mm_srt_path = workspace.mm_srt_path
+    if mm_srt_path.exists():
+        mm_txt_path = mm_srt_path.with_suffix(".txt")
+        if mm_txt_path.exists():
+            mm_txt = relative_to_workspace(mm_txt_path)
+
     pack_path = task.get("pack_path") or None
     if not pack_path:
         pack = pack_zip_path(task_id)
@@ -126,6 +158,7 @@ def _resolve_paths(task: dict) -> dict[str, Optional[str]]:
         "origin_srt_path": origin_srt,
         "mm_srt_path": translated_srt,
         "mm_audio_path": mm_audio,
+        "mm_txt_path": mm_txt,
         "pack_path": pack_path,
     }
 
@@ -186,6 +219,133 @@ def _extract_first_http_url(text: str | None) -> str | None:
     return match.group(0) if match else None
 
 
+@pages_router.get("/v1/tasks/{task_id}/mm_txt")
+def get_mm_txt(task_id: str):
+    workspace = Workspace(task_id)
+    mm_srt = workspace.mm_srt_path
+    mm_txt = mm_srt.with_suffix(".txt")
+    if not mm_txt.exists():
+        raise HTTPException(status_code=404, detail="artifact not found: mm_txt")
+    return FileResponse(mm_txt, media_type="text/plain", filename=mm_txt.name)
+
+
+def _repo_upsert(repo, task_id: str, patch: dict) -> None:
+    repo.upsert(task_id, patch)
+
+
+def _run_pipeline_background(task_id: str, repo) -> None:
+    task = repo.get(task_id)
+    if not task:
+        logger.error("Task %s not found in repository, abort pipeline", task_id)
+        return
+
+    status_update = {
+        "status": "processing",
+        "error_message": None,
+        "error_reason": None,
+    }
+
+    default_lang = os.getenv("DEFAULT_MM_LANG", "my")
+    default_voice = os.getenv("DEFAULT_MM_VOICE_ID", "mm_female_1")
+    target_lang = task.get("content_lang") or default_lang
+    voice_id = task.get("voice_id") or default_voice
+
+    current_step = "parse"
+    try:
+        _repo_upsert(repo, task_id, {**status_update, "last_step": current_step})
+        parse_req = ParseRequest(
+            task_id=task_id,
+            platform=task.get("platform"),
+            link=task.get("source_url") or task.get("link") or "",
+        )
+        parse_res = asyncio.run(run_parse_step(parse_req))
+        if isinstance(parse_res, dict):
+            _repo_upsert(
+                repo,
+                task_id,
+                {
+                    **status_update,
+                    "last_step": current_step,
+                    "raw_path": parse_res.get("raw_path"),
+                    "duration_sec": parse_res.get("duration_sec"),
+                },
+            )
+
+        current_step = "subtitles"
+        _repo_upsert(repo, task_id, {**status_update, "last_step": current_step})
+        subs_req = SubtitlesRequest(
+            task_id=task_id,
+            target_lang=target_lang,
+            force=False,
+            translate=True,
+            with_scenes=True,
+        )
+        subs_res = asyncio.run(run_subtitles_step(subs_req))
+        if isinstance(subs_res, dict):
+            _repo_upsert(
+                repo,
+                task_id,
+                {
+                    **status_update,
+                    "last_step": current_step,
+                    "origin_srt_path": subs_res.get("origin_srt"),
+                    "mm_srt_path": subs_res.get("mm_srt"),
+                },
+            )
+
+        current_step = "dub"
+        _repo_upsert(repo, task_id, {**status_update, "last_step": current_step})
+        dub_req = DubRequest(
+            task_id=task_id,
+            voice_id=voice_id,
+            force=False,
+            target_lang=target_lang,
+        )
+        dub_res = asyncio.run(run_dub_step(dub_req))
+        if isinstance(dub_res, dict):
+            _repo_upsert(
+                repo,
+                task_id,
+                {
+                    **status_update,
+                    "last_step": current_step,
+                    "mm_audio_path": dub_res.get("audio_path"),
+                },
+            )
+
+        current_step = "pack"
+        _repo_upsert(repo, task_id, {**status_update, "last_step": current_step})
+        pack_req = PackRequest(task_id=task_id)
+        pack_res = asyncio.run(run_pack_step(pack_req))
+        pack_path = None
+        if isinstance(pack_res, dict):
+            pack_path = pack_res.get("zip_path") or pack_res.get("pack_path")
+
+        _repo_upsert(
+            repo,
+            task_id,
+            {
+                "status": "done",
+                "last_step": current_step,
+                "pack_path": pack_path,
+                "error_message": None,
+                "error_reason": None,
+            },
+        )
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.exception("Pipeline failed for task %s", task_id)
+        _repo_upsert(
+            repo,
+            task_id,
+            {
+                "status": "failed",
+                "last_step": current_step,
+                "error_message": str(exc),
+                "error_reason": "pipeline_failed",
+            },
+        )
+
+
 @pages_router.get("/tasks/{task_id}", response_class=HTMLResponse)
 async def task_workbench_page(
     request: Request, task_id: str, repo=Depends(get_task_repository)
@@ -217,6 +377,7 @@ async def task_workbench_page(
     except Exception:
         env_summary["defaults"] = {}
 
+    paths = _resolve_paths(task)
     detail = _task_to_detail(task)
     task_json = {
         "task_id": detail.task_id,
@@ -230,6 +391,7 @@ async def task_workbench_page(
         "origin_srt_path": detail.origin_srt_path,
         "mm_srt_path": detail.mm_srt_path,
         "mm_audio_path": detail.mm_audio_path,
+        "mm_txt_path": paths.get("mm_txt_path"),
         "pack_path": detail.pack_path,
         "publish_status": detail.publish_status,
         "publish_provider": detail.publish_provider,
@@ -284,10 +446,23 @@ def create_task(
     }
     task_payload = normalize_task_payload(task_payload, is_new=True)
     repo.create(task_payload)
+    backend = os.getenv("TASK_REPO_BACKEND", "").lower() or "file"
+    logger.info(
+        "created task_id=%s tenant=%s backend=%s",
+        task_id,
+        task_payload.get("tenant", "default"),
+        backend,
+    )
+    stored_task = repo.get(task_id)
+    if not stored_task:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Task persistence failed for task_id={task_id}",
+        )
 
-    background_tasks.add_task(run_pipeline_background, task_id)
+    background_tasks.add_task(_run_pipeline_background, task_id, repo)
 
-    return _task_to_detail(task_payload)
+    return _task_to_detail(stored_task)
 
 
 @api_router.get("/tasks", response_model=TaskListResponse)
@@ -357,6 +532,52 @@ def list_tasks(
         )
 
     return TaskListResponse(items=summaries, page=page, page_size=page_size, total=total)
+
+
+@api_router.post("/tasks/{task_id}/dub", response_model=TaskDetail)
+def rerun_dub(
+    task_id: str,
+    payload: DubProviderRequest,
+    repo=Depends(get_task_repository),
+):
+    """Re-run dubbing for a task with a selected provider."""
+
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    provider = (payload.provider or "edge-tts").lower()
+    if provider == "edge":
+        provider = "edge-tts"
+    if provider not in {"edge-tts", "lovo"}:
+        raise HTTPException(status_code=400, detail="Unsupported dub provider")
+
+    settings = get_settings()
+    if provider == "lovo" and not settings.lovo_api_key:
+        raise HTTPException(status_code=400, detail="LOVO_API_KEY is not configured")
+
+    try:
+        result = asyncio.run(
+            synthesize_voice(
+                task_id=task_id,
+                target_lang=task.get("content_lang") or "my",
+                voice_id=payload.voice_id,
+                force=True,
+                provider=provider,
+            )
+        )
+    except DubbingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    repo.update(
+        task_id,
+        {
+            "mm_audio_path": result.get("audio_path"),
+            "dub_provider": provider,
+        },
+    )
+    stored = repo.get(task_id) or task
+    return _task_to_detail(stored)
 
 
 @api_router.get("/tasks/{task_id}", response_model=TaskDetail)

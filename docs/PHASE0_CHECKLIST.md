@@ -1,53 +1,48 @@
-# Phase0 Acceptance Checklist (v1.62 closure hardening)
+# Phase0 Regression Checklist
 
-## 0. Phase0 PR Plan (PR split)
-- PR-0: docs-only — PR policy + Phase0 checklist
-- PR-1: ports skeleton — introduce interfaces and DI shell, no behavior changes
-- PR-2: TaskRepository — unify all task persistence through repository
-- PR-3: publish backfill — API + persistence of published_url/published_at/...
-- PR-4: storage service — S3/R2 adapter + namespace isolation + unified download URL
-- PR-5: UI hardening — Workbench backfill UI + Board published badge, templates frozen
+Use this checklist for every Phase0 PR. All curl commands should be deterministic and recorded in the PR description.
 
-## 1. Module Acceptance (Must Pass)
+## API checks
 
-### A) gateway: API + publish backfill persistence
-- [ ] Publish backfill API writes to TaskRepository (published_url at minimum)
-- [ ] GET /api/tasks/{id} returns published fields after backfill
-- [ ] Restart service and confirm published fields persist
-- [ ] Non-existent task_id returns 404 (no ghost record)
+### Create task
+```bash
+curl -sS -X POST "$BASE_URL/api/tasks" \
+  -H "content-type: application/json" \
+  -d '{"source_url":"https://www.douyin.com/video/123","platform":"douyin","account_id":"x","account_name":"x","video_type":"comparison","template":"suitcase","category_key":"beauty","content_lang":"my","ui_lang":"zh","style_preset":"fast"}'
+```
 
-### B) gateway: TaskRepository constraints
-- [ ] No business code directly reads/writes tasks.json or global dict (repo-only)
-- [ ] Repository supports create/get/list/update
-- [ ] Minimal concurrency safety (no overwrite between two quick creates)
+### List tasks
+```bash
+curl -sS "$BASE_URL/api/tasks?limit=50"
+```
 
-### C) gateway + pipeline: Storage namespace isolation
-- [ ] All artifact keys follow: {tenant}/{category}/{task_id}/...
-- [ ] Download URLs returned to UI are produced by storage service (no manual URL/path concatenation)
-- [ ] Two parallel tasks do not overwrite each other’s raw/subs/audio/pack
+### Get task by id
+```bash
+curl -sS "$BASE_URL/api/tasks/{task_id}"
+```
 
-### D) static: Web UI verification (templates frozen)
-- [ ] Workbench: backfill input + save + reload persists
-- [ ] Task Board: Published badge visible and consistent with task data
-- [ ] No console errors in web verification on Render deployment
-- [ ] No changes under static/templates/**
+### (If exists) Publish + backfill validation
+```bash
+curl -sS -X POST "$BASE_URL/v1/publish" \
+  -H "content-type: application/json" \
+  -d '{"task_id":"<task_id>","provider":"<provider>","payload":{}}'
 
-### E) templates: Freeze gate
-- [ ] static/templates/** remains unchanged across PR-0..PR-5
-- [ ] If templates must change, create a dedicated "template-change" PR with screenshots + full regression
+curl -sS "$BASE_URL/api/tasks/{task_id}" | jq '.publish_status,.publish_provider,.publish_key,.publish_url,.published_at'
+```
 
-## 2. Global Regression (after Render deploy; web verification)
+## Regression cases
 
-### R0: Closed-loop persistence
-1) Create Task A (URL1) → run to pack (or farthest step)
-2) Create Task B (URL2) → run same
-3) Backfill published_url for Task A
-4) Refresh: Task A shows Published
-5) Restart / redeploy: Task A still shows Published
+- **R0: End-to-end + persistence after restart**
+  - Create a task, confirm it appears in list.
+  - Restart the service, confirm the task is still listed.
 
-### R1: Namespace isolation
-- Verify Task A artifacts are under A’s prefix; Task B artifacts are under B’s prefix
-- Randomly download A links: should never fetch B artifacts
+- **R1: Namespace isolation (if artifact storage exists)**
+  - Verify task artifacts are scoped per tenant or namespace if storage supports it.
 
-### R2: Template freeze verification
-- Confirm git diff across Phase0 PRs shows no changes under static/templates/**
+- **R2: Template/UI freeze check**
+  - Ensure no diffs under `static/templates/**` and `gateway/app/static/ui.html` unless a dedicated V1-UI PR is explicitly scoped.
+
+## Notes
+
+- Set `BASE_URL` to the target environment, e.g. `https://shortvideo-v1-capcut.onrender.com`.
+- Record outputs or relevant snippets in the PR description.

@@ -142,6 +142,7 @@ async def synthesize_voice(
     force: bool = False,
     mm_srt_text: str | None = None,
     workspace: Workspace | None = None,
+    provider: str | None = None,
 ) -> dict:
     settings = get_settings()
     ws = workspace or Workspace(task_id)
@@ -177,7 +178,9 @@ async def synthesize_voice(
 
     mm_lines = _collect_mm_lines(segments, srt_text)
 
-    backend = (settings.dub_provider or "edge-tts").lower()
+    backend = (provider or settings.dub_provider or "edge-tts").lower()
+    if backend == "edge":
+        backend = "edge-tts"
     logger.info(
         "Using %s backend for dubbing task=%s", backend, task_id
     )
