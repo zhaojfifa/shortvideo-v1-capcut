@@ -268,37 +268,39 @@
 
     function taskEndpoint(taskId, kind) {
       const id = encodeURIComponent(taskId);
-      if (kind === "raw") return `/v1/tasks/${id}/raw`;
-      if (kind === "origin") return `/v1/tasks/${id}/subs_origin`;
-      if (kind === "mm") return `/v1/tasks/${id}/subs_mm`;
       if (kind === "mm_txt") return `/v1/tasks/${id}/mm_txt`;
-      if (kind === "audio") return `/v1/tasks/${id}/audio_mm`;
-      if (kind === "pack") return `/v1/tasks/${id}/pack`;
       return null;
     }
 
     function mmTxtLink(data) {
-      if (!data.mm_srt_path) return null;
-      const txtPath = data.mm_srt_path.replace(/\.srt$/i, ".txt");
-      return `/files/${encodeURI(txtPath)}`;
+      if (data.mm_txt_path) return data.mm_txt_path;
+      const mmPath = data.mm_srt_path;
+      if (!mmPath) return null;
+      if (mmPath.startsWith("/v1/tasks/")) {
+        return taskEndpoint(data.task_id, "mm_txt");
+      }
+      if (/\.srt$/i.test(mmPath)) {
+        return mmPath.replace(/\.srt$/i, ".txt");
+      }
+      return null;
     }
 
     function updateDownloadsFromTask(data) {
-      setDownloadLink("raw-link", data.raw_path ? taskEndpoint(data.task_id, "raw") : null);
-      setDownloadLink("origin-link", data.origin_srt_path ? taskEndpoint(data.task_id, "origin") : null);
-      setDownloadLink("mm-link", data.mm_srt_path ? taskEndpoint(data.task_id, "mm") : null);
-      setDownloadLink("mm-txt-link", data.mm_srt_path ? taskEndpoint(data.task_id, "mm_txt") : null);
-      setDownloadLink("audio-link", data.mm_audio_path ? taskEndpoint(data.task_id, "audio") : null);
-      setDownloadLink("pack-link", data.pack_path ? taskEndpoint(data.task_id, "pack") : null);
-      setDownloadLink("mobile-raw-link", data.raw_path ? taskEndpoint(data.task_id, "raw") : null);
-      setDownloadLink("mobile-audio-link", data.mm_audio_path ? taskEndpoint(data.task_id, "audio") : null);
-      setDownloadLink("mobile-mm-link", data.mm_srt_path ? taskEndpoint(data.task_id, "mm") : null);
-      setDownloadLink("mobile-mm-txt-link", data.mm_srt_path ? taskEndpoint(data.task_id, "mm_txt") : null);
-      setDownloadLink("mobile-pack-link", data.pack_path ? taskEndpoint(data.task_id, "pack") : null);
+      setDownloadLink("raw-link", data.raw_path || null);
+      setDownloadLink("origin-link", data.origin_srt_path || null);
+      setDownloadLink("mm-link", data.mm_srt_path || null);
+      setDownloadLink("mm-txt-link", mmTxtLink(data));
+      setDownloadLink("audio-link", data.mm_audio_path || null);
+      setDownloadLink("pack-link", data.pack_path || null);
+      setDownloadLink("mobile-raw-link", data.raw_path || null);
+      setDownloadLink("mobile-audio-link", data.mm_audio_path || null);
+      setDownloadLink("mobile-mm-link", data.mm_srt_path || null);
+      setDownloadLink("mobile-mm-txt-link", mmTxtLink(data));
+      setDownloadLink("mobile-pack-link", data.pack_path || null);
 
       const audioEl = document.getElementById("audio-preview");
       const audioLink = document.getElementById("audio-link");
-      const audioHref = data.mm_audio_path ? taskEndpoint(data.task_id, "audio") : null;
+      const audioHref = data.mm_audio_path || null;
       if (audioEl) {
         if (audioHref) {
           audioEl.src = audioHref;
@@ -346,7 +348,7 @@
       const at = data.published_at || "-";
       const status = data.publish_status || "-";
       const taskId = data.task_id;
-      const url = `/v1/tasks/${taskId}/pack`;
+      const url = data.publish_url || data.pack_path || "-";
 
       const providerEl = document.getElementById("publish-provider");
       const keyEl = document.getElementById("publish-key");
