@@ -26,6 +26,8 @@ from ..schemas import (
 )
 from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
+from gateway.app.services.artifact_downloads import resolve_storage_url
+from gateway.app.services.task_cleanup import delete_task_record, purge_task_artifacts
 from ..services.steps_v1 import (
     run_dub_step,
     run_pack_step,
@@ -38,7 +40,6 @@ from ..core.workspace import (
     pack_zip_path,
     raw_path,
     relative_to_workspace,
-    translated_srt_path,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,24 @@ def _infer_platform_from_url(url: str) -> Optional[str]:
     return None
 
 
+def _is_storage_key(value: Optional[str]) -> bool:
+    if not value:
+        return False
+    lowered = value.lower()
+    return lowered.startswith(("http://", "https://", "s3://", "r2://"))
+
+
+def _pack_path_for_list(task: dict) -> Optional[str]:
+    task_id = str(task.get("task_id") or task.get("id") or "")
+    pack_path = task.get("pack_path")
+    if pack_path and not _is_storage_key(str(pack_path)):
+        return str(pack_path)
+    pack_file = pack_zip_path(task_id)
+    if pack_file.exists():
+        return relative_to_workspace(pack_file)
+    return None
+
+
 @pages_router.get("/tasks", response_class=HTMLResponse)
 async def tasks_page(
     request: Request,
@@ -89,7 +108,7 @@ async def tasks_page(
                 "content_lang": t.get("content_lang") or "",
                 "status": t.get("status") or "pending",
                 "created_at": t.get("created_at") or "",
-                "pack_path": str(t.get("pack_path")) if t.get("pack_path") else None,
+                "pack_path": _pack_path_for_list(t),
                 "ui_lang": t.get("ui_lang") or "",
             }
         )
@@ -110,62 +129,81 @@ async def tasks_new(request: Request) -> HTMLResponse:
     )
 
 
-def _resolve_paths(task: dict) -> dict[str, Optional[str]]:
+def _task_endpoint(task_id: str, kind: str) -> Optional[str]:
+    safe_id = str(task_id)
+    if kind == "raw":
+        return f"/v1/tasks/{safe_id}/raw"
+    if kind == "origin":
+        return f"/v1/tasks/{safe_id}/subs_origin"
+    if kind == "mm":
+        return f"/v1/tasks/{safe_id}/subs_mm"
+    if kind == "mm_txt":
+        return f"/v1/tasks/{safe_id}/mm_txt"
+    if kind == "audio":
+        return f"/v1/tasks/{safe_id}/audio_mm"
+    if kind == "pack":
+        return f"/v1/tasks/{safe_id}/pack"
+    return None
+
+
+def _resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
     task_id = str(task.get("task_id") or task.get("id"))
     workspace = Workspace(task_id)
-
-    # Prefer stored DB paths; otherwise expose workspace-relative paths if files exist.
     raw_video = task.get("raw_path") or None
-    if not raw_video and workspace.raw.exists():
-        raw_video = relative_to_workspace(workspace.raw)
+    raw_url = (
+        _task_endpoint(task_id, "raw")
+        if workspace.raw.exists()
+        else resolve_storage_url(raw_video)
+    )
 
-    origin_srt = translated_srt = None
     origin_srt = task.get("origin_srt_path")
-    translated_srt = task.get("mm_srt_path")
+    origin_url = (
+        _task_endpoint(task_id, "origin")
+        if workspace.origin_srt_path.exists()
+        else resolve_storage_url(origin_srt)
+    )
 
-    # Fall back to workspace artifacts when present.
-    if not origin_srt:
-        path = origin_srt_path(task_id)
-        if path.exists():
-            origin_srt = relative_to_workspace(path)
-    if not translated_srt:
-        path = workspace.mm_srt_path
-        if path.exists():
-            translated_srt = relative_to_workspace(path)
+    translated_srt = task.get("mm_srt_path")
+    mm_url = (
+        _task_endpoint(task_id, "mm")
+        if workspace.mm_srt_path.exists()
+        else resolve_storage_url(translated_srt)
+    )
 
     mm_audio = task.get("mm_audio_path") or None
-    if workspace.mm_audio_exists():
-        from ..core.workspace import ensure_public_audio
+    audio_url = (
+        _task_endpoint(task_id, "audio")
+        if workspace.mm_audio_exists()
+        else resolve_storage_url(mm_audio)
+    )
 
-        ensure_public_audio(workspace.mm_audio_path)
-        if not mm_audio:
-            mm_audio = f"audio/{workspace.mm_audio_path.name}"
-
-    mm_txt = None
+    mm_txt_url = None
     mm_srt_path = workspace.mm_srt_path
-    if mm_srt_path.exists():
-        mm_txt_path = mm_srt_path.with_suffix(".txt")
-        if mm_txt_path.exists():
-            mm_txt = relative_to_workspace(mm_txt_path)
+    mm_txt_local = mm_srt_path.with_suffix(".txt")
+    if mm_srt_path.exists() and mm_txt_local.exists():
+        mm_txt_url = _task_endpoint(task_id, "mm_txt")
+    elif translated_srt and translated_srt.endswith(".srt"):
+        mm_txt_url = resolve_storage_url(translated_srt[:-4] + ".txt")
 
     pack_path = task.get("pack_path") or None
-    if not pack_path:
-        pack = pack_zip_path(task_id)
-        if pack.exists():
-            pack_path = relative_to_workspace(pack)
+    pack_url = (
+        _task_endpoint(task_id, "pack")
+        if pack_zip_path(task_id).exists()
+        else resolve_storage_url(pack_path)
+    )
 
     return {
-        "raw_path": raw_video,
-        "origin_srt_path": origin_srt,
-        "mm_srt_path": translated_srt,
-        "mm_audio_path": mm_audio,
-        "mm_txt_path": mm_txt,
-        "pack_path": pack_path,
+        "raw_path": raw_url,
+        "origin_srt_path": origin_url,
+        "mm_srt_path": mm_url,
+        "mm_audio_path": audio_url,
+        "mm_txt_path": mm_txt_url,
+        "pack_path": pack_url,
     }
 
 
 def _task_to_detail(task: dict) -> TaskDetail:
-    paths = _resolve_paths(task)
+    paths = _resolve_download_urls(task)
     status = task.get("status") or "pending"
     if status != "error" and paths["pack_path"]:
         status = "ready"
@@ -392,7 +430,7 @@ async def task_workbench_page(
     except Exception:
         env_summary["defaults"] = {}
 
-    paths = _resolve_paths(task)
+    paths = _resolve_download_urls(task)
     detail = _task_to_detail(task)
     task_json = {
         "task_id": detail.task_id,
@@ -502,7 +540,8 @@ def list_tasks(
 
     summaries: list[TaskSummary] = []
     for t in items:
-        pack_path = str(t.get("pack_path")) if t.get("pack_path") else None
+        download_paths = _resolve_download_urls(t)
+        pack_path = download_paths.get("pack_path")
         status = t.get("status") or "pending"
         if status != "error" and pack_path:
             status = "ready"
@@ -604,6 +643,33 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
         raise HTTPException(status_code=404, detail="Task not found")
 
     return _task_to_detail(t)
+
+
+@api_router.delete("/tasks/{task_id}")
+def delete_task(
+    task_id: str,
+    purge: bool = Query(default=False),
+    repo=Depends(get_task_repository),
+):
+    """Delete a task record and optionally purge stored artifacts."""
+
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    try:
+        delete_task_record(task)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Delete failed: {exc}") from exc
+
+    purged = 0
+    if purge:
+        try:
+            purged = purge_task_artifacts(task)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Purge failed: {exc}") from exc
+
+    return {"status": "deleted", "task_id": task_id, "purged": purged}
 
 
 # Backwards-compatible export for existing imports
