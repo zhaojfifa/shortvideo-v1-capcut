@@ -277,6 +277,12 @@
       return null;
     }
 
+    function mmTxtLink(data) {
+      if (!data.mm_srt_path) return null;
+      const txtPath = data.mm_srt_path.replace(/\.srt$/i, ".txt");
+      return `/files/${encodeURI(txtPath)}`;
+    }
+
     function updateDownloadsFromTask(data) {
       setDownloadLink("raw-link", data.raw_path ? taskEndpoint(data.task_id, "raw") : null);
       setDownloadLink("origin-link", data.origin_srt_path ? taskEndpoint(data.task_id, "origin") : null);
