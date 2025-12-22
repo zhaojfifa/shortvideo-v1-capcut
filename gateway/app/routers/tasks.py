@@ -36,6 +36,7 @@ from ..core.workspace import (
     Workspace,
     origin_srt_path,
     pack_zip_path,
+    raw_path,
     relative_to_workspace,
     translated_srt_path,
 )
@@ -259,17 +260,19 @@ def _run_pipeline_background(task_id: str, repo) -> None:
             link=task.get("source_url") or task.get("link") or "",
         )
         parse_res = asyncio.run(run_parse_step(parse_req))
-        if isinstance(parse_res, dict):
-            _repo_upsert(
-                repo,
-                task_id,
-                {
-                    **status_update,
-                    "last_step": current_step,
-                    "raw_path": parse_res.get("raw_path"),
-                    "duration_sec": parse_res.get("duration_sec"),
-                },
-            )
+        raw_file = raw_path(task_id)
+        raw_rel = relative_to_workspace(raw_file) if raw_file.exists() else None
+        duration_sec = parse_res.get("duration_sec") if isinstance(parse_res, dict) else None
+        _repo_upsert(
+            repo,
+            task_id,
+            {
+                **status_update,
+                "last_step": current_step,
+                "raw_path": raw_rel,
+                "duration_sec": duration_sec,
+            },
+        )
 
         current_step = "subtitles"
         _repo_upsert(repo, task_id, {**status_update, "last_step": current_step})
@@ -280,18 +283,28 @@ def _run_pipeline_background(task_id: str, repo) -> None:
             translate=True,
             with_scenes=True,
         )
-        subs_res = asyncio.run(run_subtitles_step(subs_req))
-        if isinstance(subs_res, dict):
-            _repo_upsert(
-                repo,
-                task_id,
-                {
-                    **status_update,
-                    "last_step": current_step,
-                    "origin_srt_path": subs_res.get("origin_srt"),
-                    "mm_srt_path": subs_res.get("mm_srt"),
-                },
-            )
+        asyncio.run(run_subtitles_step(subs_req))
+        workspace = Workspace(task_id)
+        origin_rel = (
+            relative_to_workspace(workspace.origin_srt_path)
+            if workspace.origin_srt_path.exists()
+            else None
+        )
+        mm_rel = (
+            relative_to_workspace(workspace.mm_srt_path)
+            if workspace.mm_srt_path.exists()
+            else None
+        )
+        _repo_upsert(
+            repo,
+            task_id,
+            {
+                **status_update,
+                "last_step": current_step,
+                "origin_srt_path": origin_rel,
+                "mm_srt_path": mm_rel,
+            },
+        )
 
         current_step = "dub"
         _repo_upsert(repo, task_id, {**status_update, "last_step": current_step})
@@ -301,26 +314,28 @@ def _run_pipeline_background(task_id: str, repo) -> None:
             force=False,
             target_lang=target_lang,
         )
-        dub_res = asyncio.run(run_dub_step(dub_req))
-        if isinstance(dub_res, dict):
-            _repo_upsert(
-                repo,
-                task_id,
-                {
-                    **status_update,
-                    "last_step": current_step,
-                    "mm_audio_path": dub_res.get("audio_path"),
-                },
-            )
+        asyncio.run(run_dub_step(dub_req))
+        audio_rel = (
+            relative_to_workspace(workspace.mm_audio_path)
+            if workspace.mm_audio_exists()
+            else None
+        )
+        _repo_upsert(
+            repo,
+            task_id,
+            {
+                **status_update,
+                "last_step": current_step,
+                "mm_audio_path": audio_rel,
+            },
+        )
 
         current_step = "pack"
         _repo_upsert(repo, task_id, {**status_update, "last_step": current_step})
         pack_req = PackRequest(task_id=task_id)
-        pack_res = asyncio.run(run_pack_step(pack_req))
-        pack_path = None
-        if isinstance(pack_res, dict):
-            pack_path = pack_res.get("zip_path") or pack_res.get("pack_path")
-
+        asyncio.run(run_pack_step(pack_req))
+        pack_file = pack_zip_path(task_id)
+        pack_path = relative_to_workspace(pack_file) if pack_file.exists() else None
         _repo_upsert(
             repo,
             task_id,
