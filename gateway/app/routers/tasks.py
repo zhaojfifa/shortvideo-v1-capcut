@@ -27,6 +27,7 @@ from ..schemas import (
 from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.artifact_downloads import resolve_storage_url
+from gateway.app.services.task_cleanup import delete_task_record, purge_task_artifacts
 from ..services.steps_v1 import (
     run_dub_step,
     run_pack_step,
@@ -67,6 +68,24 @@ def _infer_platform_from_url(url: str) -> Optional[str]:
     return None
 
 
+def _is_storage_key(value: Optional[str]) -> bool:
+    if not value:
+        return False
+    lowered = value.lower()
+    return lowered.startswith(("http://", "https://", "s3://", "r2://"))
+
+
+def _pack_path_for_list(task: dict) -> Optional[str]:
+    task_id = str(task.get("task_id") or task.get("id") or "")
+    pack_path = task.get("pack_path")
+    if pack_path and not _is_storage_key(str(pack_path)):
+        return str(pack_path)
+    pack_file = pack_zip_path(task_id)
+    if pack_file.exists():
+        return relative_to_workspace(pack_file)
+    return None
+
+
 @pages_router.get("/tasks", response_class=HTMLResponse)
 async def tasks_page(
     request: Request,
@@ -89,7 +108,7 @@ async def tasks_page(
                 "content_lang": t.get("content_lang") or "",
                 "status": t.get("status") or "pending",
                 "created_at": t.get("created_at") or "",
-                "pack_path": str(t.get("pack_path")) if t.get("pack_path") else None,
+                "pack_path": _pack_path_for_list(t),
                 "ui_lang": t.get("ui_lang") or "",
             }
         )
@@ -624,6 +643,33 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
         raise HTTPException(status_code=404, detail="Task not found")
 
     return _task_to_detail(t)
+
+
+@api_router.delete("/tasks/{task_id}")
+def delete_task(
+    task_id: str,
+    purge: bool = Query(default=False),
+    repo=Depends(get_task_repository),
+):
+    """Delete a task record and optionally purge stored artifacts."""
+
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    try:
+        delete_task_record(task)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Delete failed: {exc}") from exc
+
+    purged = 0
+    if purge:
+        try:
+            purged = purge_task_artifacts(task)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Purge failed: {exc}") from exc
+
+    return {"status": "deleted", "task_id": task_id, "purged": purged}
 
 
 # Backwards-compatible export for existing imports
