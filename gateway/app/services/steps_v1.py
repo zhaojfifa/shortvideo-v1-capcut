@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 from gateway.app.core.workspace import (
     Workspace,
+    origin_srt_path,
     pack_zip_path,
     raw_path,
     relative_to_workspace,
