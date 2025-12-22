@@ -26,21 +26,22 @@ _SRT_TIME_RE = re.compile(
 
 
 def _srt_to_txt(srt_text: str) -> str:
-    out_lines: list[str] = []
-    for line in srt_text.splitlines():
-        s = line.strip()
-        if not s:
-            if out_lines and out_lines[-1] != "":
-                out_lines.append("")
-            continue
-        if s.isdigit():
-            continue
-        if "-->" in s or _SRT_TIME_RE.search(s):
-            continue
-        out_lines.append(s)
-    while out_lines and out_lines[-1] == "":
-        out_lines.pop()
-    return "\n".join(out_lines) + "\n" if out_lines else ""
+    blocks = [b for b in srt_text.split("\n\n") if b.strip()]
+    lines_out: list[str] = []
+    for block in blocks:
+        text_lines: list[str] = []
+        for line in block.splitlines():
+            s = line.strip()
+            if not s:
+                continue
+            if s.isdigit():
+                continue
+            if "-->" in s or _SRT_TIME_RE.search(s):
+                continue
+            text_lines.append(s)
+        if text_lines:
+            lines_out.append(" ".join(text_lines))
+    return "\n".join(lines_out).strip() + ("\n" if lines_out else "")
 
 
 def _write_txt_from_srt(path: Path) -> None:

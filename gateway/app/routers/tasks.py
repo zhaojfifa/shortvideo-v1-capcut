@@ -8,7 +8,7 @@ from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 from ..config import get_settings
 from ..core.features import get_features
@@ -217,6 +217,16 @@ def _extract_first_http_url(text: str | None) -> str | None:
         return None
     match = re.search(r"https?://\S+", text)
     return match.group(0) if match else None
+
+
+@pages_router.get("/v1/tasks/{task_id}/mm_txt")
+def get_mm_txt(task_id: str):
+    workspace = Workspace(task_id)
+    mm_srt = workspace.mm_srt_path
+    mm_txt = mm_srt.with_suffix(".txt")
+    if not mm_txt.exists():
+        raise HTTPException(status_code=404, detail="artifact not found: mm_txt")
+    return FileResponse(mm_txt, media_type="text/plain", filename=mm_txt.name)
 
 
 def _repo_upsert(repo, task_id: str, patch: dict) -> None:
