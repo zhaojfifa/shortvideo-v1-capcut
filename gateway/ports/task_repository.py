@@ -18,5 +18,8 @@ class ITaskRepository(Protocol):
     def list(self, filters: Optional[dict[str, Any]] = None) -> list[Any]:
         """Return a list of tasks matching optional filters."""
 
+    def upsert(self, task_id: str, payload: dict[str, Any]) -> Optional[Any]:
+        """Insert or merge a task payload and return the stored task."""
+
     def update(self, task_id: str, patch: dict[str, Any]) -> Optional[Any]:
-        """Apply a partial update and return the updated task (or None if missing)."""
+        """Backward-compatible alias for upsert."""

@@ -1,3 +1,4 @@
+import re
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -17,6 +18,35 @@ from gateway.app.core.workspace import (
 
 class SubtitleError(Exception):
     """Raised when subtitle processing fails."""
+
+
+_SRT_TIME_RE = re.compile(
+    r"\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}"
+)
+
+
+def _srt_to_txt(srt_text: str) -> str:
+    blocks = [b for b in srt_text.split("\n\n") if b.strip()]
+    lines_out: list[str] = []
+    for block in blocks:
+        text_lines: list[str] = []
+        for line in block.splitlines():
+            s = line.strip()
+            if not s:
+                continue
+            if s.isdigit():
+                continue
+            if "-->" in s or _SRT_TIME_RE.search(s):
+                continue
+            text_lines.append(s)
+        if text_lines:
+            lines_out.append(" ".join(text_lines))
+    return "\n".join(lines_out).strip() + ("\n" if lines_out else "")
+
+
+def _write_txt_from_srt(path: Path) -> None:
+    srt_text = path.read_text(encoding="utf-8")
+    path.with_suffix(".txt").write_text(_srt_to_txt(srt_text), encoding="utf-8")
 
 
 def preview_lines(text: str, limit: int = 5) -> list[str]:
@@ -156,11 +186,16 @@ async def generate_with_openai(
     translated_srt: Optional[Path] = None
     if translate_enabled:
         translated_srt = translate(task_id, origin_srt, target_lang, force=force)
+        _write_txt_from_srt(translated_srt)
+    _write_txt_from_srt(origin_srt)
 
     return {
         "task_id": task_id,
         "origin_srt": relative_to_workspace(origin_srt),
         "mm_srt": relative_to_workspace(translated_srt) if translated_srt else None,
+        "mm_txt_path": relative_to_workspace(translated_srt.with_suffix(".txt"))
+        if translated_srt
+        else None,
         "wav": relative_to_workspace(audio_path) if audio_path else None,
         "segments_json": None,
         "origin_preview": _preview(origin_srt),

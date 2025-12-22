@@ -1,66 +1,97 @@
-# PR Policy (Phase0 → v1.7/v1.8)
+# Phase0 PR Policy
 
-## 1. Purpose
-This repository follows strict submission boundaries to prevent accidental UI/template regressions while iterating on backend and pipeline capabilities.
-Phase0 focuses on v1.62 hardening and closure; v1.7/v1.8 will extend the system while inheriting the same boundaries.
+This document codifies the Phase0 PR boundaries and enforcement rules for this repo. **PR-0 is documentation-only**; no runtime code changes are allowed in PR-0.
 
-## 2. Directory Semantics
-- gateway/ : API layer, domain logic, ports/adapters, task state and persistence
-- pipeline/ : pipeline steps and orchestration (runner/step), produces artifacts and references
-- docs/ : architecture constraints, PR rules, verification checklists, runbooks
-- static/ : web UI (Workbench/TaskBoard), client-side interactions
-- static/templates/ : template injection / rendering templates (FROZEN by default)
+## Global rules
 
-## 3. Hard Boundary Rules
-### Allowed / Forbidden Paths by PR Type
-1) docs-only PR
-- Allowed: docs/**
-- Forbidden: everything else
+- **Frozen assets**: `gateway/app/static/ui.html` is frozen and **may only be changed in a dedicated V1-UI PR**.
+- **Never modify** in Phase0 PRs unless the PR slice explicitly allows it:
+  - `gateway/**`
+  - `pipeline/**`
+  - `static/**`
+  - `templates/**`
+  - `requirements.txt`
+- If a change is required outside the allowed paths for the selected PR slice, **stop** and open a separate PR under the correct slice.
 
-2) backend-only PR
-- Allowed: gateway/**, pipeline/**, docs/**
-- Forbidden: static/**, static/templates/**
+## PR slices
 
-3) ui-only PR (no templates)
-- Allowed: static/** except static/templates/**
-- Allowed: docs/** (optional)
-- Forbidden: static/templates/**, gateway/**, pipeline/**
+### PR-0: Policy & Checklist
+**Purpose**: Document boundaries and regression checks.
 
-4) template-change PR (special)
-- Allowed: static/templates/** (and only the minimum needed)
-- Allowed: docs/** (must update screenshots/regression notes)
-- Forbidden: unrelated static/** changes unless strictly required
+**Allowed paths**:
+- `docs/**`
+- `.github/workflows/**` (optional)
 
-### Absolute Freeze Gate
-- static/templates/** must not change unless the PR is explicitly labeled and reviewed as "template-change".
+**Forbidden paths**:
+- Everything else, especially `gateway/**`, `pipeline/**`, `static/**`, `templates/**`, and `requirements.txt`.
 
-## 4. PR Labels and Required Checks
-### docs-only
-- Diff scope: docs/** only
-- Checks: markdown lint (if exists), reviewer confirms rules are clear and operational
+---
 
-### backend-only
-- Diff scope: gateway/** and/or pipeline/**
-- Checks:
-  - API smoke via Render deploy: create task → run pipeline steps → list/get task
-  - Persistence check: restart and verify task data still exists
-  - Storage namespace: all artifacts under {tenant}/{category}/{task_id}/...
+### PR-1: Task Repository (File/S3/R2)
+**Purpose**: Persistence for `/api/tasks` and repository wiring.
 
-### ui-only (no templates)
-- Diff scope: static/** excluding static/templates/**
-- Checks:
-  - Web verification: Workbench shows expected fields; Task Board renders; no console errors
-  - Template freeze: confirm static/templates/** untouched
+**Allowed paths**:
+- `gateway/app/routers/tasks.py`
+- `gateway/app/deps.py`
+- `gateway/ports/task_repository.py`
+- `gateway/adapters/task_repository_file.py`
+- `gateway/adapters/task_repository_s3.py`
+- `gateway/adapters/s3_client.py` (if required)
+- `gateway/adapters/r2_s3_client.py` (if required)
 
-### template-change (special)
-- Diff scope: static/templates/** only (minimum changes)
-- Checks:
-  - Mandatory screenshots: before/after key pages
-  - Regression checklist R0/R1/R2 must be re-run
-  - Additional reviewer approval required
+**Forbidden paths**:
+- All templates/static/docs/publish/admin_publish and any pipeline logic.
 
-## 5. STOP Conditions (Do Not Merge)
-- Any PR modifies static/templates/** without "template-change" classification and explicit review.
-- Any PR mixes backend changes with template injection changes.
-- Any PR fails the global regression steps (R0/R1/R2) after Render deploy.
-- Any PR introduces direct path-building in business/UI layers instead of using storage service output URLs.
+---
+
+### PR-2: UI (V1 Pipeline Lab)
+**Purpose**: Fix `/ui` page errors or UI-only changes.
+
+**Allowed paths**:
+- `gateway/app/static/ui.html`
+- UI-specific static assets under `gateway/app/static/` that are strictly required by `/ui`
+- UI templates that directly serve `/ui` (if any)
+
+**Forbidden paths**:
+- Any `/v1` Python endpoint logic
+- `gateway/app/services/**`
+- `gateway/app/routers/publish*.py`, `gateway/app/routers/admin_publish*.py`
+
+---
+
+### PR-3: Publish & Archive
+**Purpose**: Publish/backfill workflows.
+
+**Allowed paths**:
+- `gateway/app/routers/publish*.py`
+- `gateway/app/routers/admin_publish*.py`
+- `gateway/app/services/publish_service.py`
+- `gateway/app/scripts/backfill_publish.py`
+
+**Forbidden paths**:
+- `/ui` assets and `/v1` logic
+
+---
+
+### PR-4: Pipeline (Non-V1)
+**Purpose**: Pipeline orchestration updates outside `/v1` runtime.
+
+**Allowed paths**:
+- `gateway/app/services/**` (excluding `/v1` route handlers)
+- `gateway/app/providers/**`
+
+**Forbidden paths**:
+- `/v1` routes and UI assets
+
+---
+
+### PR-5: Misc Operations
+**Purpose**: Non-functional changes, tooling, or infra.
+
+**Allowed paths**:
+- `docs/**`
+- `.github/workflows/**`
+- repository metadata files (e.g., `.gitignore`)
+
+**Forbidden paths**:
+- runtime code under `gateway/**` unless explicitly approved.
