@@ -1,6 +1,7 @@
 """Reusable pipeline step functions shared by /v1 routes and background tasks."""
 
 import logging
+from pathlib import Path
 
 from fastapi import HTTPException
 
@@ -14,6 +15,7 @@ from gateway.app.core.workspace import (
 )
 from gateway.app.db import SessionLocal
 from gateway.app import models
+from gateway.app.services.artifact_storage import upload_task_artifact
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.pack import PackError, create_capcut_pack
 from gateway.app.services.parse import detect_platform, parse_douyin_video
@@ -38,9 +40,13 @@ async def run_parse_step(req: ParseRequest):
 
     try:
         result = await parse_douyin_video(req.task_id, req.link)
+        raw_file = raw_path(req.task_id)
+        raw_key = None
+        if raw_file.exists():
+            raw_key = _upload_artifact(req.task_id, raw_file, "raw.mp4")
         _update_task(
             req.task_id,
-            raw_path=result.get("raw_path") if isinstance(result, dict) else None,
+            raw_path=raw_key,
             last_step="parse",
         )
         return result
@@ -62,12 +68,20 @@ async def run_subtitles_step(req: SubtitlesRequest):
             translate_enabled=req.translate,
             use_ffmpeg_extract=True,
         )
-        origin_srt = result.get("origin_srt") if isinstance(result, dict) else None
-        mm_srt = result.get("mm_srt") if isinstance(result, dict) else None
+        workspace = Workspace(req.task_id)
+        origin_key = None
+        mm_key = None
+        if workspace.origin_srt_path.exists():
+            origin_key = _upload_artifact(req.task_id, workspace.origin_srt_path, "origin.srt")
+        if workspace.mm_srt_path.exists():
+            mm_key = _upload_artifact(req.task_id, workspace.mm_srt_path, "mm.srt")
+            mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
+            if mm_txt_path.exists():
+                _upload_artifact(req.task_id, mm_txt_path, "mm.txt")
         _update_task(
             req.task_id,
-            origin_srt_path=origin_srt,
-            mm_srt_path=mm_srt,
+            origin_srt_path=origin_key,
+            mm_srt_path=mm_key,
             last_step="subtitles",
         )
         return result
@@ -121,7 +135,15 @@ async def run_dub_step(req: DubRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     audio_path = result.get("audio_path") if isinstance(result, dict) else None
-    _update_task(req.task_id, mm_audio_path=audio_path, last_step="dub")
+    audio_key = None
+    if audio_path:
+        path = Path(audio_path)
+        if not path.is_absolute():
+            path = workspace.mm_audio_path
+        if path.exists():
+            filename = f"mm_audio{path.suffix or '.wav'}"
+            audio_key = _upload_artifact(req.task_id, path, filename)
+    _update_task(req.task_id, mm_audio_path=audio_key, last_step="dub")
 
     audio_url = f"/v1/tasks/{req.task_id}/audio_mm"
     return {
@@ -161,9 +183,14 @@ async def run_pack_step(req: PackRequest):
         if pack_file.exists():
             pack_path = relative_to_workspace(pack_file)
 
+    pack_key = None
+    if pack_path:
+        pack_file = pack_zip_path(req.task_id)
+        if pack_file.exists():
+            pack_key = _upload_artifact(req.task_id, pack_file, "capcut_pack.zip")
     _update_task(
         req.task_id,
-        pack_path=pack_path,
+        pack_path=pack_key,
         status="ready",
         last_step="pack",
         error_message=None,
@@ -187,5 +214,16 @@ def _update_task(task_id: str, **fields) -> None:
             if value is not None and hasattr(task, key):
                 setattr(task, key, value)
         db.commit()
+    finally:
+        db.close()
+
+
+def _upload_artifact(task_id: str, local_path: Path, filename: str) -> str | None:
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if not task:
+            return None
+        return upload_task_artifact(task, local_path, filename, task_id=task_id)
     finally:
         db.close()
