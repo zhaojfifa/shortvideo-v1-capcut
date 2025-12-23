@@ -239,6 +239,49 @@ def sanitize_string_literals(text: str) -> str:
 
     return "".join(out)
 
+def sanitize_string_literals(text: str) -> str:
+    out: list[str] = []
+    in_string = False
+    quote_char = ""
+    escape = False
+    for ch in text:
+        if in_string:
+            if escape:
+                out.append(ch)
+                escape = False
+                continue
+            if ch == "\\":
+                out.append(ch)
+                escape = True
+                continue
+            if ch == quote_char:
+                out.append(ch)
+                in_string = False
+                quote_char = ""
+                continue
+            if ch == "\n":
+                out.append("\\n")
+                continue
+            if ch == "\r":
+                out.append("\\r")
+                continue
+            if ch == "\t":
+                out.append("\\t")
+                continue
+            if ord(ch) < 0x20:
+                out.append(f"\\u{ord(ch):04x}")
+                continue
+            out.append(ch)
+            continue
+        if ch in {"'", '"'}:
+            in_string = True
+            quote_char = ch
+            out.append(ch)
+            continue
+        out.append(ch)
+    return "".join(out)
+
+
 def parse_gemini_subtitle_payload(raw_text: str) -> Any:
     """
     Fault-tolerant parser for Gemini subtitle outputs.
@@ -254,6 +297,7 @@ def parse_gemini_subtitle_payload(raw_text: str) -> Any:
         payload_text = extract_json_block(text)
     except ValueError:
         payload_text = text
+    payload_sanitized = sanitize_string_literals(payload_text)
 
     # IMPORTANT: sanitize raw control chars INSIDE string literals
     payload_sanitized = sanitize_string_literals(payload_text)
@@ -262,14 +306,11 @@ def parse_gemini_subtitle_payload(raw_text: str) -> Any:
     try:
         return json.loads(payload_text)
     except json.JSONDecodeError:
-        pass
+        try:
+            return json.loads(payload_sanitized)
+        except json.JSONDecodeError:
+            pass
 
-    try:
-        return json.loads(payload_sanitized)
-    except json.JSONDecodeError:
-        pass
-
-    # Strategy 2: Python literal (use sanitized because raw newlines break literal_eval too)
     try:
         data = ast.literal_eval(payload_sanitized)
         if isinstance(data, dict):
@@ -288,10 +329,7 @@ def parse_gemini_subtitle_payload(raw_text: str) -> Any:
         lambda m: '": "{}"'.format(m.group(1).replace('"', '\\"')),
         fixed,
     )
-
-    # sanitize again in case heuristic introduced raw controls (rare but safe)
     fixed = sanitize_string_literals(fixed)
-
     try:
         return json.loads(fixed)
     except Exception:
