@@ -175,6 +175,69 @@ def extract_json_block(raw: str) -> str:
 
     raise ValueError("No JSON block found in Gemini response")
 
+def sanitize_string_literals(text: str) -> str:
+    """
+    Make JSON-like text parseable by escaping raw control characters that appear
+    inside quoted string literals.
+
+    - Converts raw LF/CR/TAB inside strings to \\n/\\r/\\t
+    - Converts other control chars (<0x20) inside strings to \\u00XX
+    - Supports both "..." and '...' string delimiters (for heuristic/fallback paths)
+    """
+    if not text:
+        return text
+
+    out: list[str] = []
+    in_string = False
+    quote_char = ""
+    escape = False
+
+    for ch in text:
+        if not in_string:
+            if ch in ('"', "'"):
+                in_string = True
+                quote_char = ch
+                escape = False
+                out.append(ch)
+            else:
+                out.append(ch)
+            continue
+
+        # in_string == True
+        if escape:
+            out.append(ch)
+            escape = False
+            continue
+
+        if ch == "\\":
+            out.append(ch)
+            escape = True
+            continue
+
+        if ch == quote_char:
+            out.append(ch)
+            in_string = False
+            quote_char = ""
+            continue
+
+        if ch == "\n":
+            out.append("\\n")
+            continue
+        if ch == "\r":
+            out.append("\\r")
+            continue
+        if ch == "\t":
+            out.append("\\t")
+            continue
+
+        oc = ord(ch)
+        if oc < 0x20:
+            out.append(f"\\u{oc:04x}")
+            continue
+
+        out.append(ch)
+
+    return "".join(out)
 
 def sanitize_string_literals(text: str) -> str:
     out: list[str] = []
@@ -236,7 +299,10 @@ def parse_gemini_subtitle_payload(raw_text: str) -> Any:
         payload_text = text
     payload_sanitized = sanitize_string_literals(payload_text)
 
-    # Strategy 1: strict JSON
+    # IMPORTANT: sanitize raw control chars INSIDE string literals
+    payload_sanitized = sanitize_string_literals(payload_text)
+
+    # Strategy 1: strict JSON (try original first, then sanitized)
     try:
         return json.loads(payload_text)
     except json.JSONDecodeError:
@@ -245,7 +311,6 @@ def parse_gemini_subtitle_payload(raw_text: str) -> Any:
         except json.JSONDecodeError:
             pass
 
-    # Strategy 2: Python literal (to handle single quotes/trailing commas)
     try:
         data = ast.literal_eval(payload_sanitized)
         if isinstance(data, dict):
@@ -253,7 +318,7 @@ def parse_gemini_subtitle_payload(raw_text: str) -> Any:
     except Exception:
         pass
 
-    # Strategy 3: heuristic fix for single-quoted keys/values
+    # Strategy 3: heuristic fix for single-quoted keys/values (apply on sanitized text)
     fixed = re.sub(
         r"(?P<q>')(?P<key>[a-zA-Z_][a-zA-Z0-9_]*)'(?=\s*:)",
         r'"\g<key>"',
@@ -268,13 +333,9 @@ def parse_gemini_subtitle_payload(raw_text: str) -> Any:
     try:
         return json.loads(fixed)
     except Exception:
-        logger.warning(
-            "Gemini subtitles did not return valid JSON. Snippet: %s",
-            snippet,
-        )
-        raise ValueError(
-            f"Gemini subtitles did not return valid JSON. Snippet: {snippet}"
-        )
+        logger.warning("Gemini subtitles did not return valid JSON. Snippet: %s", snippet)
+        raise ValueError(f"Gemini subtitles did not return valid JSON. Snippet: {snippet}")
+
 
 
 def translate_and_segment_with_gemini(
