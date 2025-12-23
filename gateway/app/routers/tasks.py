@@ -4,11 +4,12 @@ import asyncio
 import logging
 import os
 import re
+from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pydantic import BaseModel
 from ..config import get_settings
 from ..core.features import get_features
@@ -27,6 +28,7 @@ from ..schemas import (
 from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.artifact_storage import upload_task_artifact
+from gateway.app.services.artifact_storage import get_download_url, get_object_bytes, object_exists
 from gateway.app.services.task_cleanup import delete_task_record, purge_task_artifacts
 from ..services.steps_v1 import (
     run_dub_step,
@@ -131,6 +133,75 @@ async def tasks_new(request: Request) -> HTMLResponse:
     )
 
 
+@pages_router.get("/v1/tasks/{task_id}/raw")
+def download_raw(task_id: str, repo=Depends(get_task_repository)):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="raw video not found")
+    key = _require_storage_key(task, "raw_path", "raw video not found")
+    return RedirectResponse(url=get_download_url(key), status_code=302)
+
+
+@pages_router.get("/v1/tasks/{task_id}/subs_origin")
+def download_origin_subs(
+    task_id: str,
+    inline: bool = Query(default=False),
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="origin subtitles not found")
+    key = _require_storage_key(task, "origin_srt_path", "origin subtitles not found")
+    return _text_or_redirect(key, inline=inline)
+
+
+@pages_router.get("/v1/tasks/{task_id}/subs_mm")
+def download_mm_subs(
+    task_id: str,
+    inline: bool = Query(default=False),
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="burmese subtitles not found")
+    key = _require_storage_key(task, "mm_srt_path", "burmese subtitles not found")
+    return _text_or_redirect(key, inline=inline)
+
+
+@pages_router.get("/v1/tasks/{task_id}/mm_txt")
+def download_mm_txt(
+    task_id: str,
+    inline: bool = Query(default=False),
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="mm txt not found")
+    mm_key = _require_storage_key(task, "mm_srt_path", "mm txt not found")
+    txt_key = mm_key[:-4] + ".txt" if mm_key.endswith(".srt") else f"{mm_key}.txt"
+    if not object_exists(txt_key):
+        raise HTTPException(status_code=404, detail="mm txt not found")
+    return _text_or_redirect(txt_key, inline=inline)
+
+
+@pages_router.get("/v1/tasks/{task_id}/audio_mm")
+def download_audio_mm(task_id: str, repo=Depends(get_task_repository)):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="dubbed audio not found")
+    key = _require_storage_key(task, "mm_audio_path", "dubbed audio not found")
+    return RedirectResponse(url=get_download_url(key), status_code=302)
+
+
+@pages_router.get("/v1/tasks/{task_id}/pack")
+def download_pack(task_id: str, repo=Depends(get_task_repository)):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Pack not found")
+    key = _require_storage_key(task, "pack_path", "Pack not found")
+    return RedirectResponse(url=get_download_url(key), status_code=302)
+
+
 def _task_endpoint(task_id: str, kind: str) -> Optional[str]:
     safe_id = str(task_id)
     if kind == "raw":
@@ -148,29 +219,49 @@ def _task_endpoint(task_id: str, kind: str) -> Optional[str]:
     return None
 
 
+def _task_key(task: dict, field: str) -> Optional[str]:
+    value = task.get(field)
+    return str(value) if value else None
+
+
+def _require_storage_key(task: dict, field: str, not_found: str) -> str:
+    key = _task_key(task, field)
+    if not key or not object_exists(key):
+        raise HTTPException(status_code=404, detail=not_found)
+    return key
+
+
+def _text_or_redirect(key: str, inline: bool) -> Response:
+    if inline:
+        data = get_object_bytes(key)
+        if data is None:
+            raise HTTPException(status_code=404, detail="artifact not found")
+        return Response(content=data, media_type="text/plain; charset=utf-8")
+    return RedirectResponse(url=get_download_url(key), status_code=302)
+
+
 def _resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
     task_id = str(task.get("task_id") or task.get("id"))
-    workspace = Workspace(task_id)
-    raw_url = _task_endpoint(task_id, "raw") if task.get("raw_path") or workspace.raw.exists() else None
+    raw_url = _task_endpoint(task_id, "raw") if task.get("raw_path") else None
     origin_url = (
         _task_endpoint(task_id, "origin")
-        if task.get("origin_srt_path") or workspace.origin_srt_path.exists()
+        if task.get("origin_srt_path")
         else None
     )
     mm_url = (
         _task_endpoint(task_id, "mm")
-        if task.get("mm_srt_path") or workspace.mm_srt_path.exists()
+        if task.get("mm_srt_path")
         else None
     )
     audio_url = (
         _task_endpoint(task_id, "audio")
-        if task.get("mm_audio_path") or workspace.mm_audio_exists()
+        if task.get("mm_audio_path")
         else None
     )
     mm_txt_url = _task_endpoint(task_id, "mm_txt") if mm_url else None
     pack_url = (
         _task_endpoint(task_id, "pack")
-        if task.get("pack_path") or pack_zip_path(task_id).exists()
+        if task.get("pack_path")
         else None
     )
 
@@ -333,8 +424,7 @@ def _run_pipeline_background(task_id: str, repo) -> None:
         audio_key = None
         if workspace.mm_audio_exists():
             audio_path = workspace.mm_audio_path
-            filename = f"mm_audio{audio_path.suffix or '.wav'}"
-            audio_key = upload_task_artifact(task, audio_path, filename, task_id=task_id)
+            audio_key = upload_task_artifact(task, audio_path, "mm_audio.mp3", task_id=task_id)
         _repo_upsert(
             repo,
             task_id,
@@ -602,10 +692,14 @@ def rerun_dub(
     except DubbingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    audio_key = None
+    audio_path = result.get("path")
+    if audio_path:
+        audio_key = upload_task_artifact(task, Path(audio_path), "mm_audio.mp3", task_id=task_id)
     repo.update(
         task_id,
         {
-            "mm_audio_path": result.get("audio_path"),
+            "mm_audio_path": audio_key,
             "dub_provider": provider,
         },
     )

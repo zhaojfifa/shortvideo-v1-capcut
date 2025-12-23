@@ -141,8 +141,7 @@ async def run_dub_step(req: DubRequest):
         if not path.is_absolute():
             path = workspace.mm_audio_path
         if path.exists():
-            filename = f"mm_audio{path.suffix or '.wav'}"
-            audio_key = _upload_artifact(req.task_id, path, filename)
+            audio_key = _upload_artifact(req.task_id, path, "mm_audio.mp3")
     _update_task(req.task_id, mm_audio_path=audio_key, last_step="dub")
 
     audio_url = f"/v1/tasks/{req.task_id}/audio_mm"

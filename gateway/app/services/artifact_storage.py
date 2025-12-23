@@ -66,3 +66,18 @@ def object_exists(key: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def get_object_bytes(key: str) -> bytes | None:
+    if not storage_available():
+        return None
+    client = get_s3_client()
+    bucket = get_bucket_name()
+    try:
+        obj = client.get_object(Bucket=bucket, Key=key)
+    except Exception:
+        return None
+    body = obj.get("Body")
+    if body is None:
+        return None
+    return body.read()
