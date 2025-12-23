@@ -187,6 +187,38 @@
       <h2>{{ t_primary("step2") }} · Transcribe & Translate</h2>
       <p>Generate subtitles via /v1/subtitles.</p>
       <button id="btn-subtitles">Generate subtitles</button>
+
+      <details id="subs-compare" style="margin-top:12px;">
+        <summary style="cursor:pointer; font-weight:700;">Subtitles (origin vs mm) · compare / copy / edit</summary>
+        <div style="margin-top:12px; display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+          <div>
+            <div class="row" style="justify-content:space-between;">
+              <label style="margin:0;">Origin (SRT)</label>
+              <button type="button" id="btn-copy-origin" class="btn" style="padding:6px 10px;">Copy</button>
+            </div>
+            <pre id="origin-text" style="max-height:220px;"></pre>
+          </div>
+          <div>
+            <div class="row" style="justify-content:space-between;">
+              <label style="margin:0;">MM (TXT)</label>
+              <button type="button" id="btn-copy-mm" class="btn" style="padding:6px 10px;">Copy</button>
+            </div>
+            <pre id="mm-text" style="max-height:220px;"></pre>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <div class="row" style="justify-content:space-between;">
+            <label for="mm-edit" style="margin:0;">MM Edited (mm_edited.txt)</label>
+            <div class="row" style="gap:8px;">
+              <button type="button" id="btn-load-edited" class="btn" style="padding:6px 10px;">Reload</button>
+              <button type="button" id="btn-save-edited" class="btn" style="padding:6px 10px;">Save</button>
+            </div>
+          </div>
+          <textarea id="mm-edit" rows="6" style="width:100%; margin-top:8px; border-radius:10px; border:1px solid #e5e7eb; padding:10px;"></textarea>
+          <div class="muted" id="mm-edit-status" style="margin-top:6px;">-</div>
+        </div>
+      </details>
     </section>
 
     <section>
@@ -268,42 +300,54 @@
 
     function taskEndpoint(taskId, kind) {
       const id = encodeURIComponent(taskId);
-      if (kind === "mm_txt") return `/v1/tasks/${id}/mm_txt`;
-      return null;
+      const map = {
+        raw: `/v1/tasks/${id}/raw`,
+        origin_srt: `/v1/tasks/${id}/subs_origin`,
+        mm_srt: `/v1/tasks/${id}/subs_mm`,
+        mm_txt: `/v1/tasks/${id}/mm_txt`,
+        audio_mm: `/v1/tasks/${id}/audio_mm`,
+        pack: `/v1/tasks/${id}/pack`,
+      };
+      return map[kind] || null;
+    }
+
+    function isPresignedLike(url) {
+      if (!url) return false;
+      const u = String(url);
+      return /X-Amz-|Signature=|cloudflarestorage|AWS4-HMAC-SHA256/i.test(u);
     }
 
     function mmTxtLink(data) {
-      if (data.mm_txt_path) return data.mm_txt_path;
-      const mmPath = data.mm_srt_path;
-      if (!mmPath) return null;
-      if (mmPath.startsWith("/v1/tasks/")) {
-        return taskEndpoint(data.task_id, "mm_txt");
-      }
-      if (/\.srt$/i.test(mmPath)) {
-        return mmPath.replace(/\.srt$/i, ".txt");
-      }
-      return null;
+      const hasMmTxt = !!(data.mm_txt_path || data.mm_srt_path);
+      return hasMmTxt ? taskEndpoint(data.task_id, "mm_txt") : null;
     }
 
     function updateDownloadsFromTask(data) {
-      setDownloadLink("raw-link", data.raw_path || null);
-      setDownloadLink("origin-link", data.origin_srt_path || null);
-      setDownloadLink("mm-link", data.mm_srt_path || null);
-      setDownloadLink("mm-txt-link", mmTxtLink(data));
-      setDownloadLink("audio-link", data.mm_audio_path || null);
-      setDownloadLink("pack-link", data.pack_path || null);
-      setDownloadLink("mobile-raw-link", data.raw_path || null);
-      setDownloadLink("mobile-audio-link", data.mm_audio_path || null);
-      setDownloadLink("mobile-mm-link", data.mm_srt_path || null);
-      setDownloadLink("mobile-mm-txt-link", mmTxtLink(data));
-      setDownloadLink("mobile-pack-link", data.pack_path || null);
+      const taskId = data.task_id;
+      const hasRaw = !!data.raw_path;
+      const hasOrigin = !!data.origin_srt_path;
+      const hasMmSrt = !!data.mm_srt_path;
+      const hasMmTxt = !!(data.mm_txt_path || data.mm_srt_path);
+      const hasAudio = !!data.mm_audio_path;
+      const hasPack = !!data.pack_path;
+
+      setDownloadLink("raw-link", hasRaw ? taskEndpoint(taskId, "raw") : null);
+      setDownloadLink("origin-link", hasOrigin ? taskEndpoint(taskId, "origin_srt") : null);
+      setDownloadLink("mm-link", hasMmSrt ? taskEndpoint(taskId, "mm_srt") : null);
+      setDownloadLink("mm-txt-link", hasMmTxt ? taskEndpoint(taskId, "mm_txt") : null);
+      setDownloadLink("audio-link", hasAudio ? taskEndpoint(taskId, "audio_mm") : null);
+      setDownloadLink("pack-link", hasPack ? taskEndpoint(taskId, "pack") : null);
+      setDownloadLink("mobile-raw-link", hasRaw ? taskEndpoint(taskId, "raw") : null);
+      setDownloadLink("mobile-audio-link", hasAudio ? taskEndpoint(taskId, "audio_mm") : null);
+      setDownloadLink("mobile-mm-link", hasMmSrt ? taskEndpoint(taskId, "mm_srt") : null);
+      setDownloadLink("mobile-mm-txt-link", hasMmTxt ? taskEndpoint(taskId, "mm_txt") : null);
+      setDownloadLink("mobile-pack-link", hasPack ? taskEndpoint(taskId, "pack") : null);
 
       const audioEl = document.getElementById("audio-preview");
       const audioLink = document.getElementById("audio-link");
-      const audioHref = data.mm_audio_path || null;
       if (audioEl) {
-        if (audioHref) {
-          audioEl.src = audioHref;
+        if (hasAudio) {
+          audioEl.src = taskEndpoint(taskId, "audio_mm");
           audioEl.style.display = "block";
         } else {
           audioEl.removeAttribute("src");
@@ -311,12 +355,7 @@
         }
       }
       if (audioLink) {
-        if (data.mm_audio_path) {
-          const ext = data.mm_audio_path.split(".").pop() || "audio";
-          audioLink.textContent = `mm_audio.${ext}`;
-        } else {
-          audioLink.textContent = "mm_audio";
-        }
+        audioLink.textContent = "mm_audio";
       }
     }
 
@@ -348,7 +387,10 @@
       const at = data.published_at || "-";
       const status = data.publish_status || "-";
       const taskId = data.task_id;
-      const url = data.publish_url || data.pack_path || "-";
+      let url = data.publish_url || "-";
+      if (url === "-" || isPresignedLike(url)) {
+        url = data.pack_path ? taskEndpoint(taskId, "pack") : "-";
+      }
 
       const providerEl = document.getElementById("publish-provider");
       const keyEl = document.getElementById("publish-key");
@@ -361,7 +403,7 @@
       if (statusEl) statusEl.textContent = status;
       if (urlEl) {
         urlEl.textContent = url;
-        urlEl.href = url;
+        urlEl.href = url === "-" ? "#" : url;
       }
     }
 
@@ -506,6 +548,130 @@
         appendLog("Initial refresh failed: " + err);
       });
     });
+
+    async function fetchTextOrFallback(url, fallbackMessage) {
+      try {
+        const resp = await fetch(url, { method: "GET" });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        return await resp.text();
+      } catch (err) {
+        console.warn("fetchText failed", url, err);
+        return fallbackMessage || `Failed to load. You can use download links above. (${url})`;
+      }
+    }
+
+    async function loadCompareBlock(forceReload) {
+      const taskId = window.currentTask.task_id;
+      const originPre = document.getElementById("origin-text");
+      const mmPre = document.getElementById("mm-text");
+      const mmEdit = document.getElementById("mm-edit");
+      const statusEl = document.getElementById("mm-edit-status");
+      if (!originPre || !mmPre || !mmEdit) return;
+
+      if (!forceReload && originPre.getAttribute("data-loaded") === "1") {
+        return;
+      }
+
+      originPre.textContent = "Loading…";
+      mmPre.textContent = "Loading…";
+      if (statusEl) statusEl.textContent = "Loading…";
+
+      const originUrl = taskEndpoint(taskId, "origin_srt");
+      const mmTxtUrl = taskEndpoint(taskId, "mm_txt");
+
+      const originText = await fetchTextOrFallback(
+        originUrl,
+        "Unable to load origin subtitles in-browser (possible CORS redirect). Use Downloads → origin.srt."
+      );
+      const mmText = await fetchTextOrFallback(
+        mmTxtUrl,
+        "Unable to load mm text in-browser (possible CORS redirect). Use Downloads → mm.txt."
+      );
+      originPre.textContent = originText || "";
+      mmPre.textContent = mmText || "";
+      originPre.setAttribute("data-loaded", "1");
+
+      try {
+        const r = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/mm_edited`);
+        if (r.ok) {
+          const j = await r.json();
+          if (j && j.text != null && String(j.text).length > 0) {
+            mmEdit.value = String(j.text);
+            if (statusEl) statusEl.textContent = "Loaded mm_edited.txt";
+          } else {
+            mmEdit.value = mmText || "";
+            if (statusEl) statusEl.textContent = "No mm_edited.txt; initialized from mm.txt";
+          }
+        } else {
+          mmEdit.value = mmText || "";
+          if (statusEl) statusEl.textContent = `mm_edited load failed: HTTP ${r.status} (fallback to mm.txt)`;
+        }
+      } catch (err) {
+        mmEdit.value = mmText || "";
+        if (statusEl) statusEl.textContent = "mm_edited load error (fallback to mm.txt)";
+      }
+    }
+
+    const detailsEl = document.getElementById("subs-compare");
+    if (detailsEl) {
+      detailsEl.addEventListener("toggle", () => {
+        if (detailsEl.open) loadCompareBlock(false);
+      });
+    }
+
+    const copyBtnOrigin = document.getElementById("btn-copy-origin");
+    if (copyBtnOrigin) {
+      copyBtnOrigin.addEventListener("click", async () => {
+        const t = (document.getElementById("origin-text") || {}).textContent || "";
+        await navigator.clipboard.writeText(t);
+        appendLog("Copied origin subtitles.");
+      });
+    }
+    const copyBtnMm = document.getElementById("btn-copy-mm");
+    if (copyBtnMm) {
+      copyBtnMm.addEventListener("click", async () => {
+        const t = (document.getElementById("mm-text") || {}).textContent || "";
+        await navigator.clipboard.writeText(t);
+        appendLog("Copied mm text.");
+      });
+    }
+
+    const btnReload = document.getElementById("btn-load-edited");
+    if (btnReload) {
+      btnReload.addEventListener("click", async () => {
+        await loadCompareBlock(true);
+        appendLog("Reloaded compare block.");
+      });
+    }
+
+    const btnSave = document.getElementById("btn-save-edited");
+    if (btnSave) {
+      btnSave.addEventListener("click", async () => {
+        const taskId = window.currentTask.task_id;
+        const mmEdit = document.getElementById("mm-edit");
+        const statusEl = document.getElementById("mm-edit-status");
+        const text = mmEdit ? mmEdit.value : "";
+        if (statusEl) statusEl.textContent = "Saving…";
+        try {
+          const resp = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/mm_edited`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text }),
+          });
+          if (!resp.ok) {
+            const detail = await resp.text();
+            if (statusEl) statusEl.textContent = `Save failed: HTTP ${resp.status} ${detail}`;
+            appendLog(`Save mm_edited failed: HTTP ${resp.status}`);
+            return;
+          }
+          if (statusEl) statusEl.textContent = "Saved mm_edited.txt";
+          appendLog("Saved mm_edited.txt");
+        } catch (err) {
+          if (statusEl) statusEl.textContent = `Save error: ${err}`;
+          appendLog("Save mm_edited error: " + err);
+        }
+      });
+    }
   </script>
 </body>
 </html>
