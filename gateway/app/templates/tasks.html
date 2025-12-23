@@ -78,6 +78,17 @@
     .secondary { display: block; color: #6b7280; font-size: 0.85rem; }
     .action-stack { display: flex; flex-direction: column; gap: 6px; }
     .action-item { display: flex; flex-direction: column; gap: 2px; }
+    .link-button {
+      background: none;
+      border: none;
+      padding: 0;
+      color: #2563eb;
+      font-size: 0.9rem;
+      text-align: left;
+      cursor: pointer;
+    }
+    .link-button:hover { text-decoration: underline; }
+    .link-button.danger { color: #dc2626; }
     @media (max-width: 768px) {
       thead { display: none; }
       table, tbody, tr, td { display: block; width: 100%; }
@@ -329,6 +340,9 @@
                       {% endif %}
                     </div>
                     <div class="action-item">
+                      <button class="link-button danger js-task-delete" data-task-id="{{ t.task_id }}" type="button">Delete</button>
+                    </div>
+                    <div class="action-item">
                       <a href="/api/tasks/{{ t.task_id }}" target="_blank" rel="noopener">{{ t_primary("json") }}</a>
                       {% if ui_show_secondary %}
                         <span class="secondary">{{ t_secondary("json") }}</span>
@@ -502,6 +516,9 @@
                   ${showSecondary ? `<span class="secondary">{{ t_secondary("open") }}</span>` : ""}
                 </div>
                 <div class="action-item">
+                  <button class="link-button danger js-task-delete" data-task-id="${t.task_id}" type="button">Delete</button>
+                </div>
+                <div class="action-item">
                   <a href="/api/tasks/${t.task_id}" target="_blank" rel="noopener">{{ t_primary("json") }}</a>
                   ${showSecondary ? `<span class="secondary">{{ t_secondary("json") }}</span>` : ""}
                 </div>
@@ -572,6 +589,47 @@
     } else {
       refreshTasks();
     }
+
+    async function handleDeleteClick(event) {
+      const button = event.target.closest(".js-task-delete");
+      if (!button) return;
+      event.preventDefault();
+      const taskId = button.dataset.taskId;
+      if (!taskId) return;
+      const confirmed = window.confirm("Delete this task?");
+      if (!confirmed) return;
+      const originalText = button.textContent;
+      button.disabled = true;
+      button.textContent = "Deleting...";
+      try {
+        const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}?delete_assets=false`, {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const row = button.closest("tr");
+        if (row) {
+          row.remove();
+        }
+        if (typeof refreshTasks === "function") {
+          refreshTasks();
+        }
+      } catch (err) {
+        console.error(err);
+        if (countPrimaryEl) {
+          countPrimaryEl.textContent = `Delete failed: ${err.message}`;
+        }
+        if (countSecondaryEl) {
+          countSecondaryEl.textContent = "";
+        }
+      } finally {
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+    }
+
+    document.addEventListener("click", handleDeleteClick);
 
     window.addEventListener("focus", () => refreshTasks());
   </script>
