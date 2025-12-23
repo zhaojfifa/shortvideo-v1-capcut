@@ -42,6 +42,7 @@ from ..core.workspace import (
     pack_zip_path,
     raw_path,
     relative_to_workspace,
+    task_base_dir,
 )
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,10 @@ logger = logging.getLogger(__name__)
 class DubProviderRequest(BaseModel):
     provider: str | None = None
     voice_id: str | None = None
+
+
+class EditedPayload(BaseModel):
+    text: str = ""
 
 
 pages_router = APIRouter()
@@ -88,6 +93,23 @@ def _pack_path_for_list(task: dict) -> Optional[str]:
     if pack_file.exists():
         return relative_to_workspace(pack_file)
     return None
+
+
+def _mm_edited_path(task_id: str) -> Path:
+    return task_base_dir(task_id) / "mm_edited.txt"
+
+
+def _load_dub_text(task_id: str) -> tuple[str, str]:
+    edited_path = _mm_edited_path(task_id)
+    if edited_path.exists():
+        text = edited_path.read_text(encoding="utf-8").strip()
+        if text:
+            return text, "mm_edited"
+    workspace = Workspace(task_id)
+    mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
+    if mm_txt_path.exists():
+        return mm_txt_path.read_text(encoding="utf-8"), "mm_txt"
+    return "", "mm_txt"
 
 
 @pages_router.get("/tasks", response_class=HTMLResponse)
@@ -657,6 +679,28 @@ def list_tasks(
     return TaskListResponse(items=summaries, page=page, page_size=page_size, total=total)
 
 
+@api_router.get("/tasks/{task_id}/mm_edited")
+def get_mm_edited(task_id: str):
+    path = _mm_edited_path(task_id)
+    if not path.exists():
+        return {"exists": False, "text": ""}
+    try:
+        return {"exists": True, "text": path.read_text(encoding="utf-8")}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"read mm_edited failed: {exc}") from exc
+
+
+@api_router.put("/tasks/{task_id}/mm_edited")
+def put_mm_edited(task_id: str, payload: EditedPayload):
+    path = _mm_edited_path(task_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        path.write_text(payload.text or "", encoding="utf-8")
+        return {"ok": True, "path": str(path)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"write mm_edited failed: {exc}") from exc
+
+
 @api_router.post("/tasks/{task_id}/dub", response_model=TaskDetail)
 def rerun_dub(
     task_id: str,
@@ -680,12 +724,19 @@ def rerun_dub(
         raise HTTPException(status_code=400, detail="LOVO_API_KEY is not configured")
 
     try:
+        dub_text, _source = _load_dub_text(task_id)
+        if not dub_text.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="dub text missing: mm_edited.txt/mm.txt not found or empty",
+            )
         result = asyncio.run(
             synthesize_voice(
                 task_id=task_id,
                 target_lang=task.get("content_lang") or "my",
                 voice_id=payload.voice_id,
                 force=True,
+                mm_srt_text=dub_text,
                 provider=provider,
             )
         )
