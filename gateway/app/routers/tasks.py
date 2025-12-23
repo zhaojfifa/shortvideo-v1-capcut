@@ -9,7 +9,7 @@ from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from pydantic import BaseModel
 from ..config import get_settings
 from ..core.features import get_features
@@ -53,8 +53,8 @@ class DubProviderRequest(BaseModel):
     voice_id: str | None = None
 
 
-class EditedPayload(BaseModel):
-    text: str = ""
+class EditedTextRequest(BaseModel):
+    text: str
 
 
 pages_router = APIRouter()
@@ -110,6 +110,48 @@ def _load_dub_text(task_id: str) -> tuple[str, str]:
     if mm_txt_path.exists():
         return mm_txt_path.read_text(encoding="utf-8"), "mm_txt"
     return "", "mm_txt"
+
+
+def _resolve_text_path(task_id: str, kind: str) -> Path | None:
+    td = task_base_dir(task_id)
+    ws = Workspace(task_id)
+
+    if kind == "mm_edited":
+        p = _mm_edited_path(task_id)
+        return p if p.exists() else None
+
+    if kind == "mm_txt":
+        p = ws.mm_srt_path.with_suffix(".txt")
+        if p.exists():
+            return p
+        p2 = td / "mm.txt"
+        return p2 if p2.exists() else None
+
+    if kind == "origin_srt":
+        candidates: list[Path] = []
+        origin_attr = getattr(ws, "origin_srt_path", None)
+        if isinstance(origin_attr, Path):
+            candidates.append(origin_attr)
+        candidates.extend(
+            [
+                td / "origin.srt",
+                td / "subs_origin.srt",
+                td / "subs_origin.txt",
+            ]
+        )
+        for c in candidates:
+            if c and c.exists():
+                return c
+        return None
+
+    if kind == "mm_srt":
+        p = ws.mm_srt_path
+        if p.exists():
+            return p
+        p2 = td / "mm.srt"
+        return p2 if p2.exists() else None
+
+    return None
 
 
 @pages_router.get("/tasks", response_class=HTMLResponse)
@@ -679,24 +721,37 @@ def list_tasks(
     return TaskListResponse(items=summaries, page=page, page_size=page_size, total=total)
 
 
-@api_router.get("/tasks/{task_id}/mm_edited")
-def get_mm_edited(task_id: str):
-    path = _mm_edited_path(task_id)
-    if not path.exists():
-        return {"exists": False, "text": ""}
+@api_router.get("/tasks/{task_id}/text", response_class=PlainTextResponse)
+def get_task_text(
+    task_id: str,
+    kind: str = Query(default=..., pattern="^(origin_srt|mm_txt|mm_srt|mm_edited)$"),
+):
+    path = _resolve_text_path(task_id, kind)
+    if not path:
+        raise HTTPException(status_code=404, detail=f"{kind} not found")
     try:
-        return {"exists": True, "text": path.read_text(encoding="utf-8")}
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"read mm_edited failed: {exc}") from exc
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return path.read_text(errors="ignore")
 
 
-@api_router.put("/tasks/{task_id}/mm_edited")
-def put_mm_edited(task_id: str, payload: EditedPayload):
+@api_router.post("/tasks/{task_id}/mm_edited")
+def save_mm_edited(task_id: str, payload: EditedTextRequest):
+    text = (payload.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is empty")
     path = _mm_edited_path(task_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        path.write_text(payload.text or "", encoding="utf-8")
-        return {"ok": True, "path": str(path)}
+        path.write_text(text + "\n", encoding="utf-8")
+        return JSONResponse(
+            {
+                "ok": True,
+                "task_id": task_id,
+                "kind": "mm_edited",
+                "bytes": len(text.encode("utf-8")),
+            }
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"write mm_edited failed: {exc}") from exc
 

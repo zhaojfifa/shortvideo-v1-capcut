@@ -576,8 +576,8 @@
       mmPre.textContent = "Loading…";
       if (statusEl) statusEl.textContent = "Loading…";
 
-      const originUrl = taskEndpoint(taskId, "origin_srt");
-      const mmTxtUrl = taskEndpoint(taskId, "mm_txt");
+      const originUrl = `/api/tasks/${encodeURIComponent(taskId)}/text?kind=origin_srt`;
+      const mmTxtUrl = `/api/tasks/${encodeURIComponent(taskId)}/text?kind=mm_txt`;
 
       const originText = await fetchTextOrFallback(
         originUrl,
@@ -592,11 +592,12 @@
       originPre.setAttribute("data-loaded", "1");
 
       try {
-        const r = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/mm_edited`);
+        const editedUrl = `/api/tasks/${encodeURIComponent(taskId)}/text?kind=mm_edited`;
+        const r = await fetch(editedUrl);
         if (r.ok) {
-          const j = await r.json();
-          if (j && j.text != null && String(j.text).length > 0) {
-            mmEdit.value = String(j.text);
+          const text = await r.text();
+          if (text && text.trim().length > 0) {
+            mmEdit.value = text;
             if (statusEl) statusEl.textContent = "Loaded mm_edited.txt";
           } else {
             mmEdit.value = mmText || "";
@@ -654,7 +655,7 @@
         if (statusEl) statusEl.textContent = "Saving…";
         try {
           const resp = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/mm_edited`, {
-            method: "PUT",
+            method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ text }),
           });
