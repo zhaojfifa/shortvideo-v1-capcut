@@ -85,7 +85,12 @@ class S3TaskRepository(ITaskRepository):
                 key = item.get("Key")
                 if not key:
                     continue
-                obj = self._client.get_object(Bucket=self._bucket, Key=key)
+                try:
+                    obj = self._client.get_object(Bucket=self._bucket, Key=key)
+                except ClientError as exc:
+                    if exc.response.get("Error", {}).get("Code") in {"NoSuchKey", "404"}:
+                        continue
+                    raise
                 payload = obj["Body"].read().decode("utf-8")
                 data = json.loads(payload)
                 if _matches_filters(data, filters):
