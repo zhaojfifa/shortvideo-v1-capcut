@@ -18,9 +18,9 @@ GEMINI_BASE_URL = os.getenv(
     "https://generativelanguage.googleapis.com/v1beta",
 )
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-GEMINI_MAX_OUTPUT_TOKENS = os.getenv("GEMINI_MAX_OUTPUT_TOKENS")
-GEMINI_TEMPERATURE = os.getenv("GEMINI_TEMPERATURE")
-GEMINI_CANDIDATE_COUNT = os.getenv("GEMINI_CANDIDATE_COUNT")
+GEMINI_MAX_OUTPUT_TOKENS = 8192
+GEMINI_TEMPERATURE = 0.2
+GEMINI_CANDIDATE_COUNT = 1
 
 
 class GeminiSubtitlesError(RuntimeError):
@@ -39,50 +39,11 @@ def _build_gemini_url() -> str:
     return f"{base}/models/{GEMINI_MODEL}:generateContent"
 
 
-def _env_int(val: str | None) -> int | None:
-    if val is None or val == "":
-        return None
-    try:
-        return int(val)
-    except ValueError:
-        return None
-
-
-def _env_float(val: str | None) -> float | None:
-    if val is None or val == "":
-        return None
-    try:
-        return float(val)
-    except ValueError:
-        return None
-
-
 def _apply_generation_config(gen_cfg: Dict[str, Any]) -> None:
-    if "responseMimeType" not in gen_cfg:
-        gen_cfg["responseMimeType"] = "application/json"
-
-    max_tokens = _env_int(GEMINI_MAX_OUTPUT_TOKENS)
-    if max_tokens is not None and "maxOutputTokens" not in gen_cfg:
-        gen_cfg["maxOutputTokens"] = max_tokens
-
-    temperature = _env_float(GEMINI_TEMPERATURE)
-    if temperature is not None and "temperature" not in gen_cfg:
-        gen_cfg["temperature"] = temperature
-
-    candidate_count = _env_int(GEMINI_CANDIDATE_COUNT)
-    if candidate_count is not None and "candidateCount" not in gen_cfg:
-        gen_cfg["candidateCount"] = candidate_count
-
-
-def _log_finish_reasons(resp_json: Dict[str, Any]) -> None:
-    candidates = resp_json.get("candidates") or []
-    reasons = []
-    for cand in candidates:
-        reason = cand.get("finishReason")
-        if reason:
-            reasons.append(reason)
-    if reasons:
-        logger.info("Gemini finishReason=%s", ",".join(reasons))
+    gen_cfg.setdefault("responseMimeType", "application/json")
+    gen_cfg.setdefault("maxOutputTokens", GEMINI_MAX_OUTPUT_TOKENS)
+    gen_cfg.setdefault("temperature", GEMINI_TEMPERATURE)
+    gen_cfg.setdefault("candidateCount", GEMINI_CANDIDATE_COUNT)
 
 
 def _call_gemini(prompt: str, timeout: int = 60) -> Dict[str, Any]:
@@ -176,6 +137,10 @@ def _extract_text(resp_json: Dict[str, Any]) -> str:
                 out.append(part.get("text", "") or "")
         return out
 
+    finish = candidates[0].get("finishReason")
+    if finish:
+        logger.info("Gemini finishReason=%s", finish)
+
     texts = _texts_from_candidate(candidates[0])
     if not texts:
         for cand in candidates[1:]:
@@ -257,59 +222,33 @@ def extract_json_block(raw: str) -> str:
 
     raise ValueError("No complete JSON object found in Gemini response")
 
-def sanitize_string_literals(text: str) -> str:
-    out: list[str] = []
-    in_string = False
-    quote_char = ""
-    escape = False
-    for ch in text:
-        if in_string:
-            if escape:
-                out.append(ch)
-                escape = False
-                continue
-            if ch == "\\":
-                out.append(ch)
-                escape = True
-                continue
-            if ch == quote_char:
-                out.append(ch)
-                in_string = False
-                quote_char = ""
-                continue
-            if ch == "\n":
-                out.append("\\n")
-                continue
-            if ch == "\r":
-                out.append("\\r")
-                continue
-            if ch == "\t":
-                out.append("\\t")
-                continue
-            if ord(ch) < 0x20:
-                out.append(f"\\u{ord(ch):04x}")
-                continue
-            out.append(ch)
-            continue
-        if ch in {"'", '"'}:
-            in_string = True
-            quote_char = ch
-            out.append(ch)
-            continue
-        out.append(ch)
-    return "".join(out)
-
-
-def _repair_json_with_gemini(raw_text: str) -> str:
-    prompt = f"""
-You are a strict JSON fixer. The following text should contain a JSON object but may be malformed.
-
-Return ONLY a valid JSON object. Do not include code fences, comments, or extra text.
-
 Input:
 {raw_text}
 """.strip()
     resp_json = _call_gemini(prompt)
+    return _extract_text(resp_json)
+
+
+def _repair_json_with_gemini(broken: str, timeout: int = 60) -> str:
+    repair_prompt = (
+        "You are a JSON repair tool. Fix the following broken JSON into a valid JSON object. "
+        "Output ONLY the JSON object. No markdown, no code fences, no commentary."
+    )
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": repair_prompt + "\n\n" + (broken or "")}],
+            }
+        ],
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "maxOutputTokens": 4096,
+            "temperature": 0,
+            "candidateCount": 1,
+        },
+    }
+    resp_json = _call_gemini_with_payload(payload, timeout=timeout)
     return _extract_text(resp_json)
 
 
@@ -362,9 +301,13 @@ def parse_gemini_subtitle_payload(raw_text: str) -> Any:
         return json.loads(fixed)
     except Exception:
         try:
-            repaired = _repair_json_with_gemini(raw_text)
-            repaired = sanitize_string_literals(repaired)
-            return json.loads(repaired)
+            repaired_raw = _repair_json_with_gemini(payload_text)
+            repaired_block = extract_json_block(repaired_raw)
+            repaired_sanitized = sanitize_string_literals(repaired_block)
+            try:
+                return json.loads(repaired_block)
+            except json.JSONDecodeError:
+                return json.loads(repaired_sanitized)
         except Exception:
             logger.warning("Gemini subtitles did not return valid JSON. Snippet: %s", snippet)
             raise ValueError(f"Gemini subtitles did not return valid JSON. Snippet: {snippet}")
