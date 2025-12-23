@@ -16,7 +16,11 @@ from gateway.app.core.workspace import (
 )
 from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
 from gateway.app import models
-from gateway.app.services.artifact_storage import get_download_url, upload_task_artifact
+from gateway.app.services.artifact_storage import (
+    get_download_url,
+    object_exists,
+    upload_task_artifact,
+)
 from gateway.app.routers import admin_publish, publish as publish_router, tasks as tasks_router
 from gateway.routes import admin_tools
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
@@ -174,6 +178,17 @@ async def get_audio(task_id: str):
 
 @app.get("/v1/tasks/{task_id}/mm_txt")
 async def get_mm_txt(task_id: str):
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if task and task.mm_srt_path:
+            key = str(task.mm_srt_path)
+            txt_key = key[:-4] + ".txt" if key.endswith(".srt") else f"{key}.txt"
+            if object_exists(txt_key):
+                return RedirectResponse(url=get_download_url(txt_key), status_code=302)
+    finally:
+        db.close()
+
     workspace = Workspace(task_id)
     mm_srt = workspace.mm_srt_path
     mm_txt = mm_srt.with_suffix(".txt")
@@ -206,7 +221,7 @@ def _ensure_task_artifact_key(
         if not task:
             raise HTTPException(status_code=404, detail=not_found)
         existing = getattr(task, field, None)
-        if existing:
+        if existing and object_exists(str(existing)):
             return str(existing)
         if not local_path.exists():
             raise HTTPException(status_code=404, detail=not_found)

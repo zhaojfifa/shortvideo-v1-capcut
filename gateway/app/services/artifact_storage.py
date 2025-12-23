@@ -56,3 +56,15 @@ def upload_task_artifact(
 
 def get_download_url(key: str, expires_sec: int = 3600) -> str:
     return build_download_url(key, expires_sec=expires_sec)
+
+
+def object_exists(key: str) -> bool:
+    if not storage_available():
+        return False
+    client = get_s3_client()
+    bucket = get_bucket_name()
+    try:
+        client.head_object(Bucket=bucket, Key=key)
+        return True
+    except Exception:
+        return False

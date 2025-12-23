@@ -7,7 +7,11 @@ from sqlalchemy.orm import Session
 from gateway.app import models, schemas
 from gateway.app.db import get_db
 from gateway.app.core.workspace import pack_zip_path
-from gateway.app.services.artifact_storage import get_download_url, upload_task_artifact
+from gateway.app.services.artifact_storage import (
+    get_download_url,
+    object_exists,
+    upload_task_artifact,
+)
 from gateway.app.services.publish_service import publish_task_pack, resolve_download_url
 
 router = APIRouter()
@@ -37,15 +41,18 @@ def download_pack(task_id: str, db: Session = Depends(get_db)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Pack not found")
-    if not task.pack_path:
-        pack_file = pack_zip_path(task_id)
-        if not pack_file.exists():
-            raise HTTPException(status_code=404, detail="Pack not found")
-        try:
-            key = upload_task_artifact(task, pack_file, "capcut_pack.zip", task_id=task_id)
-        except RuntimeError as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
-        task.pack_path = key
-        db.commit()
-    url = get_download_url(task.pack_path)
+    if task.pack_path and object_exists(str(task.pack_path)):
+        url = get_download_url(task.pack_path)
+        return RedirectResponse(url=url, status_code=302)
+
+    pack_file = pack_zip_path(task_id)
+    if not pack_file.exists():
+        raise HTTPException(status_code=404, detail="Pack not found")
+    try:
+        key = upload_task_artifact(task, pack_file, "capcut_pack.zip", task_id=task_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    task.pack_path = key
+    db.commit()
+    url = get_download_url(key)
     return RedirectResponse(url=url, status_code=302)

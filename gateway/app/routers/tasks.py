@@ -150,12 +150,29 @@ def _task_endpoint(task_id: str, kind: str) -> Optional[str]:
 
 def _resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
     task_id = str(task.get("task_id") or task.get("id"))
-    raw_url = _task_endpoint(task_id, "raw") if task.get("raw_path") else None
-    origin_url = _task_endpoint(task_id, "origin") if task.get("origin_srt_path") else None
-    mm_url = _task_endpoint(task_id, "mm") if task.get("mm_srt_path") else None
-    audio_url = _task_endpoint(task_id, "audio") if task.get("mm_audio_path") else None
-    mm_txt_url = _task_endpoint(task_id, "mm_txt") if task.get("mm_srt_path") else None
-    pack_url = _task_endpoint(task_id, "pack") if task.get("pack_path") else None
+    workspace = Workspace(task_id)
+    raw_url = _task_endpoint(task_id, "raw") if task.get("raw_path") or workspace.raw.exists() else None
+    origin_url = (
+        _task_endpoint(task_id, "origin")
+        if task.get("origin_srt_path") or workspace.origin_srt_path.exists()
+        else None
+    )
+    mm_url = (
+        _task_endpoint(task_id, "mm")
+        if task.get("mm_srt_path") or workspace.mm_srt_path.exists()
+        else None
+    )
+    audio_url = (
+        _task_endpoint(task_id, "audio")
+        if task.get("mm_audio_path") or workspace.mm_audio_exists()
+        else None
+    )
+    mm_txt_url = _task_endpoint(task_id, "mm_txt") if mm_url else None
+    pack_url = (
+        _task_endpoint(task_id, "pack")
+        if task.get("pack_path") or pack_zip_path(task_id).exists()
+        else None
+    )
 
     return {
         "raw_path": raw_url,
