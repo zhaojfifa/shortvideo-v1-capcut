@@ -343,7 +343,7 @@
                     </div>
                     <div class="action-item">
                       <button type="button"
-                              class="link-button danger js-task-delete"
+                              class="link-button danger js-delete-task"
                               data-task-id="{{ t.task_id }}">
                         {{ delete_label }}
                       </button>
@@ -524,7 +524,7 @@
                 </div>
                 <div class="action-item">
                   <button type="button"
-                          class="link-button danger js-task-delete"
+                          class="link-button danger js-delete-task"
                           data-task-id="${t.task_id}">
                     ${DELETE_LABEL}
                   </button>
@@ -602,7 +602,7 @@
     }
 
     async function handleDeleteClick(event) {
-      const button = event.target.closest(".js-task-delete");
+      const button = event.target.closest(".js-delete-task");
       if (!button) return;
       event.preventDefault();
       const taskId = button.dataset.taskId;
@@ -635,7 +635,9 @@
       }
     }
 
-    document.addEventListener("click", handleDeleteClick);
+    if (tableBody) {
+      tableBody.addEventListener("click", handleDeleteClick);
+    }
 
     window.addEventListener("focus", () => refreshTasks());
   </script>
