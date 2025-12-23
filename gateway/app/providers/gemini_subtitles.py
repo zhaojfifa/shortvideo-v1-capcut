@@ -176,6 +176,49 @@ def extract_json_block(raw: str) -> str:
     raise ValueError("No JSON block found in Gemini response")
 
 
+def sanitize_string_literals(text: str) -> str:
+    out: list[str] = []
+    in_string = False
+    quote_char = ""
+    escape = False
+    for ch in text:
+        if in_string:
+            if escape:
+                out.append(ch)
+                escape = False
+                continue
+            if ch == "\\":
+                out.append(ch)
+                escape = True
+                continue
+            if ch == quote_char:
+                out.append(ch)
+                in_string = False
+                quote_char = ""
+                continue
+            if ch == "\n":
+                out.append("\\n")
+                continue
+            if ch == "\r":
+                out.append("\\r")
+                continue
+            if ch == "\t":
+                out.append("\\t")
+                continue
+            if ord(ch) < 0x20:
+                out.append(f"\\u{ord(ch):04x}")
+                continue
+            out.append(ch)
+            continue
+        if ch in {"'", '"'}:
+            in_string = True
+            quote_char = ch
+            out.append(ch)
+            continue
+        out.append(ch)
+    return "".join(out)
+
+
 def parse_gemini_subtitle_payload(raw_text: str) -> Any:
     """
     Fault-tolerant parser for Gemini subtitle outputs.
@@ -191,16 +234,20 @@ def parse_gemini_subtitle_payload(raw_text: str) -> Any:
         payload_text = extract_json_block(text)
     except ValueError:
         payload_text = text
+    payload_sanitized = sanitize_string_literals(payload_text)
 
     # Strategy 1: strict JSON
     try:
         return json.loads(payload_text)
     except json.JSONDecodeError:
-        pass
+        try:
+            return json.loads(payload_sanitized)
+        except json.JSONDecodeError:
+            pass
 
     # Strategy 2: Python literal (to handle single quotes/trailing commas)
     try:
-        data = ast.literal_eval(payload_text)
+        data = ast.literal_eval(payload_sanitized)
         if isinstance(data, dict):
             return data
     except Exception:
@@ -210,13 +257,14 @@ def parse_gemini_subtitle_payload(raw_text: str) -> Any:
     fixed = re.sub(
         r"(?P<q>')(?P<key>[a-zA-Z_][a-zA-Z0-9_]*)'(?=\s*:)",
         r'"\g<key>"',
-        payload_text,
+        payload_sanitized,
     )
     fixed = re.sub(
         r"':\s*'([^']*)'",
         lambda m: '": "{}"'.format(m.group(1).replace('"', '\\"')),
         fixed,
     )
+    fixed = sanitize_string_literals(fixed)
     try:
         return json.loads(fixed)
     except Exception:

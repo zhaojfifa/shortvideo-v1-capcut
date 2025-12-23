@@ -146,10 +146,10 @@ def resolve_download_url(task: models.Task) -> str:
         p = Path(task.publish_key)
         try:
             rel = relative_to_workspace(p)
-            return f"/files/{rel}"
+            return f"/v1/tasks/{task.id}/pack"
         except Exception:
             pass
 
     if task.pack_path:
-        return f"/files/{task.pack_path}"
+        return f"/v1/tasks/{task.id}/pack"
     return ""

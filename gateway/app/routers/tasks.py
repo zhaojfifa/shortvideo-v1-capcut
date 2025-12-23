@@ -4,11 +4,12 @@ import asyncio
 import logging
 import os
 import re
+from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pydantic import BaseModel
 from ..config import get_settings
 from ..core.features import get_features
@@ -26,6 +27,9 @@ from ..schemas import (
 )
 from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
+from gateway.app.services.artifact_storage import upload_task_artifact
+from gateway.app.services.artifact_storage import get_download_url, get_object_bytes, object_exists
+from gateway.app.services.task_cleanup import delete_task_record, purge_task_artifacts
 from ..services.steps_v1 import (
     run_dub_step,
     run_pack_step,
@@ -38,7 +42,6 @@ from ..core.workspace import (
     pack_zip_path,
     raw_path,
     relative_to_workspace,
-    translated_srt_path,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,6 +70,26 @@ def _infer_platform_from_url(url: str) -> Optional[str]:
     return None
 
 
+def _is_storage_key(value: Optional[str]) -> bool:
+    if not value:
+        return False
+    lowered = value.lower()
+    return lowered.startswith(("http://", "https://", "s3://", "r2://"))
+
+
+def _pack_path_for_list(task: dict) -> Optional[str]:
+    task_id = str(task.get("task_id") or task.get("id") or "")
+    pack_path = task.get("pack_path")
+    if pack_path:
+        pack_path = str(pack_path)
+        if pack_path.startswith(("pack/", "published/")) and not _is_storage_key(pack_path):
+            return pack_path
+    pack_file = pack_zip_path(task_id)
+    if pack_file.exists():
+        return relative_to_workspace(pack_file)
+    return None
+
+
 @pages_router.get("/tasks", response_class=HTMLResponse)
 async def tasks_page(
     request: Request,
@@ -89,7 +112,7 @@ async def tasks_page(
                 "content_lang": t.get("content_lang") or "",
                 "status": t.get("status") or "pending",
                 "created_at": t.get("created_at") or "",
-                "pack_path": str(t.get("pack_path")) if t.get("pack_path") else None,
+                "pack_path": _pack_path_for_list(t),
                 "ui_lang": t.get("ui_lang") or "",
             }
         )
@@ -110,62 +133,150 @@ async def tasks_new(request: Request) -> HTMLResponse:
     )
 
 
-def _resolve_paths(task: dict) -> dict[str, Optional[str]]:
+@pages_router.get("/v1/tasks/{task_id}/raw")
+def download_raw(task_id: str, repo=Depends(get_task_repository)):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="raw video not found")
+    key = _require_storage_key(task, "raw_path", "raw video not found")
+    return RedirectResponse(url=get_download_url(key), status_code=302)
+
+
+@pages_router.get("/v1/tasks/{task_id}/subs_origin")
+def download_origin_subs(
+    task_id: str,
+    inline: bool = Query(default=False),
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="origin subtitles not found")
+    key = _require_storage_key(task, "origin_srt_path", "origin subtitles not found")
+    return _text_or_redirect(key, inline=inline)
+
+
+@pages_router.get("/v1/tasks/{task_id}/subs_mm")
+def download_mm_subs(
+    task_id: str,
+    inline: bool = Query(default=False),
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="burmese subtitles not found")
+    key = _require_storage_key(task, "mm_srt_path", "burmese subtitles not found")
+    return _text_or_redirect(key, inline=inline)
+
+
+@pages_router.get("/v1/tasks/{task_id}/mm_txt")
+def download_mm_txt(
+    task_id: str,
+    inline: bool = Query(default=False),
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="mm txt not found")
+    mm_key = _require_storage_key(task, "mm_srt_path", "mm txt not found")
+    txt_key = mm_key[:-4] + ".txt" if mm_key.endswith(".srt") else f"{mm_key}.txt"
+    if not object_exists(txt_key):
+        raise HTTPException(status_code=404, detail="mm txt not found")
+    return _text_or_redirect(txt_key, inline=inline)
+
+
+@pages_router.get("/v1/tasks/{task_id}/audio_mm")
+def download_audio_mm(task_id: str, repo=Depends(get_task_repository)):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="dubbed audio not found")
+    key = _require_storage_key(task, "mm_audio_path", "dubbed audio not found")
+    return RedirectResponse(url=get_download_url(key), status_code=302)
+
+
+@pages_router.get("/v1/tasks/{task_id}/pack")
+def download_pack(task_id: str, repo=Depends(get_task_repository)):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Pack not found")
+    key = _require_storage_key(task, "pack_path", "Pack not found")
+    return RedirectResponse(url=get_download_url(key), status_code=302)
+
+
+def _task_endpoint(task_id: str, kind: str) -> Optional[str]:
+    safe_id = str(task_id)
+    if kind == "raw":
+        return f"/v1/tasks/{safe_id}/raw"
+    if kind == "origin":
+        return f"/v1/tasks/{safe_id}/subs_origin"
+    if kind == "mm":
+        return f"/v1/tasks/{safe_id}/subs_mm"
+    if kind == "mm_txt":
+        return f"/v1/tasks/{safe_id}/mm_txt"
+    if kind == "audio":
+        return f"/v1/tasks/{safe_id}/audio_mm"
+    if kind == "pack":
+        return f"/v1/tasks/{safe_id}/pack"
+    return None
+
+
+def _task_key(task: dict, field: str) -> Optional[str]:
+    value = task.get(field)
+    return str(value) if value else None
+
+
+def _require_storage_key(task: dict, field: str, not_found: str) -> str:
+    key = _task_key(task, field)
+    if not key or not object_exists(key):
+        raise HTTPException(status_code=404, detail=not_found)
+    return key
+
+
+def _text_or_redirect(key: str, inline: bool) -> Response:
+    if inline:
+        data = get_object_bytes(key)
+        if data is None:
+            raise HTTPException(status_code=404, detail="artifact not found")
+        return Response(content=data, media_type="text/plain; charset=utf-8")
+    return RedirectResponse(url=get_download_url(key), status_code=302)
+
+
+def _resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
     task_id = str(task.get("task_id") or task.get("id"))
-    workspace = Workspace(task_id)
-
-    # Prefer stored DB paths; otherwise expose workspace-relative paths if files exist.
-    raw_video = task.get("raw_path") or None
-    if not raw_video and workspace.raw.exists():
-        raw_video = relative_to_workspace(workspace.raw)
-
-    origin_srt = translated_srt = None
-    origin_srt = task.get("origin_srt_path")
-    translated_srt = task.get("mm_srt_path")
-
-    # Fall back to workspace artifacts when present.
-    if not origin_srt:
-        path = origin_srt_path(task_id)
-        if path.exists():
-            origin_srt = relative_to_workspace(path)
-    if not translated_srt:
-        path = workspace.mm_srt_path
-        if path.exists():
-            translated_srt = relative_to_workspace(path)
-
-    mm_audio = task.get("mm_audio_path") or None
-    if workspace.mm_audio_exists():
-        from ..core.workspace import ensure_public_audio
-
-        ensure_public_audio(workspace.mm_audio_path)
-        if not mm_audio:
-            mm_audio = f"audio/{workspace.mm_audio_path.name}"
-
-    mm_txt = None
-    mm_srt_path = workspace.mm_srt_path
-    if mm_srt_path.exists():
-        mm_txt_path = mm_srt_path.with_suffix(".txt")
-        if mm_txt_path.exists():
-            mm_txt = relative_to_workspace(mm_txt_path)
-
-    pack_path = task.get("pack_path") or None
-    if not pack_path:
-        pack = pack_zip_path(task_id)
-        if pack.exists():
-            pack_path = relative_to_workspace(pack)
+    raw_url = _task_endpoint(task_id, "raw") if task.get("raw_path") else None
+    origin_url = (
+        _task_endpoint(task_id, "origin")
+        if task.get("origin_srt_path")
+        else None
+    )
+    mm_url = (
+        _task_endpoint(task_id, "mm")
+        if task.get("mm_srt_path")
+        else None
+    )
+    audio_url = (
+        _task_endpoint(task_id, "audio")
+        if task.get("mm_audio_path")
+        else None
+    )
+    mm_txt_url = _task_endpoint(task_id, "mm_txt") if mm_url else None
+    pack_url = (
+        _task_endpoint(task_id, "pack")
+        if task.get("pack_path")
+        else None
+    )
 
     return {
-        "raw_path": raw_video,
-        "origin_srt_path": origin_srt,
-        "mm_srt_path": translated_srt,
-        "mm_audio_path": mm_audio,
-        "mm_txt_path": mm_txt,
-        "pack_path": pack_path,
+        "raw_path": raw_url,
+        "origin_srt_path": origin_url,
+        "mm_srt_path": mm_url,
+        "mm_audio_path": audio_url,
+        "mm_txt_path": mm_txt_url,
+        "pack_path": pack_url,
     }
 
 
 def _task_to_detail(task: dict) -> TaskDetail:
-    paths = _resolve_paths(task)
+    paths = _resolve_download_urls(task)
     status = task.get("status") or "pending"
     if status != "error" and paths["pack_path"]:
         status = "ready"
@@ -220,16 +331,6 @@ def _extract_first_http_url(text: str | None) -> str | None:
     return match.group(0) if match else None
 
 
-@pages_router.get("/v1/tasks/{task_id}/mm_txt")
-def get_mm_txt(task_id: str):
-    workspace = Workspace(task_id)
-    mm_srt = workspace.mm_srt_path
-    mm_txt = mm_srt.with_suffix(".txt")
-    if not mm_txt.exists():
-        raise HTTPException(status_code=404, detail="artifact not found: mm_txt")
-    return FileResponse(mm_txt, media_type="text/plain", filename=mm_txt.name)
-
-
 def _repo_upsert(repo, task_id: str, patch: dict) -> None:
     repo.upsert(task_id, patch)
 
@@ -261,7 +362,9 @@ def _run_pipeline_background(task_id: str, repo) -> None:
         )
         parse_res = asyncio.run(run_parse_step(parse_req))
         raw_file = raw_path(task_id)
-        raw_rel = relative_to_workspace(raw_file) if raw_file.exists() else None
+        raw_key = None
+        if raw_file.exists():
+            raw_key = upload_task_artifact(task, raw_file, "raw.mp4", task_id=task_id)
         duration_sec = parse_res.get("duration_sec") if isinstance(parse_res, dict) else None
         _repo_upsert(
             repo,
@@ -269,7 +372,7 @@ def _run_pipeline_background(task_id: str, repo) -> None:
             {
                 **status_update,
                 "last_step": current_step,
-                "raw_path": raw_rel,
+                "raw_path": raw_key,
                 "duration_sec": duration_sec,
             },
         )
@@ -285,24 +388,27 @@ def _run_pipeline_background(task_id: str, repo) -> None:
         )
         asyncio.run(run_subtitles_step(subs_req))
         workspace = Workspace(task_id)
-        origin_rel = (
-            relative_to_workspace(workspace.origin_srt_path)
+        origin_key = (
+            upload_task_artifact(task, workspace.origin_srt_path, "origin.srt", task_id=task_id)
             if workspace.origin_srt_path.exists()
             else None
         )
-        mm_rel = (
-            relative_to_workspace(workspace.mm_srt_path)
+        mm_key = (
+            upload_task_artifact(task, workspace.mm_srt_path, "mm.srt", task_id=task_id)
             if workspace.mm_srt_path.exists()
             else None
         )
+        mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
+        if mm_txt_path.exists():
+            upload_task_artifact(task, mm_txt_path, "mm.txt", task_id=task_id)
         _repo_upsert(
             repo,
             task_id,
             {
                 **status_update,
                 "last_step": current_step,
-                "origin_srt_path": origin_rel,
-                "mm_srt_path": mm_rel,
+                "origin_srt_path": origin_key,
+                "mm_srt_path": mm_key,
             },
         )
 
@@ -315,18 +421,17 @@ def _run_pipeline_background(task_id: str, repo) -> None:
             target_lang=target_lang,
         )
         asyncio.run(run_dub_step(dub_req))
-        audio_rel = (
-            relative_to_workspace(workspace.mm_audio_path)
-            if workspace.mm_audio_exists()
-            else None
-        )
+        audio_key = None
+        if workspace.mm_audio_exists():
+            audio_path = workspace.mm_audio_path
+            audio_key = upload_task_artifact(task, audio_path, "mm_audio.mp3", task_id=task_id)
         _repo_upsert(
             repo,
             task_id,
             {
                 **status_update,
                 "last_step": current_step,
-                "mm_audio_path": audio_rel,
+                "mm_audio_path": audio_key,
             },
         )
 
@@ -335,14 +440,16 @@ def _run_pipeline_background(task_id: str, repo) -> None:
         pack_req = PackRequest(task_id=task_id)
         asyncio.run(run_pack_step(pack_req))
         pack_file = pack_zip_path(task_id)
-        pack_path = relative_to_workspace(pack_file) if pack_file.exists() else None
+        pack_key = None
+        if pack_file.exists():
+            pack_key = upload_task_artifact(task, pack_file, "capcut_pack.zip", task_id=task_id)
         _repo_upsert(
             repo,
             task_id,
             {
                 "status": "done",
                 "last_step": current_step,
-                "pack_path": pack_path,
+                "pack_path": pack_key,
                 "error_message": None,
                 "error_reason": None,
             },
@@ -392,7 +499,7 @@ async def task_workbench_page(
     except Exception:
         env_summary["defaults"] = {}
 
-    paths = _resolve_paths(task)
+    paths = _resolve_download_urls(task)
     detail = _task_to_detail(task)
     task_json = {
         "task_id": detail.task_id,
@@ -502,7 +609,8 @@ def list_tasks(
 
     summaries: list[TaskSummary] = []
     for t in items:
-        pack_path = str(t.get("pack_path")) if t.get("pack_path") else None
+        download_paths = _resolve_download_urls(t)
+        pack_path = download_paths.get("pack_path")
         status = t.get("status") or "pending"
         if status != "error" and pack_path:
             status = "ready"
@@ -584,10 +692,14 @@ def rerun_dub(
     except DubbingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    audio_key = None
+    audio_path = result.get("path")
+    if audio_path:
+        audio_key = upload_task_artifact(task, Path(audio_path), "mm_audio.mp3", task_id=task_id)
     repo.update(
         task_id,
         {
-            "mm_audio_path": result.get("audio_path"),
+            "mm_audio_path": audio_key,
             "dub_provider": provider,
         },
     )
@@ -604,6 +716,34 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
         raise HTTPException(status_code=404, detail="Task not found")
 
     return _task_to_detail(t)
+
+
+@api_router.delete("/tasks/{task_id}")
+def delete_task(
+    task_id: str,
+    delete_assets: bool = Query(default=False),
+    repo=Depends(get_task_repository),
+):
+    """Delete a task record and optionally purge stored artifacts."""
+
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if delete_assets:
+        try:
+            purged = purge_task_artifacts(task)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Asset purge failed: {exc}") from exc
+    else:
+        purged = 0
+
+    try:
+        delete_task_record(task)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Delete failed: {exc}") from exc
+
+    return {"ok": True, "task_id": task_id, "deleted_assets": bool(delete_assets), "purged": purged}
 
 
 # Backwards-compatible export for existing imports
