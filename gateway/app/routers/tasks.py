@@ -725,7 +725,26 @@ def list_tasks(
 def get_task_text(
     task_id: str,
     kind: str = Query(default=..., pattern="^(origin_srt|mm_txt|mm_srt|mm_edited)$"),
+    repo=Depends(get_task_repository),
 ):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="task not found")
+
+    if kind == "mm_edited":
+        path = _mm_edited_path(task_id)
+        if not path.exists():
+            return PlainTextResponse(
+                "",
+                status_code=200,
+                headers={"X-Text-Exists": "0"},
+            )
+        return PlainTextResponse(
+            path.read_text(encoding="utf-8"),
+            status_code=200,
+            headers={"X-Text-Exists": "1"},
+        )
+
     path = _resolve_text_path(task_id, kind)
     if not path:
         raise HTTPException(status_code=404, detail=f"{kind} not found")
