@@ -132,6 +132,41 @@ curl -X POST "http://127.0.0.1:8000/v1/pack" \
   -d '{"task_id":"dy_demo_v1"}'
 ```
 
+## Phase0 下载与删除验证（curl）
+
+```bash
+# 创建任务
+curl -X POST "http://127.0.0.1:8000/api/tasks" \
+  -H "Content-Type: application/json" \
+  -d '{"source_url":"https://www.douyin.com/video/7578478453415851707"}'
+
+# 执行 pipeline（parse/subtitles/dub/pack）
+curl -X POST "http://127.0.0.1:8000/v1/parse" \
+  -H "Content-Type: application/json" \
+  -d '{"task_id":"dy_demo_v1","platform":"douyin","link":"https://www.douyin.com/video/7578478453415851707"}'
+curl -X POST "http://127.0.0.1:8000/v1/subtitles" \
+  -H "Content-Type: application/json" \
+  -d '{"task_id":"dy_demo_v1"}'
+curl -X POST "http://127.0.0.1:8000/v1/dub" \
+  -H "Content-Type: application/json" \
+  -d '{"task_id":"dy_demo_v1"}'
+curl -X POST "http://127.0.0.1:8000/v1/pack" \
+  -H "Content-Type: application/json" \
+  -d '{"task_id":"dy_demo_v1"}'
+
+# 下载端点应返回 302（Location 头）
+curl -I "http://127.0.0.1:8000/v1/tasks/dy_demo_v1/raw"
+curl -I "http://127.0.0.1:8000/v1/tasks/dy_demo_v1/subs_origin"
+curl -I "http://127.0.0.1:8000/v1/tasks/dy_demo_v1/subs_mm"
+curl -I "http://127.0.0.1:8000/v1/tasks/dy_demo_v1/mm_txt"
+curl -I "http://127.0.0.1:8000/v1/tasks/dy_demo_v1/audio_mm"
+curl -I "http://127.0.0.1:8000/v1/tasks/dy_demo_v1/pack"
+
+# 删除任务并验证列表中已删除
+curl -X DELETE "http://127.0.0.1:8000/api/tasks/dy_demo_v1?delete_assets=1"
+curl "http://127.0.0.1:8000/api/tasks?limit=5"
+```
+
 ## Admin Tools（Provider 配置）
 
 访问 `/admin/tools` 查看与更新默认 provider（parse/subtitles/dub/pack/face_swap）。页面会列出可用 provider 并允许启用/禁用。
