@@ -282,6 +282,49 @@ def sanitize_string_literals(text: str) -> str:
     return "".join(out)
 
 
+def sanitize_string_literals(text: str) -> str:
+    out: list[str] = []
+    in_string = False
+    quote_char = ""
+    escape = False
+    for ch in text:
+        if in_string:
+            if escape:
+                out.append(ch)
+                escape = False
+                continue
+            if ch == "\\":
+                out.append(ch)
+                escape = True
+                continue
+            if ch == quote_char:
+                out.append(ch)
+                in_string = False
+                quote_char = ""
+                continue
+            if ch == "\n":
+                out.append("\\n")
+                continue
+            if ch == "\r":
+                out.append("\\r")
+                continue
+            if ch == "\t":
+                out.append("\\t")
+                continue
+            if ord(ch) < 0x20:
+                out.append(f"\\u{ord(ch):04x}")
+                continue
+            out.append(ch)
+            continue
+        if ch in {"'", '"'}:
+            in_string = True
+            quote_char = ch
+            out.append(ch)
+            continue
+        out.append(ch)
+    return "".join(out)
+
+
 def parse_gemini_subtitle_payload(raw_text: str) -> Any:
     """
     Fault-tolerant parser for Gemini subtitle outputs.
