@@ -173,6 +173,8 @@
       </div>
 
       <div class="table-wrapper">
+        {% set delete_label_primary = t_primary("delete") %}
+        {% set delete_label = delete_label_primary if delete_label_primary != "delete" else "Delete" %}
         <table class="tasks-table">
           <thead>
             <tr>
@@ -340,7 +342,11 @@
                       {% endif %}
                     </div>
                     <div class="action-item">
-                      <button class="link-button danger js-task-delete" data-task-id="{{ t.task_id }}" type="button">Delete</button>
+                      <button type="button"
+                              class="link-button danger js-delete-task"
+                              data-task-id="{{ t.task_id }}">
+                        {{ delete_label }}
+                      </button>
                     </div>
                     <div class="action-item">
                       <a href="/api/tasks/{{ t.task_id }}" target="_blank" rel="noopener">{{ t_primary("json") }}</a>
@@ -394,6 +400,7 @@
       primary: "{{ t_primary('task_count') }}",
       secondary: "{{ t_secondary('task_count') }}",
     };
+    const DELETE_LABEL = "{{ delete_label }}";
 
     function statusBadgeClass(status) {
       if (status === "ready") return "badge badge-ready";
@@ -516,7 +523,11 @@
                   ${showSecondary ? `<span class="secondary">{{ t_secondary("open") }}</span>` : ""}
                 </div>
                 <div class="action-item">
-                  <button class="link-button danger js-task-delete" data-task-id="${t.task_id}" type="button">Delete</button>
+                  <button type="button"
+                          class="link-button danger js-delete-task"
+                          data-task-id="${t.task_id}">
+                    ${DELETE_LABEL}
+                  </button>
                 </div>
                 <div class="action-item">
                   <a href="/api/tasks/${t.task_id}" target="_blank" rel="noopener">{{ t_primary("json") }}</a>
@@ -591,7 +602,7 @@
     }
 
     async function handleDeleteClick(event) {
-      const button = event.target.closest(".js-task-delete");
+      const button = event.target.closest(".js-delete-task");
       if (!button) return;
       event.preventDefault();
       const taskId = button.dataset.taskId;
@@ -617,19 +628,16 @@
         }
       } catch (err) {
         console.error(err);
-        if (countPrimaryEl) {
-          countPrimaryEl.textContent = `Delete failed: ${err.message}`;
-        }
-        if (countSecondaryEl) {
-          countSecondaryEl.textContent = "";
-        }
+        window.alert(`Delete failed: ${err.message}`);
       } finally {
         button.disabled = false;
         button.textContent = originalText;
       }
     }
 
-    document.addEventListener("click", handleDeleteClick);
+    if (tableBody) {
+      tableBody.addEventListener("click", handleDeleteClick);
+    }
 
     window.addEventListener("focus", () => refreshTasks());
   </script>
