@@ -309,9 +309,9 @@
                 </td>
                 <td data-label="{{ t_primary('created') }} / {{ t_secondary('created') }}">{{ t.created_at }}</td>
                 <td data-label="{{ t_primary('pack') }} / {{ t_secondary('pack') }}">
-                  {% if features.allow_pack_download and t.pack_path %}
+                  {% if features.allow_pack_download %}
                     <div class="action-item">
-                      <a href="/files/{{ t.pack_path }}" target="_blank" rel="noopener">{{ t_primary("download") }}</a>
+                      <a href="/v1/tasks/{{ t.task_id }}/pack" target="_blank" rel="noopener">{{ t_primary("download") }}</a>
                       {% if ui_show_secondary %}
                         <span class="secondary">{{ t_secondary("download") }}</span>
                       {% endif %}
@@ -488,9 +488,9 @@
             </td>
             <td data-label="${LABELS.created}">${t.created_at || ""}</td>
             <td data-label="${LABELS.pack}">${
-              (allowPackDownload && t.pack_path)
+              (allowPackDownload)
                 ? `<div class="action-item">
-                    <a href="/files/${t.pack_path}" target="_blank" rel="noopener">{{ t_primary("download") }}</a>
+                    <a href="/v1/tasks/${t.task_id}/pack" target="_blank" rel="noopener">{{ t_primary("download") }}</a>
                     ${showSecondary ? `<span class="secondary">{{ t_secondary("download") }}</span>` : ""}
                   </div>`
                 : "–"
@@ -556,7 +556,12 @@
         }
       } catch (err) {
         console.error(err);
-        countEl.textContent = `Failed to load tasks: ${err.message}`;
+        if (countPrimaryEl) {
+          countPrimaryEl.textContent = `Failed to load tasks: ${err.message}`;
+        }
+        if (countSecondaryEl) {
+          countSecondaryEl.textContent = "";
+        }
       }
     }
 
