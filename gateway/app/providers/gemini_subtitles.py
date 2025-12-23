@@ -222,11 +222,6 @@ def extract_json_block(raw: str) -> str:
 
     raise ValueError("No complete JSON object found in Gemini response")
 
-Input:
-{raw_text}
-""".strip()
-    resp_json = _call_gemini(prompt)
-    return _extract_text(resp_json)
 
 
 def _repair_json_with_gemini(broken: str, timeout: int = 60) -> str:
