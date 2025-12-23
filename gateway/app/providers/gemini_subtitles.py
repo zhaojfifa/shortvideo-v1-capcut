@@ -314,86 +314,35 @@ def parse_gemini_subtitle_payload(raw_text: str) -> Any:
 
 
 
-def translate_and_segment_with_gemini(
-    origin_srt_text: str,
-    target_lang: str = "my",
-) -> Dict[str, Any]:
-    """
-    使用 Gemini 把 SRT 字幕翻译成缅甸语，并做场景分段。
+diff --git a/gateway/app/providers/gemini_subtitles.py b/gateway/app/providers/gemini_subtitles.py
+index 1111111..2222222 100644
+--- a/gateway/app/providers/gemini_subtitles.py
++++ b/gateway/app/providers/gemini_subtitles.py
+@@ -1,20 +1,16 @@
+ def translate_and_segment_with_gemini(
+     origin_srt_text: str,
+     target_lang: str = "my",
+ ) -> Dict[str, Any]:
+-    """
+-    使用 Gemini 把 SRT 字幕翻译成缅甸语，并做场景分段。
+-
+-    返回结构：
+-    {
+-      "language": "<source_language_code>",
+-      "segments": [...],
+-      "scenes": [...]
+-    }
+-    """
++    # Use Gemini to translate SRT subtitles to Burmese and provide scene segmentation.
++    # Expected return schema:
++    # {
++    #   "language": "<source_language_code>",
++    #   "segments": [...],
++    #   "scenes": [...]
++    # }
+     prompt = f"""
+ You are a subtitle translator and scene segmenter for short social videos.
 
-    返回结构：
-    {
-      "language": "<source_language_code>",
-      "segments": [...],
-      "scenes": [...]
-    }
-    """
-    prompt = f"""
-You are a subtitle translator and scene segmenter for short social videos.
-
-The input subtitles are in SRT format (original language).
-Translate them to the target language "{target_lang}" (Burmese)
-and also provide scene segmentation.
-
-Return ONLY valid JSON with this exact shape:
-
-{{
-  "language": "<source_language_code>",
-  "segments": [
-    {{
-      "index": 1,
-      "start": 0.0,
-      "end": 2.5,
-      "origin": "original text",
-      "mm": "Burmese text",
-      "scene_id": 1
-    }}
-  ],
-  "scenes": [
-    {{
-      "scene_id": 1,
-      "start": 0.0,
-      "end": 5.0,
-      "title": "concise original scene title",
-      "mm_title": "Burmese title"
-    }}
-  ]
-}}
-
-Rules:
-- Keep segments in original SRT order; timestamps are in seconds.
-- Make timestamps monotonic and non-overlapping.
-- Keep translations concise and natural.
-- If unsure about a scene title, keep it short or leave it empty.
-- All property names must be in double quotes; response must be strict JSON.
-- Do not include trailing commas or comments.
-- The response must be valid JSON that Python json.loads can parse.
-- Respond with JSON only. Do NOT add explanations, backticks, or code fences.
-
-    Here are the subtitles to process (SRT):
-
-{origin_srt_text}
-""".strip()
-
-    # 1) 调用 Gemini
-    resp_json = _call_gemini(prompt)
-    raw_text = _extract_text(resp_json)
-    data = parse_gemini_subtitle_payload(raw_text)
-
-    # 3) 做一点点 schema 校验，避免后续逻辑踩坑
-    if not isinstance(data, dict):
-        raise GeminiSubtitlesError("Gemini subtitles JSON root must be an object")
-
-    language = data.get("language")
-    if not isinstance(language, str):
-        raise GeminiSubtitlesError("Gemini subtitles JSON must include a language code")
-
-    if "segments" not in data or "scenes" not in data:
-        raise GeminiSubtitlesError(
-            "Gemini subtitles JSON must contain 'segments' and 'scenes'"
-        )
-
-    return data
 
 
 def transcribe_translate_and_segment_with_gemini(
