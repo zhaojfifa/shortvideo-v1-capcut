@@ -48,8 +48,8 @@ def translate_subtitles_to_burmese(task_id: str, origin_srt: Path) -> Path:
     burmese_path = subs_dir() / f"{task_id}_mm.srt"
     origin_content = origin_srt.read_text(encoding="utf-8")
     prompt = (
-        "你是一名专业的字幕翻译。请将以下 SRT 内容翻译成缅甸语，"
-        "保持 SRT 时间戳和序号格式不变，只翻译文本内容。"
+        "You are a professional subtitle translator. Please translate the following SRT content into Burmese,
+keeping the SRT timestamps and sequence numbers unchanged—translate only the text content."
     )
     completion = client.chat.completions.create(
         model=config.GPT_MODEL,
