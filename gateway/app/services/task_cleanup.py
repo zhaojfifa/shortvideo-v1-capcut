@@ -82,10 +82,8 @@ def delete_task_record(task: dict) -> None:
 
 def purge_task_artifacts(task: dict) -> int:
     task_id = _task_id_from_payload(task)
-    tenant = _tenant_from_payload(task)
-    category = _category_from_payload(task)
-    prefix = f"{tenant}/{category}/{task_id}/"
-    if len(prefix) < 6 or prefix.count("/") < 3:
+    prefix = f"tasks/{task_id}/"
+    if len(prefix) < 10 or prefix.count("/") < 2:
         raise ValueError("Refusing to purge: invalid prefix")
     client = get_s3_client()
     bucket = get_bucket_name()

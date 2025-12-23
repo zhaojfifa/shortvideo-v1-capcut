@@ -20,9 +20,7 @@ def _task_value(task: Any, key: str) -> Optional[str]:
 
 def task_storage_prefix(task: Any, task_id: Optional[str] = None) -> str:
     resolved_id = task_id or _task_value(task, "task_id") or _task_value(task, "id") or "unknown"
-    tenant = _task_value(task, "tenant") or _task_value(task, "account_id") or "default"
-    category = _task_value(task, "category_key") or _task_value(task, "category") or "unknown"
-    return f"{tenant}/{category}/{resolved_id}"
+    return f"tasks/{resolved_id}"
 
 
 def artifact_key(task: Any, filename: str, task_id: Optional[str] = None) -> str:
