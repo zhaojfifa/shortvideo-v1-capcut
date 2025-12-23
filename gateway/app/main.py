@@ -6,10 +6,17 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from gateway.app.core.workspace import workspace_root
+from gateway.app.core.workspace import (
+    Workspace,
+    origin_srt_path,
+    pack_zip_path,
+    raw_path,
+    translated_srt_path,
+    workspace_root,
+)
 from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
 from gateway.app import models
-from gateway.app.services.artifact_storage import get_download_url
+from gateway.app.services.artifact_storage import get_download_url, upload_task_artifact
 from gateway.app.routers import admin_publish, publish as publish_router, tasks as tasks_router
 from gateway.routes import admin_tools
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
@@ -103,15 +110,14 @@ async def parse(request: ParseRequest):
 
 @app.get("/v1/tasks/{task_id}/raw")
 async def get_raw(task_id: str):
-    db = SessionLocal()
-    try:
-        task = db.query(models.Task).filter(models.Task.id == task_id).first()
-        if not task or not task.raw_path:
-            raise HTTPException(status_code=404, detail="raw video not found")
-        url = get_download_url(task.raw_path)
-    finally:
-        db.close()
-    return RedirectResponse(url=url, status_code=302)
+    key = _ensure_task_artifact_key(
+        task_id=task_id,
+        field="raw_path",
+        local_path=raw_path(task_id),
+        filename="raw.mp4",
+        not_found="raw video not found",
+    )
+    return RedirectResponse(url=get_download_url(key), status_code=302)
 
 
 @app.post("/v1/subtitles")
@@ -121,28 +127,29 @@ async def subtitles(request: SubtitlesRequest):
 
 @app.get("/v1/tasks/{task_id}/subs_origin")
 async def get_origin_subs(task_id: str):
-    db = SessionLocal()
-    try:
-        task = db.query(models.Task).filter(models.Task.id == task_id).first()
-        if not task or not task.origin_srt_path:
-            raise HTTPException(status_code=404, detail="origin subtitles not found")
-        url = get_download_url(task.origin_srt_path)
-    finally:
-        db.close()
-    return RedirectResponse(url=url, status_code=302)
+    key = _ensure_task_artifact_key(
+        task_id=task_id,
+        field="origin_srt_path",
+        local_path=origin_srt_path(task_id),
+        filename="origin.srt",
+        not_found="origin subtitles not found",
+    )
+    return RedirectResponse(url=get_download_url(key), status_code=302)
 
 
 @app.get("/v1/tasks/{task_id}/subs_mm")
 async def get_mm_subs(task_id: str):
-    db = SessionLocal()
-    try:
-        task = db.query(models.Task).filter(models.Task.id == task_id).first()
-        if not task or not task.mm_srt_path:
-            raise HTTPException(status_code=404, detail="burmese subtitles not found")
-        url = get_download_url(task.mm_srt_path)
-    finally:
-        db.close()
-    return RedirectResponse(url=url, status_code=302)
+    mm_path = translated_srt_path(task_id, "my")
+    if not mm_path.exists():
+        mm_path = translated_srt_path(task_id, "mm")
+    key = _ensure_task_artifact_key(
+        task_id=task_id,
+        field="mm_srt_path",
+        local_path=mm_path,
+        filename="mm.srt",
+        not_found="burmese subtitles not found",
+    )
+    return RedirectResponse(url=get_download_url(key), status_code=302)
 
 
 @app.post("/v1/dub")
@@ -152,36 +159,83 @@ async def dub(request: DubRequest):
 
 @app.get("/v1/tasks/{task_id}/audio_mm")
 async def get_audio(task_id: str):
-    db = SessionLocal()
-    try:
-        task = db.query(models.Task).filter(models.Task.id == task_id).first()
-        if not task or not task.mm_audio_path:
-            raise HTTPException(status_code=404, detail="dubbed audio not found")
-        url = get_download_url(task.mm_audio_path)
-    finally:
-        db.close()
-    return RedirectResponse(url=url, status_code=302)
+    workspace = Workspace(task_id)
+    audio_path = workspace.mm_audio_path
+    filename = f"mm_audio{audio_path.suffix or '.wav'}"
+    key = _ensure_task_artifact_key(
+        task_id=task_id,
+        field="mm_audio_path",
+        local_path=audio_path,
+        filename=filename,
+        not_found="dubbed audio not found",
+    )
+    return RedirectResponse(url=get_download_url(key), status_code=302)
 
 
 @app.get("/v1/tasks/{task_id}/mm_txt")
 async def get_mm_txt(task_id: str):
-    db = SessionLocal()
-    try:
-        task = db.query(models.Task).filter(models.Task.id == task_id).first()
-        if not task or not task.mm_srt_path:
-            raise HTTPException(status_code=404, detail="mm txt not found")
-        key = str(task.mm_srt_path)
-        if key.endswith(".srt"):
-            key = key[:-4] + ".txt"
-        else:
-            key = f"{key}.txt"
-        url = get_download_url(key)
-    finally:
-        db.close()
-    return RedirectResponse(url=url, status_code=302)
+    workspace = Workspace(task_id)
+    mm_srt = workspace.mm_srt_path
+    mm_txt = mm_srt.with_suffix(".txt")
+    if not mm_txt.exists():
+        raise HTTPException(status_code=404, detail="mm txt not found")
+    key = _ensure_task_loose_artifact_key(
+        task_id=task_id,
+        local_path=mm_txt,
+        filename="mm.txt",
+    )
+    return RedirectResponse(url=get_download_url(key), status_code=302)
 
 
 @app.post("/v1/pack")
 async def pack(request: PackRequest):
     result = await run_pack_step(request)
     return result
+
+
+def _ensure_task_artifact_key(
+    task_id: str,
+    field: str,
+    local_path: Path,
+    filename: str,
+    not_found: str,
+) -> str:
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail=not_found)
+        existing = getattr(task, field, None)
+        if existing:
+            return str(existing)
+        if not local_path.exists():
+            raise HTTPException(status_code=404, detail=not_found)
+        key = upload_task_artifact(task, local_path, filename, task_id=task_id)
+        setattr(task, field, key)
+        db.commit()
+        return key
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    finally:
+        db.close()
+
+
+def _ensure_task_loose_artifact_key(
+    task_id: str,
+    local_path: Path,
+    filename: str,
+) -> str:
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="task not found")
+        if not local_path.exists():
+            raise HTTPException(status_code=404, detail="artifact not found")
+        key = upload_task_artifact(task, local_path, filename, task_id=task_id)
+        db.commit()
+        return key
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    finally:
+        db.close()
