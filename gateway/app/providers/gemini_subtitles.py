@@ -18,6 +18,9 @@ GEMINI_BASE_URL = os.getenv(
     "https://generativelanguage.googleapis.com/v1beta",
 )
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MAX_OUTPUT_TOKENS = os.getenv("GEMINI_MAX_OUTPUT_TOKENS")
+GEMINI_TEMPERATURE = os.getenv("GEMINI_TEMPERATURE")
+GEMINI_CANDIDATE_COUNT = os.getenv("GEMINI_CANDIDATE_COUNT")
 
 
 class GeminiSubtitlesError(RuntimeError):
@@ -36,6 +39,52 @@ def _build_gemini_url() -> str:
     return f"{base}/models/{GEMINI_MODEL}:generateContent"
 
 
+def _env_int(val: str | None) -> int | None:
+    if val is None or val == "":
+        return None
+    try:
+        return int(val)
+    except ValueError:
+        return None
+
+
+def _env_float(val: str | None) -> float | None:
+    if val is None or val == "":
+        return None
+    try:
+        return float(val)
+    except ValueError:
+        return None
+
+
+def _apply_generation_config(gen_cfg: Dict[str, Any]) -> None:
+    if "responseMimeType" not in gen_cfg:
+        gen_cfg["responseMimeType"] = "application/json"
+
+    max_tokens = _env_int(GEMINI_MAX_OUTPUT_TOKENS)
+    if max_tokens is not None and "maxOutputTokens" not in gen_cfg:
+        gen_cfg["maxOutputTokens"] = max_tokens
+
+    temperature = _env_float(GEMINI_TEMPERATURE)
+    if temperature is not None and "temperature" not in gen_cfg:
+        gen_cfg["temperature"] = temperature
+
+    candidate_count = _env_int(GEMINI_CANDIDATE_COUNT)
+    if candidate_count is not None and "candidateCount" not in gen_cfg:
+        gen_cfg["candidateCount"] = candidate_count
+
+
+def _log_finish_reasons(resp_json: Dict[str, Any]) -> None:
+    candidates = resp_json.get("candidates") or []
+    reasons = []
+    for cand in candidates:
+        reason = cand.get("finishReason")
+        if reason:
+            reasons.append(reason)
+    if reasons:
+        logger.info("Gemini finishReason=%s", ",".join(reasons))
+
+
 def _call_gemini(prompt: str, timeout: int = 60) -> Dict[str, Any]:
     """
     Call Gemini text model with a single text prompt and return raw JSON response.
@@ -50,12 +99,9 @@ def _call_gemini(prompt: str, timeout: int = 60) -> Dict[str, Any]:
                 ],
             }
         ],
-        "generationConfig": {
-            # Ask Gemini to respond with strict JSON
-            "response_mime_type": "application/json",
-            "responseMimeType": "application/json",
-        },
+        "generationConfig": {},
     }
+    _apply_generation_config(payload["generationConfig"])
     params = {"key": GEMINI_API_KEY}
 
     logger.info("Calling Gemini subtitles model %s", GEMINI_MODEL)
@@ -74,7 +120,9 @@ def _call_gemini(prompt: str, timeout: int = 60) -> Dict[str, Any]:
         logger.error("Gemini error body: %s", resp.text[:1000])
         raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}: {resp.text[:200]}") from exc
 
-    return resp.json()  # type: ignore[no-any-return]
+    resp_json = resp.json()  # type: ignore[no-any-return]
+    _log_finish_reasons(resp_json)
+    return resp_json
 
 
 def _call_gemini_with_payload(
@@ -87,11 +135,8 @@ def _call_gemini_with_payload(
     url = _build_gemini_url()
     params = {"key": GEMINI_API_KEY}
 
-    # Ensure we always request JSON output from the model
     gen_cfg = payload.setdefault("generationConfig", {})
-    if "response_mime_type" not in gen_cfg and "responseMimeType" not in gen_cfg:
-        gen_cfg["response_mime_type"] = "application/json"
-        gen_cfg["responseMimeType"] = "application/json"
+    _apply_generation_config(gen_cfg)
 
     logger.info("Calling Gemini subtitles model %s", GEMINI_MODEL)
     resp = requests.post(url, params=params, json=payload, timeout=timeout)
@@ -108,7 +153,9 @@ def _call_gemini_with_payload(
         logger.error("Gemini error body: %s", resp.text[:1000])
         raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}: {resp.text[:200]}") from exc
 
-    return resp.json()  # type: ignore[no-any-return]
+    resp_json = resp.json()  # type: ignore[no-any-return]
+    _log_finish_reasons(resp_json)
+    return resp_json
 
 
 def _extract_text(resp_json: Dict[str, Any]) -> str:
@@ -211,70 +258,6 @@ def extract_json_block(raw: str) -> str:
     raise ValueError("No complete JSON object found in Gemini response")
 
 def sanitize_string_literals(text: str) -> str:
-    """
-    Make JSON-like text parseable by escaping raw control characters that appear
-    inside quoted string literals.
-
-    - Converts raw LF/CR/TAB inside strings to \\n/\\r/\\t
-    - Converts other control chars (<0x20) inside strings to \\u00XX
-    - Supports both "..." and '...' string delimiters (for heuristic/fallback paths)
-    """
-    if not text:
-        return text
-
-    out: list[str] = []
-    in_string = False
-    quote_char = ""
-    escape = False
-
-    for ch in text:
-        if not in_string:
-            if ch in ('"', "'"):
-                in_string = True
-                quote_char = ch
-                escape = False
-                out.append(ch)
-            else:
-                out.append(ch)
-            continue
-
-        # in_string == True
-        if escape:
-            out.append(ch)
-            escape = False
-            continue
-
-        if ch == "\\":
-            out.append(ch)
-            escape = True
-            continue
-
-        if ch == quote_char:
-            out.append(ch)
-            in_string = False
-            quote_char = ""
-            continue
-
-        if ch == "\n":
-            out.append("\\n")
-            continue
-        if ch == "\r":
-            out.append("\\r")
-            continue
-        if ch == "\t":
-            out.append("\\t")
-            continue
-
-        oc = ord(ch)
-        if oc < 0x20:
-            out.append(f"\\u{oc:04x}")
-            continue
-
-        out.append(ch)
-
-    return "".join(out)
-
-def sanitize_string_literals(text: str) -> str:
     out: list[str] = []
     in_string = False
     quote_char = ""
@@ -317,90 +300,17 @@ def sanitize_string_literals(text: str) -> str:
     return "".join(out)
 
 
-def sanitize_string_literals(text: str) -> str:
-    out: list[str] = []
-    in_string = False
-    quote_char = ""
-    escape = False
-    for ch in text:
-        if in_string:
-            if escape:
-                out.append(ch)
-                escape = False
-                continue
-            if ch == "\\":
-                out.append(ch)
-                escape = True
-                continue
-            if ch == quote_char:
-                out.append(ch)
-                in_string = False
-                quote_char = ""
-                continue
-            if ch == "\n":
-                out.append("\\n")
-                continue
-            if ch == "\r":
-                out.append("\\r")
-                continue
-            if ch == "\t":
-                out.append("\\t")
-                continue
-            if ord(ch) < 0x20:
-                out.append(f"\\u{ord(ch):04x}")
-                continue
-            out.append(ch)
-            continue
-        if ch in {"'", '"'}:
-            in_string = True
-            quote_char = ch
-            out.append(ch)
-            continue
-        out.append(ch)
-    return "".join(out)
+def _repair_json_with_gemini(raw_text: str) -> str:
+    prompt = f"""
+You are a strict JSON fixer. The following text should contain a JSON object but may be malformed.
 
+Return ONLY a valid JSON object. Do not include code fences, comments, or extra text.
 
-def sanitize_string_literals(text: str) -> str:
-    out: list[str] = []
-    in_string = False
-    quote_char = ""
-    escape = False
-    for ch in text:
-        if in_string:
-            if escape:
-                out.append(ch)
-                escape = False
-                continue
-            if ch == "\\":
-                out.append(ch)
-                escape = True
-                continue
-            if ch == quote_char:
-                out.append(ch)
-                in_string = False
-                quote_char = ""
-                continue
-            if ch == "\n":
-                out.append("\\n")
-                continue
-            if ch == "\r":
-                out.append("\\r")
-                continue
-            if ch == "\t":
-                out.append("\\t")
-                continue
-            if ord(ch) < 0x20:
-                out.append(f"\\u{ord(ch):04x}")
-                continue
-            out.append(ch)
-            continue
-        if ch in {"'", '"'}:
-            in_string = True
-            quote_char = ch
-            out.append(ch)
-            continue
-        out.append(ch)
-    return "".join(out)
+Input:
+{raw_text}
+""".strip()
+    resp_json = _call_gemini(prompt)
+    return _extract_text(resp_json)
 
 
 def parse_gemini_subtitle_payload(raw_text: str) -> Any:
@@ -418,9 +328,6 @@ def parse_gemini_subtitle_payload(raw_text: str) -> Any:
         payload_text = extract_json_block(text)
     except ValueError:
         payload_text = text
-    payload_sanitized = sanitize_string_literals(payload_text)
-
-    # IMPORTANT: sanitize raw control chars INSIDE string literals
     payload_sanitized = sanitize_string_literals(payload_text)
 
     # Strategy 1: strict JSON (try original first, then sanitized)
@@ -454,8 +361,13 @@ def parse_gemini_subtitle_payload(raw_text: str) -> Any:
     try:
         return json.loads(fixed)
     except Exception:
-        logger.warning("Gemini subtitles did not return valid JSON. Snippet: %s", snippet)
-        raise ValueError(f"Gemini subtitles did not return valid JSON. Snippet: {snippet}")
+        try:
+            repaired = _repair_json_with_gemini(raw_text)
+            repaired = sanitize_string_literals(repaired)
+            return json.loads(repaired)
+        except Exception:
+            logger.warning("Gemini subtitles did not return valid JSON. Snippet: %s", snippet)
+            raise ValueError(f"Gemini subtitles did not return valid JSON. Snippet: {snippet}")
 
 
 
@@ -593,13 +505,13 @@ Rules:
             {
                 "role": "user",
                 "parts": [
+                    {"text": prompt},
                     {
                         "inline_data": {
                             "mime_type": "video/mp4",
                             "data": encoded,
                         }
                     },
-                    {"text": prompt},
                 ],
             }
         ]
