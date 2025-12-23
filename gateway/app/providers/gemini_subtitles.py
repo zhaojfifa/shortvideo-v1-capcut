@@ -53,6 +53,7 @@ def _call_gemini(prompt: str, timeout: int = 60) -> Dict[str, Any]:
         "generationConfig": {
             # Ask Gemini to respond with strict JSON
             "response_mime_type": "application/json",
+            "responseMimeType": "application/json",
         },
     }
     params = {"key": GEMINI_API_KEY}
@@ -88,8 +89,9 @@ def _call_gemini_with_payload(
 
     # Ensure we always request JSON output from the model
     gen_cfg = payload.setdefault("generationConfig", {})
-    if "response_mime_type" not in gen_cfg:
+    if "response_mime_type" not in gen_cfg and "responseMimeType" not in gen_cfg:
         gen_cfg["response_mime_type"] = "application/json"
+        gen_cfg["responseMimeType"] = "application/json"
 
     logger.info("Calling Gemini subtitles model %s", GEMINI_MODEL)
     resp = requests.post(url, params=params, json=payload, timeout=timeout)
@@ -118,13 +120,21 @@ def _extract_text(resp_json: Dict[str, Any]) -> str:
     if not candidates:
         raise GeminiSubtitlesError("Gemini response has no candidates")
 
-    texts: List[str] = []
-    for cand in candidates:
+    def _texts_from_candidate(cand: Dict[str, Any]) -> List[str]:
         content: Dict[str, Any] = cand.get("content") or {}
         parts: List[Dict[str, Any]] = content.get("parts") or []
+        out: List[str] = []
         for part in parts:
             if isinstance(part, dict) and "text" in part:
-                texts.append(part.get("text", ""))
+                out.append(part.get("text", "") or "")
+        return out
+
+    texts = _texts_from_candidate(candidates[0])
+    if not texts:
+        for cand in candidates[1:]:
+            texts = _texts_from_candidate(cand)
+            if texts:
+                break
 
     if not texts:
         raise GeminiSubtitlesError("Gemini response has no text parts")
@@ -162,18 +172,43 @@ def extract_json_block(raw: str) -> str:
     - Raise ValueError if no JSON block is found.
     """
 
-    raw = raw.strip()
-
+    raw = (raw or "").strip()
     fenced_match = re.search(r"```(?:json)?\s*(.*?)```", raw, re.DOTALL | re.IGNORECASE)
     if fenced_match:
-        return fenced_match.group(1)
+        raw = (fenced_match.group(1) or "").strip()
 
     start = raw.find("{")
-    end = raw.rfind("}")
-    if start != -1 and end != -1 and end > start:
-        return raw[start : end + 1]
+    if start == -1:
+        raise ValueError("No JSON block found in Gemini response")
 
-    raise ValueError("No JSON block found in Gemini response")
+    in_str = False
+    esc = False
+    depth = 0
+    for i in range(start, len(raw)):
+        ch = raw[i]
+        if in_str:
+            if esc:
+                esc = False
+                continue
+            if ch == "\\":
+                esc = True
+                continue
+            if ch == '"':
+                in_str = False
+            continue
+
+        if ch == '"':
+            in_str = True
+            continue
+        if ch == "{":
+            depth += 1
+            continue
+        if ch == "}":
+            depth -= 1
+            if depth == 0:
+                return raw[start : i + 1].strip()
+
+    raise ValueError("No complete JSON object found in Gemini response")
 
 def sanitize_string_literals(text: str) -> str:
     """
