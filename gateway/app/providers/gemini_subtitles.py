@@ -81,7 +81,9 @@ def _call_gemini(prompt: str, timeout: int = 60) -> Dict[str, Any]:
         logger.error("Gemini error body: %s", resp.text[:1000])
         raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}: {resp.text[:200]}") from exc
 
-    return resp.json()  # type: ignore[no-any-return]
+    resp_json = resp.json()  # type: ignore[no-any-return]
+    _log_finish_reasons(resp_json)
+    return resp_json
 
 
 def _call_gemini_with_payload(
@@ -112,7 +114,9 @@ def _call_gemini_with_payload(
         logger.error("Gemini error body: %s", resp.text[:1000])
         raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}: {resp.text[:200]}") from exc
 
-    return resp.json()  # type: ignore[no-any-return]
+    resp_json = resp.json()  # type: ignore[no-any-return]
+    _log_finish_reasons(resp_json)
+    return resp_json
 
 
 def _extract_text(resp_json: Dict[str, Any]) -> str:
@@ -218,47 +222,11 @@ def extract_json_block(raw: str) -> str:
 
     raise ValueError("No complete JSON object found in Gemini response")
 
-def sanitize_string_literals(text: str) -> str:
-    out: list[str] = []
-    in_string = False
-    quote_char = ""
-    escape = False
-    for ch in text:
-        if in_string:
-            if escape:
-                out.append(ch)
-                escape = False
-                continue
-            if ch == "\\":
-                out.append(ch)
-                escape = True
-                continue
-            if ch == quote_char:
-                out.append(ch)
-                in_string = False
-                quote_char = ""
-                continue
-            if ch == "\n":
-                out.append("\\n")
-                continue
-            if ch == "\r":
-                out.append("\\r")
-                continue
-            if ch == "\t":
-                out.append("\\t")
-                continue
-            if ord(ch) < 0x20:
-                out.append(f"\\u{ord(ch):04x}")
-                continue
-            out.append(ch)
-            continue
-        if ch in {"'", '"'}:
-            in_string = True
-            quote_char = ch
-            out.append(ch)
-            continue
-        out.append(ch)
-    return "".join(out)
+Input:
+{raw_text}
+""".strip()
+    resp_json = _call_gemini(prompt)
+    return _extract_text(resp_json)
 
 
 def _repair_json_with_gemini(broken: str, timeout: int = 60) -> str:
