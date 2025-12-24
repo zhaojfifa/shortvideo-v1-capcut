@@ -58,9 +58,9 @@ def _call_gemini(prompt: str, timeout: int = 60) -> Dict[str, Any]:
 
     try:
         resp.raise_for_status()
-    except requests.HTTPError as exc:
-        logger.error("Gemini error body: %s", (resp.text or "")[:1000])
-        raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}: {(resp.text or '')[:200]}") from exc
+    except requests.HTTPError as exc:  # type: ignore[no-untyped-call]
+        logger.error("Gemini error body: %s", resp.text[:1000])
+        raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}: {resp.text[:200]}") from exc
 
     return resp.json()  # type: ignore[no-any-return]
 
@@ -238,29 +238,7 @@ def sanitize_string_literals(text: str) -> str:
 
     raise ValueError("No complete JSON object found in Gemini response")
 
-
-def _repair_json_with_gemini(broken: str, timeout: int = 60) -> str:
-    repair_prompt = (
-        "You are a JSON repair tool. Fix the following broken JSON into a valid JSON object. "
-        "Output ONLY the JSON object. No markdown, no code fences, no commentary."
-    )
-    payload = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [{"text": repair_prompt + "\n\n" + (broken or "")}],
-            }
-        ],
-        "generationConfig": {
-            "responseMimeType": "application/json",
-            "maxOutputTokens": 4096,
-            "temperature": 0,
-            "candidateCount": 1,
-        },
-    }
-    resp_json = _call_gemini_with_payload(payload, timeout=timeout)
-    return _extract_text(resp_json)
-
+    return "".join(out)
 
 
 def _repair_json_with_gemini(broken: str, timeout: int = 60) -> str:
@@ -286,12 +264,12 @@ def _repair_json_with_gemini(broken: str, timeout: int = 60) -> str:
     return _extract_text(resp_json)
 
 
-def parse_gemini_subtitle_payload(
-    raw_text: str,
-    *,
-    allow_repair: bool = True,
-    debug_dir: Path | None = None,
-) -> Any:
+def _write_debug_text(debug_dir: Path, filename: str, text: str) -> None:
+    debug_dir.mkdir(parents=True, exist_ok=True)
+    (debug_dir / filename).write_text(text or "", encoding="utf-8")
+
+
+def parse_gemini_subtitle_payload(raw_text: str, debug_dir: Path | None = None) -> Any:
     """
     Fault-tolerant parser for Gemini subtitle outputs.
 
@@ -309,11 +287,17 @@ def parse_gemini_subtitle_payload(
     snippet = (text[:500]).replace("\n", "\\n")
     _write_debug_text(debug_dir, "gemini_response_raw.txt", text)
 
+    if debug_dir is not None:
+        _write_debug_text(debug_dir, "gemini_response_raw.txt", text)
+
     # Extract best-effort JSON object text
     try:
         payload_text = extract_json_block(text)
     except Exception:
         payload_text = text
+
+    if debug_dir is not None:
+        _write_debug_text(debug_dir, "gemini_response_json_block.txt", payload_text)
 
     payload_sanitized = sanitize_string_literals(payload_text)
     _write_debug_text(debug_dir, "gemini_payload_sanitized.txt", payload_sanitized)
