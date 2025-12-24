@@ -7,7 +7,7 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import requests
 
@@ -219,24 +219,40 @@ def sanitize_string_literals(text: str) -> str:
                 out.append(ch)
             continue
 
-        # in_string
+        # inside a quoted string
         if escape:
             out.append(ch)
             escape = False
             continue
 
-        if ch == '"':
-            in_str = True
+        if ch == "\\":
+            out.append(ch)
+            escape = True
             continue
-        if ch == "{":
-            depth += 1
-            continue
-        if ch == "}":
-            depth -= 1
-            if depth == 0:
-                return raw[start : i + 1].strip()
 
-    raise ValueError("No complete JSON object found in Gemini response")
+        if ch == quote_char:
+            out.append(ch)
+            in_string = False
+            quote_char = ""
+            continue
+
+        # normalize control characters inside string literals
+        if ch == "\n":
+            out.append("\\n")
+            continue
+        if ch == "\r":
+            out.append("\\r")
+            continue
+        if ch == "\t":
+            out.append("\\t")
+            continue
+
+        code = ord(ch)
+        if code < 0x20:
+            out.append(f"\\u{code:04x}")
+            continue
+
+        out.append(ch)
 
     return "".join(out)
 
@@ -264,24 +280,18 @@ def _repair_json_with_gemini(broken: str, timeout: int = 60) -> str:
     return _extract_text(resp_json)
 
 
-def _write_debug_text(debug_dir: Optional[Path], filename: str, text: str) -> None:
-    """
-    Best-effort debug writer; safe no-op if debug_dir is None.
-    """
-    if not debug_dir:
+def _write_debug_text(debug_dir: Path | None, filename: str, text: str) -> None:
+    if debug_dir is None:
         return
-    try:
-        debug_dir.mkdir(parents=True, exist_ok=True)
-        (debug_dir / filename).write_text(text or "", encoding="utf-8")
-    except Exception:
-        return
+    debug_dir.mkdir(parents=True, exist_ok=True)
+    (debug_dir / filename).write_text(text or "", encoding="utf-8")
 
 
 def parse_gemini_subtitle_payload(
     raw_text: str,
     *,
     allow_repair: bool = True,
-    debug_dir: Optional[Path] = None,
+    debug_dir: Path | None = None,
     write_debug: bool = False,
 ) -> Any:
     """
@@ -296,13 +306,9 @@ def parse_gemini_subtitle_payload(
 
     Raises ValueError with a helpful snippet if all strategies fail.
     """
-    snippet = (raw_text or "")[:500].replace("\n", "\\n")
     text = (raw_text or "").strip()
     snippet = (text[:500]).replace("\n", "\\n")
     _write_debug_text(debug_dir, "gemini_response_raw.txt", text)
-
-    if debug_dir is not None:
-        _write_debug_text(debug_dir, "gemini_response_raw.txt", text)
 
     if write_debug:
         _write_debug_text(debug_dir, "gemini_response_raw.txt", text)
@@ -316,7 +322,11 @@ def parse_gemini_subtitle_payload(
     if write_debug:
         _write_debug_text(debug_dir, "gemini_response_json_block.txt", payload_text)
 
-    payload_sanitized = sanitize_string_literals(payload_text)
+    try:
+        payload_sanitized = sanitize_string_literals(payload_text)
+    except Exception:
+        # 防御式降级：sanitize 本身不应导致全流程 500
+        payload_sanitized = payload_text
     _write_debug_text(debug_dir, "gemini_payload_sanitized.txt", payload_sanitized)
 
     # 1) strict JSON
