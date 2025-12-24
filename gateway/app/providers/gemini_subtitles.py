@@ -112,6 +112,23 @@ def _extract_text(resp_json: Dict[str, Any]) -> str:
             if texts:
                 break
 
+    if not texts:
+        raise GeminiSubtitlesError("Gemini response has no text parts")
+
+    return "".join(texts).strip()
+
+
+    finish = candidates[0].get("finishReason")
+    if finish:
+        logger.info("Gemini finishReason=%s", finish)
+
+    texts = _texts_from_candidate(candidates[0])
+    if not texts:
+        for cand in candidates[1:]:
+            texts = _texts_from_candidate(cand)
+            if texts:
+                break
+
     texts = _texts(candidates[0])
     if not texts:
         for cand in candidates[1:]:
@@ -125,30 +142,31 @@ def _extract_text(resp_json: Dict[str, Any]) -> str:
 
 
 def extract_json_block(raw: str) -> str:
-    raw = (raw or "").strip()
-    fenced = re.search(r"```(?:json)?\s*(.*?)```", raw, re.DOTALL | re.IGNORECASE)
-    if fenced:
-        raw = (fenced.group(1) or "").strip()
-
-    - If a ```json ... ``` fenced block exists, return its inner content.
-    - Otherwise, return the substring between the first '{' and the last '}'.
-    - Raise ValueError if no JSON block is found.
     """
+    Extract the most relevant JSON object from Gemini responses.
 
+    Strategy:
+    - If a ```json ...``` (or ``` ... ```) fenced block exists, use its inner content.
+    - Otherwise, return the substring from the first '{' to the matching final '}' (brace-balanced).
+    - Raise ValueError if no complete JSON object is found.
+    """
     raw = (raw or "").strip()
+
     fenced_match = re.search(r"```(?:json)?\s*(.*?)```", raw, re.DOTALL | re.IGNORECASE)
     if fenced_match:
         raw = (fenced_match.group(1) or "").strip()
 
     start = raw.find("{")
     if start == -1:
-        raise ValueError("No JSON block found in Gemini response")
+        raise ValueError("No JSON object start '{' found in Gemini response")
 
     in_str = False
     esc = False
     depth = 0
+
     for i in range(start, len(raw)):
         ch = raw[i]
+
         if in_str:
             if esc:
                 esc = False
@@ -158,6 +176,53 @@ def extract_json_block(raw: str) -> str:
                 continue
             if ch == '"':
                 in_str = False
+            continue
+
+        if ch == '"':
+            in_str = True
+            continue
+        if ch == "{":
+            depth += 1
+            continue
+        if ch == "}":
+            depth -= 1
+            if depth == 0:
+                return raw[start : i + 1].strip()
+
+    raise ValueError("No complete JSON object found in Gemini response")
+
+def sanitize_string_literals(text: str) -> str:
+    """
+    Escape raw control characters that appear *inside* quoted string literals so the
+    JSON-like payload becomes parseable.
+
+    - Converts raw LF/CR/TAB inside strings to \\n/\\r/\\t
+    - Converts other control chars (<0x20) inside strings to \\u00XX
+    - Only operates while inside a quoted string (supports both " and ' for fallback parsing)
+    """
+    if not text:
+        return text
+
+    out: list[str] = []
+    in_string = False
+    quote_char = ""
+    escape = False
+
+    for ch in text:
+        if not in_string:
+            if ch in ('"', "'"):
+                in_string = True
+                quote_char = ch
+                escape = False
+                out.append(ch)
+            else:
+                out.append(ch)
+            continue
+
+        # in_string
+        if escape:
+            out.append(ch)
+            escape = False
             continue
 
         if ch == '"':
@@ -197,14 +262,28 @@ def _repair_json_with_gemini(broken: str, timeout: int = 60) -> str:
     return _extract_text(resp_json)
 
 
-def _write_debug_text(debug_dir: Path | None, filename: str, content: str) -> None:
-    try:
-        if not debug_dir:
-            return
-        debug_dir.mkdir(parents=True, exist_ok=True)
-        (debug_dir / filename).write_text(content or "", encoding="utf-8")
-    except Exception:
-        return
+
+def _repair_json_with_gemini(broken: str, timeout: int = 60) -> str:
+    repair_prompt = (
+        "You are a JSON repair tool. Fix the following broken JSON into a valid JSON object. "
+        "Output ONLY the JSON object. No markdown, no code fences, no commentary."
+    )
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": repair_prompt + "\n\n" + (broken or "")}],
+            }
+        ],
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "maxOutputTokens": 4096,
+            "temperature": 0,
+            "candidateCount": 1,
+        },
+    }
+    resp_json = _call_gemini_with_payload(payload, timeout=timeout)
+    return _extract_text(resp_json)
 
 
 def parse_gemini_subtitle_payload(
@@ -216,33 +295,42 @@ def parse_gemini_subtitle_payload(
     """
     Fault-tolerant parser for Gemini subtitle outputs.
 
-    Attempts strict JSON first, then Python literal parsing, then a heuristic
-    fix for single-quoted keys/values before failing with a descriptive error.
-    """
+    Parsing order:
+    1) Extract JSON block (if any) -> strict json.loads
+    2) Sanitize control chars inside string literals -> json.loads
+    3) ast.literal_eval (for Python-dict-like outputs) on sanitized
+    4) Heuristic: convert single-quoted keys/values -> json.loads
+    5) Repair fallback: call Gemini once to repair -> parse again (strict then sanitized)
 
+    Raises ValueError with a helpful snippet if all strategies fail.
+    """
+    snippet = (raw_text or "")[:500].replace("\n", "\\n")
     text = (raw_text or "").strip()
     snippet = (text[:500]).replace("\n", "\\n")
     _write_debug_text(debug_dir, "gemini_response_raw.txt", text)
 
+    # Extract best-effort JSON object text
     try:
         payload_text = extract_json_block(text)
     except Exception:
         payload_text = text
 
-    _write_debug_text(debug_dir, "gemini_payload_extracted.txt", payload_text)
-
     payload_sanitized = sanitize_string_literals(payload_text)
     _write_debug_text(debug_dir, "gemini_payload_sanitized.txt", payload_sanitized)
 
+    # 1) strict JSON
     try:
         return json.loads(payload_text)
     except json.JSONDecodeError:
-        try:
-            return json.loads(payload_sanitized)
-        except json.JSONDecodeError:
-            pass
+        pass
 
-    # Strategy 2: python literal eval (fallback)
+    # 2) sanitized JSON
+    try:
+        return json.loads(payload_sanitized)
+    except json.JSONDecodeError:
+        pass
+
+    # 3) python literal fallback
     try:
         data = ast.literal_eval(payload_sanitized)
         if isinstance(data, dict):
@@ -250,7 +338,7 @@ def parse_gemini_subtitle_payload(
     except Exception:
         pass
 
-    # Strategy 3: heuristic single-quote fix
+    # 4) heuristic single-quote fix (apply on sanitized)
     fixed = re.sub(
         r"(?P<q>')(?P<key>[a-zA-Z_][a-zA-Z0-9_]*)'(?=\s*:)",
         r'"\g<key>"',
@@ -266,23 +354,20 @@ def parse_gemini_subtitle_payload(
     try:
         return json.loads(fixed)
     except Exception:
-        _write_debug_text(debug_dir, "gemini_payload_fixed.txt", fixed)
+        pass
 
-    if allow_repair:
+    # 5) repair fallback (best-effort; never crash the whole service if repair fails)
+    try:
+        repaired_raw = _repair_json_with_gemini(payload_text)
+        repaired_block = extract_json_block(repaired_raw)
+        repaired_sanitized = sanitize_string_literals(repaired_block)
         try:
-            repaired_raw = _repair_json_with_gemini(payload_text)
-            _write_debug_text(debug_dir, "gemini_payload_repaired_raw.txt", repaired_raw)
-            repaired_block = extract_json_block(repaired_raw)
-            repaired_sanitized = sanitize_string_literals(repaired_block)
-            try:
-                return json.loads(repaired_block)
-            except json.JSONDecodeError:
-                return json.loads(repaired_sanitized)
-        except Exception as exc:
-            logger.warning("Gemini JSON repair failed: %s", exc)
-
-    logger.warning("Gemini subtitles did not return valid JSON. Snippet: %s", snippet)
-    raise ValueError(f"Gemini subtitles did not return valid JSON. Snippet: {snippet}")
+            return json.loads(repaired_block)
+        except json.JSONDecodeError:
+            return json.loads(repaired_sanitized)
+    except Exception:
+        logger.warning("Gemini subtitles did not return valid JSON. Snippet: %s", snippet)
+        raise ValueError(f"Gemini subtitles did not return valid JSON. Snippet: {snippet}")
 
 
 
@@ -294,7 +379,7 @@ def translate_and_segment_with_gemini(
     debug_dir: Path | None = None,
 ) -> Dict[str, Any]:
     """
-    使用 Gemini 把 SRT 字幕翻译成缅甸语，并做场景分段。
+    # 使用 Gemini 把 SRT 字幕翻译成缅甸语，并做场景分段。
 
     返回结构：
     {
@@ -360,7 +445,7 @@ def transcribe_translate_and_segment_with_gemini(
     debug_dir: Path | None = None,
 ) -> Dict[str, Any]:
     """
-    使用 Gemini 2.0 Flash 对原始视频做转写 + 翻译 + 场景切分。
+    # 使用 Gemini 2.0 Flash 对原始视频做转写 + 翻译 + 场景切分。
 
     返回结构与 translate_and_segment_with_gemini 对齐：
     {
