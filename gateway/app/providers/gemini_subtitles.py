@@ -7,7 +7,7 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -264,12 +264,26 @@ def _repair_json_with_gemini(broken: str, timeout: int = 60) -> str:
     return _extract_text(resp_json)
 
 
-def _write_debug_text(debug_dir: Path, filename: str, text: str) -> None:
-    debug_dir.mkdir(parents=True, exist_ok=True)
-    (debug_dir / filename).write_text(text or "", encoding="utf-8")
+def _write_debug_text(debug_dir: Optional[Path], filename: str, text: str) -> None:
+    """
+    Best-effort debug writer; safe no-op if debug_dir is None.
+    """
+    if not debug_dir:
+        return
+    try:
+        debug_dir.mkdir(parents=True, exist_ok=True)
+        (debug_dir / filename).write_text(text or "", encoding="utf-8")
+    except Exception:
+        return
 
 
-def parse_gemini_subtitle_payload(raw_text: str, debug_dir: Path | None = None) -> Any:
+def parse_gemini_subtitle_payload(
+    raw_text: str,
+    *,
+    allow_repair: bool = True,
+    debug_dir: Optional[Path] = None,
+    write_debug: bool = False,
+) -> Any:
     """
     Fault-tolerant parser for Gemini subtitle outputs.
 
@@ -290,13 +304,16 @@ def parse_gemini_subtitle_payload(raw_text: str, debug_dir: Path | None = None) 
     if debug_dir is not None:
         _write_debug_text(debug_dir, "gemini_response_raw.txt", text)
 
+    if write_debug:
+        _write_debug_text(debug_dir, "gemini_response_raw.txt", text)
+
     # Extract best-effort JSON object text
     try:
         payload_text = extract_json_block(text)
     except Exception:
         payload_text = text
 
-    if debug_dir is not None:
+    if write_debug:
         _write_debug_text(debug_dir, "gemini_response_json_block.txt", payload_text)
 
     payload_sanitized = sanitize_string_literals(payload_text)
@@ -341,17 +358,20 @@ def parse_gemini_subtitle_payload(raw_text: str, debug_dir: Path | None = None) 
         pass
 
     # 5) repair fallback (best-effort; never crash the whole service if repair fails)
-    try:
-        repaired_raw = _repair_json_with_gemini(payload_text)
-        repaired_block = extract_json_block(repaired_raw)
-        repaired_sanitized = sanitize_string_literals(repaired_block)
+    if allow_repair:
         try:
-            return json.loads(repaired_block)
-        except json.JSONDecodeError:
-            return json.loads(repaired_sanitized)
-    except Exception:
-        logger.warning("Gemini subtitles did not return valid JSON. Snippet: %s", snippet)
-        raise ValueError(f"Gemini subtitles did not return valid JSON. Snippet: {snippet}")
+            repaired_raw = _repair_json_with_gemini(payload_text)
+            repaired_block = extract_json_block(repaired_raw)
+            repaired_sanitized = sanitize_string_literals(repaired_block)
+            try:
+                return json.loads(repaired_block)
+            except json.JSONDecodeError:
+                return json.loads(repaired_sanitized)
+        except Exception:
+            pass
+
+    logger.warning("Gemini subtitles did not return valid JSON. Snippet: %s", snippet)
+    raise ValueError(f"Gemini subtitles did not return valid JSON. Snippet: {snippet}")
 
 
 
