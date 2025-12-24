@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import ast
 import base64
 import json
@@ -12,12 +13,9 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# 配置项：优先使用 GEMINI_API_KEY，兼容 GOOGLE_API_KEY
+# Prefer GEMINI_API_KEY, fallback to GOOGLE_API_KEY for compatibility
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-GEMINI_BASE_URL = os.getenv(
-    "GEMINI_BASE_URL",
-    "https://generativelanguage.googleapis.com/v1beta",
-)
+GEMINI_BASE_URL = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 GEMINI_MAX_OUTPUT_TOKENS = 8192
 GEMINI_TEMPERATURE = 0.2
@@ -29,13 +27,8 @@ class GeminiSubtitlesError(RuntimeError):
 
 
 def _build_gemini_url() -> str:
-    """
-    Build full Gemini REST URL, e.g.
-    https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
-    """
     if not GEMINI_API_KEY:
         raise GeminiSubtitlesError("GEMINI_API_KEY is not configured")
-
     base = GEMINI_BASE_URL.rstrip("/")
     return f"{base}/models/{GEMINI_MODEL}:generateContent"
 
@@ -48,18 +41,10 @@ def _apply_generation_config(gen_cfg: Dict[str, Any]) -> None:
 
 
 def _call_gemini(prompt: str, timeout: int = 60) -> Dict[str, Any]:
-    """
-    Call Gemini text model with a single text prompt and return raw JSON response.
-    """
     url = _build_gemini_url()
     payload: Dict[str, Any] = {
         "contents": [
-            {
-                "role": "user",
-                "parts": [
-                    {"text": prompt},
-                ],
-            }
+            {"role": "user", "parts": [{"text": prompt}]}
         ],
         "generationConfig": {
             "responseMimeType": "application/json",
@@ -68,34 +53,19 @@ def _call_gemini(prompt: str, timeout: int = 60) -> Dict[str, Any]:
             "candidateCount": GEMINI_CANDIDATE_COUNT,
         },
     }
-    params = {"key": GEMINI_API_KEY}
-
-    logger.info("Calling Gemini subtitles model %s", GEMINI_MODEL)
-    resp = requests.post(url, params=params, json=payload, timeout=timeout)
-
-    logger.info(
-        "Gemini HTTP %s, body preview=%r",
-        resp.status_code,
-        resp.text[:300],
-    )
+    resp = requests.post(url, params={"key": GEMINI_API_KEY}, json=payload, timeout=timeout)
+    logger.info("Gemini HTTP %s, body preview=%r", resp.status_code, (resp.text or "")[:300])
 
     try:
         resp.raise_for_status()
-    except requests.HTTPError as exc:  # type: ignore[no-untyped-call]
-        # 输出部分 body，方便在 Render 日志里排查 4xx/5xx
-        logger.error("Gemini error body: %s", resp.text[:1000])
-        raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}: {resp.text[:200]}") from exc
+    except requests.HTTPError as exc:
+        logger.error("Gemini error body: %s", (resp.text or "")[:1000])
+        raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}: {(resp.text or '')[:200]}") from exc
 
     return resp.json()  # type: ignore[no-any-return]
 
 
-def _call_gemini_with_payload(
-    payload: Dict[str, Any],
-    timeout: int = 120,
-) -> Dict[str, Any]:
-    """
-    通用的 Gemini 调用封装，主要用于多模态（视频）场景。
-    """
+def _call_gemini_with_payload(payload: Dict[str, Any], timeout: int = 120) -> Dict[str, Any]:
     url = _build_gemini_url()
     params = {"key": GEMINI_API_KEY}
 
@@ -105,29 +75,19 @@ def _call_gemini_with_payload(
     gen_cfg.setdefault("temperature", GEMINI_TEMPERATURE)
     gen_cfg.setdefault("candidateCount", GEMINI_CANDIDATE_COUNT)
 
-    logger.info("Calling Gemini subtitles model %s", GEMINI_MODEL)
     resp = requests.post(url, params=params, json=payload, timeout=timeout)
-
-    logger.info(
-        "Gemini HTTP %s, body preview=%r",
-        resp.status_code,
-        resp.text[:300],
-    )
+    logger.info("Gemini HTTP %s, body preview=%r", resp.status_code, (resp.text or "")[:300])
 
     try:
         resp.raise_for_status()
-    except requests.HTTPError as exc:  # type: ignore[no-untyped-call]
-        logger.error("Gemini error body: %s", resp.text[:1000])
-        raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}: {resp.text[:200]}") from exc
+    except requests.HTTPError as exc:
+        logger.error("Gemini error body: %s", (resp.text or "")[:1000])
+        raise GeminiSubtitlesError(f"Gemini HTTP {resp.status_code}: {(resp.text or '')[:200]}") from exc
 
     return resp.json()  # type: ignore[no-any-return]
 
 
 def _extract_text(resp_json: Dict[str, Any]) -> str:
-    """
-    从 Gemini JSON 响应里把所有 text part 拼出来。
-    v1beta 结构：candidates[*].content.parts[*].text
-    """
     candidates: List[Dict[str, Any]] = resp_json.get("candidates") or []
     if not candidates:
         raise GeminiSubtitlesError("Gemini response has no candidates")
@@ -152,36 +112,23 @@ def _extract_text(resp_json: Dict[str, Any]) -> str:
             if texts:
                 break
 
+    texts = _texts(candidates[0])
+    if not texts:
+        for cand in candidates[1:]:
+            texts = _texts(cand)
+            if texts:
+                break
+
     if not texts:
         raise GeminiSubtitlesError("Gemini response has no text parts")
-
     return "".join(texts).strip()
 
 
-def _strip_code_fences(text: str) -> str:
-    """
-    去掉 ```json ... ``` 或 ``` ... ``` 这样的 code fence。
-    """
-    t = text.strip()
-
-    if t.startswith("```"):
-        # 去掉前导 ```
-        t = t[3:]
-        t = t.lstrip()
-
-        lower = t.lower()
-        if lower.startswith("json"):
-            t = t[4:].lstrip()
-
-        if t.endswith("```"):
-            t = t[:-3].rstrip()
-
-    return t
-
-
 def extract_json_block(raw: str) -> str:
-    """
-    Extract the most relevant JSON block from Gemini responses.
+    raw = (raw or "").strip()
+    fenced = re.search(r"```(?:json)?\s*(.*?)```", raw, re.DOTALL | re.IGNORECASE)
+    if fenced:
+        raw = (fenced.group(1) or "").strip()
 
     - If a ```json ... ``` fenced block exists, return its inner content.
     - Otherwise, return the substring between the first '{' and the last '}'.
@@ -225,48 +172,6 @@ def extract_json_block(raw: str) -> str:
                 return raw[start : i + 1].strip()
 
     raise ValueError("No complete JSON object found in Gemini response")
-
-def sanitize_string_literals(text: str) -> str:
-    out: list[str] = []
-    in_string = False
-    quote_char = ""
-    escape = False
-    for ch in text:
-        if in_string:
-            if escape:
-                out.append(ch)
-                escape = False
-                continue
-            if ch == "\\":
-                out.append(ch)
-                escape = True
-                continue
-            if ch == quote_char:
-                out.append(ch)
-                in_string = False
-                quote_char = ""
-                continue
-            if ch == "\n":
-                out.append("\\n")
-                continue
-            if ch == "\r":
-                out.append("\\r")
-                continue
-            if ch == "\t":
-                out.append("\\t")
-                continue
-            if ord(ch) < 0x20:
-                out.append(f"\\u{ord(ch):04x}")
-                continue
-            out.append(ch)
-            continue
-        if ch in {"'", '"'}:
-            in_string = True
-            quote_char = ch
-            out.append(ch)
-            continue
-        out.append(ch)
-    return "".join(out)
 
 
 def _repair_json_with_gemini(broken: str, timeout: int = 60) -> str:
@@ -337,6 +242,7 @@ def parse_gemini_subtitle_payload(
         except json.JSONDecodeError:
             pass
 
+    # Strategy 2: python literal eval (fallback)
     try:
         data = ast.literal_eval(payload_sanitized)
         if isinstance(data, dict):
@@ -344,7 +250,7 @@ def parse_gemini_subtitle_payload(
     except Exception:
         pass
 
-    # Strategy 3: heuristic fix for single-quoted keys/values (apply on sanitized text)
+    # Strategy 3: heuristic single-quote fix
     fixed = re.sub(
         r"(?P<q>')(?P<key>[a-zA-Z_][a-zA-Z0-9_]*)'(?=\s*:)",
         r'"\g<key>"',
@@ -356,6 +262,7 @@ def parse_gemini_subtitle_payload(
         fixed,
     )
     fixed = sanitize_string_literals(fixed)
+
     try:
         return json.loads(fixed)
     except Exception:
@@ -400,50 +307,30 @@ def translate_and_segment_with_gemini(
 You are a subtitle translator and scene segmenter for short social videos.
 
 The input subtitles are in SRT format (original language).
-Translate them to the target language "{target_lang}" (Burmese)
-and also provide scene segmentation.
+Translate them to the target language "{target_lang}" (Burmese) and also provide scene segmentation.
 
 Return ONLY valid JSON with this exact shape:
-
 {{
   "language": "<source_language_code>",
   "segments": [
-    {{
-      "index": 1,
-      "start": 0.0,
-      "end": 2.5,
-      "origin": "original text",
-      "mm": "Burmese text",
-      "scene_id": 1
-    }}
+    {{"index": 1, "start": 0.0, "end": 2.5, "origin": "original text", "mm": "Burmese text", "scene_id": 1}}
   ],
   "scenes": [
-    {{
-      "scene_id": 1,
-      "start": 0.0,
-      "end": 5.0,
-      "title": "concise original scene title",
-      "mm_title": "Burmese title"
-    }}
+    {{"scene_id": 1, "start": 0.0, "end": 5.0, "title": "concise original scene title", "mm_title": "Burmese title"}}
   ]
 }}
 
 Rules:
 - Keep segments in original SRT order; timestamps are in seconds.
 - Make timestamps monotonic and non-overlapping.
-- Keep translations concise and natural.
-- If unsure about a scene title, keep it short or leave it empty.
 - All property names must be in double quotes; response must be strict JSON.
-- Do not include trailing commas or comments.
-- The response must be valid JSON that Python json.loads can parse.
-- Respond with JSON only. Do NOT add explanations, backticks, or code fences.
+- Respond with JSON only. Do NOT add explanations or code fences.
 
-    Here are the subtitles to process (SRT):
+Here are the subtitles to process (SRT):
 
 {origin_srt_text}
 """.strip()
 
-    # 1) 调用 Gemini
     resp_json = _call_gemini(prompt)
     raw_text = _extract_text(resp_json)
     data = parse_gemini_subtitle_payload(
@@ -452,7 +339,6 @@ Rules:
         debug_dir=debug_dir,
     )
 
-    # 3) 做一点点 schema 校验，避免后续逻辑踩坑
     if not isinstance(data, dict):
         raise GeminiSubtitlesError("Gemini subtitles JSON root must be an object")
 
@@ -461,9 +347,7 @@ Rules:
         raise GeminiSubtitlesError("Gemini subtitles JSON must include a language code")
 
     if "segments" not in data or "scenes" not in data:
-        raise GeminiSubtitlesError(
-            "Gemini subtitles JSON must contain 'segments' and 'scenes'"
-        )
+        raise GeminiSubtitlesError("Gemini subtitles JSON must contain 'segments' and 'scenes'")
 
     return data
 
@@ -488,7 +372,6 @@ def transcribe_translate_and_segment_with_gemini(
     if not video_path.exists():
         raise GeminiSubtitlesError(f"Raw video not found: {video_path}")
 
-    # 注意：这里使用 inline_data，而不是 file_data.data
     encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
 
     prompt = f"""
@@ -496,26 +379,20 @@ You are a subtitle transcriber, translator, and scene segmenter for short social
 
 Tasks:
 1) Transcribe the spoken Chinese in the provided MP4 video into subtitles.
-2) Translate the subtitles into Burmese.
-3) Provide scene segmentation that aligns with the subtitles.
+2) Translate the subtitles into Burmese (target "{target_lang}").
+3) Provide scene segmentation aligned with subtitles.
 
 Return ONLY valid JSON with this shape:
 {{
   "language": "<source_language_code>",
-  "segments": [
-    {{"index": 1, "start": 0.0, "end": 2.5, "origin": "Chinese text", "mm": "Burmese text", "scene_id": 1}}
-  ],
-  "scenes": [
-    {{"scene_id": 1, "start": 0.0, "end": 5.0, "title": "concise original scene title", "mm_title": "Burmese title"}}
-  ]
+  "segments": [{{"index": 1, "start": 0.0, "end": 2.5, "origin": "Chinese text", "mm": "Burmese text", "scene_id": 1}}],
+  "scenes": [{{"scene_id": 1, "start": 0.0, "end": 5.0, "title": "concise original scene title", "mm_title": "Burmese title"}}]
 }}
 
 Rules:
-- Keep timestamps in seconds, monotonic, and aligned between origin/mm.
-- All property names must be in double quotes; response must be strict JSON.
-- Do not include trailing commas or comments.
-- The response must be valid JSON that Python json.loads can parse.
-- Respond with JSON only. Do NOT add explanations or code fences.
+- Timestamps are seconds, monotonic, non-overlapping.
+- All property names must be double-quoted.
+- Respond with JSON only. No code fences.
 """.strip()
 
     payload: Dict[str, Any] = {
@@ -562,8 +439,6 @@ Rules:
         raise GeminiSubtitlesError("Gemini subtitles JSON must include a language code")
 
     if "segments" not in data or "scenes" not in data:
-        raise GeminiSubtitlesError(
-            "Gemini subtitles JSON must contain 'segments' and 'scenes'"
-        )
+        raise GeminiSubtitlesError("Gemini subtitles JSON must contain 'segments' and 'scenes'")
 
     return data
