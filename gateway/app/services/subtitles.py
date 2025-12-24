@@ -9,7 +9,7 @@ from fastapi import HTTPException
 
 from gateway.app.config import get_settings
 from gateway.app.core.subtitle_utils import preview_lines, segments_to_srt
-from gateway.app.core.workspace import Workspace, relative_to_workspace
+from gateway.app.core.workspace import Workspace, relative_to_workspace, subs_dir
 from gateway.app.providers.gemini_subtitles import (
     GeminiSubtitlesError,
     translate_and_segment_with_gemini,
@@ -92,6 +92,7 @@ async def generate_subtitles(
                 gemini_result = translate_and_segment_with_gemini(
                     origin_srt_text=origin_srt_text,
                     target_lang=target_lang,
+                    debug_dir=subs_dir(task_id),
                 )
             else:
                 if not workspace.raw_video_exists():
@@ -103,6 +104,7 @@ async def generate_subtitles(
                 gemini_result = transcribe_translate_and_segment_with_gemini(
                     video_path=workspace.raw_video_path,
                     target_lang=target_lang,
+                    debug_dir=subs_dir(task_id),
                 )
                 origin_srt_text = gemini_result.get("origin_srt") or origin_srt_text
         except GeminiSubtitlesError as exc:
