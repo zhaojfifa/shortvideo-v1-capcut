@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from pydantic import BaseModel
@@ -25,8 +26,26 @@ from ..schemas import (
     TaskListResponse,
     TaskSummary,
 )
+# ... 其他 imports ...
+from gateway.app.db import get_db, get_task_repository
+# 1. 确保 Repository 接口存在 (解决 Pylance 报错)
+from gateway.app.ports.repository import ITaskRepository 
+
+# 2. 确保 steps 路径正确 (PR-0D 修复)
+from gateway.app.steps.dubbing import run_dub_step
+# from gateway.app.steps.pack import run_pack_step  # 如果你有这个文件的话
+# from gateway.app.steps.subtitles import run_subtitles_step # 如果你有这个文件的话
+
+# 3. 确保 artifact_storage 引用正确 (包含所有4个兼容函数)
+from gateway.app.services.artifact_storage import (
+    upload_task_artifact, 
+    get_download_url, 
+    get_object_bytes, 
+    object_exists
+)
+# ...
 from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
-from gateway.app.services.dubbing import DubbingError, synthesize_voice
+from gateway.app.steps.dubbing import run_dub_step
 from gateway.app.services.artifact_storage import upload_task_artifact
 from gateway.app.services.artifact_storage import get_download_url, get_object_bytes, object_exists
 from gateway.app.services.task_cleanup import delete_task_record, purge_task_artifacts
@@ -775,61 +794,6 @@ def save_mm_edited(task_id: str, payload: EditedTextRequest):
         raise HTTPException(status_code=500, detail=f"write mm_edited failed: {exc}") from exc
 
 
-@api_router.post("/tasks/{task_id}/dub", response_model=TaskDetail)
-def rerun_dub(
-    task_id: str,
-    payload: DubProviderRequest,
-    repo=Depends(get_task_repository),
-):
-    """Re-run dubbing for a task with a selected provider."""
-
-    task = repo.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-
-    provider = (payload.provider or "edge-tts").lower()
-    if provider == "edge":
-        provider = "edge-tts"
-    if provider not in {"edge-tts", "lovo"}:
-        raise HTTPException(status_code=400, detail="Unsupported dub provider")
-
-    settings = get_settings()
-    if provider == "lovo" and not settings.lovo_api_key:
-        raise HTTPException(status_code=400, detail="LOVO_API_KEY is not configured")
-
-    try:
-        dub_text, _source = _load_dub_text(task_id)
-        if not dub_text.strip():
-            raise HTTPException(
-                status_code=400,
-                detail="dub text missing: mm_edited.txt/mm.txt not found or empty",
-            )
-        result = asyncio.run(
-            synthesize_voice(
-                task_id=task_id,
-                target_lang=task.get("content_lang") or "my",
-                voice_id=payload.voice_id,
-                force=True,
-                mm_srt_text=dub_text,
-                provider=provider,
-            )
-        )
-    except DubbingError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    audio_key = None
-    audio_path = result.get("path")
-    if audio_path:
-        audio_key = upload_task_artifact(task, Path(audio_path), "mm_audio.mp3", task_id=task_id)
-    repo.update(
-        task_id,
-        {
-            "mm_audio_path": audio_key,
-            "dub_provider": provider,
-        },
-    )
-    stored = repo.get(task_id) or task
-    return _task_to_detail(stored)
 
 
 @api_router.get("/tasks/{task_id}", response_model=TaskDetail)
@@ -841,6 +805,76 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
         raise HTTPException(status_code=404, detail="Task not found")
 
     return _task_to_detail(t)
+
+@api_router.post("/tasks/{task_id}/dub", response_model=TaskDetail)
+async def rerun_dub(
+    task_id: str,
+    payload: DubRequest, # 请确认头部 import 了 DubRequest
+    repo: ITaskRepository = Depends(get_task_repository),
+):
+    """Re-run dubbing for a task with a selected provider."""
+
+    # 1. 检查任务
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # 2. 检查参数
+    provider = (payload.provider or "edge-tts").lower()
+    if provider == "edge": provider = "edge-tts"
+    if provider not in {"edge-tts", "lovo"}:
+        raise HTTPException(status_code=400, detail="Unsupported dub provider")
+
+    settings = get_settings()
+    if provider == "lovo" and not settings.lovo_api_key:
+        raise HTTPException(status_code=400, detail="LOVO_API_KEY is not configured")
+
+    # 3. 执行新步骤 (SSOT)
+    try:
+        # 构造适配器对象
+        class TaskAdapter:
+            def __init__(self, t, voice_override=None):
+                getter = t.get if isinstance(t, dict) else lambda k, d=None: getattr(t, k, d)
+                self.id = getter("id", None)
+                self.tenant_id = getter("tenant_id", "default")
+                self.project_id = getter("project_id", "default")
+                self.target_lang = getter("target_lang", getter("content_lang", "my"))
+                self.voice_id = voice_override or getter("voice_id", None)
+
+        task_adapter = TaskAdapter(task, voice_override=payload.voice_id)
+
+        # 核心：调用 run_dub_step
+        # 注意：这个步骤会自动读取 subtitles.json -> 生成音频 -> 上传到 R2
+        from gateway.app.steps.dubbing import run_dub_step
+        await run_dub_step(task_adapter)
+        
+        # 4. 获取结果路径 (直接推算，不需要从 step 返回)
+        from gateway.app.utils.keys import KeyBuilder
+        audio_key = KeyBuilder.build(
+            task_adapter.tenant_id, 
+            task_adapter.project_id, 
+            task_adapter.id, 
+            "artifacts/voice/full.mp3"
+        )
+
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Dubbing step failed: {str(exc)}")
+
+    # 5. 更新数据库 (仅更新路径引用，不需要再上传)
+    repo.update(
+        task_id,
+        {
+            "mm_audio_path": audio_key, # 直接存 R2 Key
+            "dub_provider": provider,
+            "last_step": "dubbing"      # 更新状态
+        },
+    )
+    
+    # 6. 返回结果
+    stored = repo.get(task_id)
+    return _task_to_detail(stored)
 
 
 @api_router.delete("/tasks/{task_id}")
@@ -870,7 +904,41 @@ def delete_task(
 
     return {"ok": True, "task_id": task_id, "deleted_assets": bool(delete_assets), "purged": purged}
 
-
+# ============================================================
+# Helper for reading small files (e.g. JSON/TXT)
+# ============================================================
+def get_object_bytes(task_id: str, artifact_name: str, tenant_id: str = "default", project_id: str = "default") -> bytes | None:
+    """
+    读取文件内容到内存。仅用于读取 JSON/Text 等小文件。
+    """
+    import os
+    from gateway.app.config import get_storage_service, get_settings
+    from gateway.app.utils.keys import KeyBuilder
+    
+    storage = get_storage_service()
+    settings = get_settings()
+    key = KeyBuilder.build(tenant_id, project_id, task_id, artifact_name)
+    
+    # 因为 IStorageService 没有 read_bytes 接口，我们先下载到临时文件再读取
+    # 这是一个妥协方案，未来应该在 IStorageService 加 read 方法
+    temp_path = f"/tmp/{task_id}_{artifact_name.replace('/', '_')}"
+    # Windows 兼容
+    if os.name == 'nt':
+        temp_path = os.path.join(os.environ.get("TEMP", "."), f"{task_id}_{artifact_name.replace('/', '_')}")
+        
+    try:
+        storage.download_file(key, temp_path)
+        with open(temp_path, "rb") as f:
+            return f.read()
+    except Exception as e:
+        logger.error(f"Failed to read bytes from {key}: {e}")
+        return None
+    finally:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except:
+                pass
 # Backwards-compatible export for existing imports
 router = api_router
 
