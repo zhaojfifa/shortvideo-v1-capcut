@@ -144,3 +144,18 @@ def object_exists(task_id: str, artifact_name: str, tenant_id: str = "default", 
     key = KeyBuilder.build(tenant_id, project_id, task_id, artifact_name)
     
     return storage.exists(key)
+# ============================================================
+# Legacy Wrapper (Hotfix 3 for Main.py compatibility)
+# ============================================================
+def upload_task_artifact(task_id: str, local_path: str, artifact_name: str, tenant_id: str = "default", project_id: str = "default") -> str | None:
+    """
+    上传文件的兼容性包装器。
+    供 main.py 和旧路由调用，底层转发给新的 Storage Service。
+    """
+    from gateway.app.config import get_storage_service
+    from gateway.app.utils.keys import KeyBuilder
+    
+    storage = get_storage_service()
+    key = KeyBuilder.build(tenant_id, project_id, task_id, artifact_name)
+    
+    return storage.upload_file(local_path, key)
