@@ -113,3 +113,21 @@ def exists_in_storage(task_id: str, artifact_name: str,
         return True
     except:
         return False
+
+# ============================================================
+# Legacy Wrapper (Hotfix for Main.py compatibility)
+# ============================================================
+def get_download_url(task_id: str, artifact_name: str, tenant_id: str = "default", project_id: str = "default") -> str:
+    """
+    获取下载链接的兼容性包装器。
+    供 main.py 和旧路由调用，底层转发给新的 Storage Service。
+    """
+    # 在函数内部导入，防止循环依赖
+    from gateway.app.config import get_storage_service
+    from gateway.app.utils.keys import KeyBuilder
+    
+    storage = get_storage_service()
+    key = KeyBuilder.build(tenant_id, project_id, task_id, artifact_name)
+    
+    # 生成 1 小时有效的签名链接
+    return storage.generate_presigned_url(key, expiration=3600)    
