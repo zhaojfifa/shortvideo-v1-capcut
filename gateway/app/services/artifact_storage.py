@@ -131,3 +131,16 @@ def get_download_url(task_id: str, artifact_name: str, tenant_id: str = "default
     
     # 生成 1 小时有效的签名链接
     return storage.generate_presigned_url(key, expiration=3600)    
+
+def object_exists(task_id: str, artifact_name: str, tenant_id: str = "default", project_id: str = "default") -> bool:
+    """
+    Legacy wrapper for checking file existence.
+    Delegates to the new Storage Service.
+    """
+    from gateway.app.config import get_storage_service
+    from gateway.app.utils.keys import KeyBuilder
+    
+    storage = get_storage_service()
+    key = KeyBuilder.build(tenant_id, project_id, task_id, artifact_name)
+    
+    return storage.exists(key)
