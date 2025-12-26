@@ -158,3 +158,20 @@ def get_db():
         yield db
     finally:
         db.close()
+# ============================================================
+# Repository Dependency Factory (PR-0B Fix)
+# ============================================================
+from fastapi import Depends
+from sqlalchemy.orm import Session
+# 确保导入了刚才写的适配器和接口
+from gateway.app.adapters.repo_sql import SQLAlchemyTaskRepository
+from gateway.app.ports.repository import ITaskRepository
+
+# 假设 get_db 已经在这个文件里定义了，如果没定义，请确保从 session 模块导入
+# from .session import get_db 
+
+def get_task_repository(db: Session = Depends(get_db)) -> ITaskRepository:
+    """
+    FastAPI Dependency: 获取 Task Repository 实例
+    """
+    return SQLAlchemyTaskRepository(db)
