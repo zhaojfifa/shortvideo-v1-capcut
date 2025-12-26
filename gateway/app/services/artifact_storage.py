@@ -1,83 +1,115 @@
-from __future__ import annotations
+import os
+import logging
+from gateway.app.config import get_settings
+# 假设你已经在 PR-0A 第一步创建了 keys.py，如果没有，请确保该文件存在
+from gateway.app.utils.keys import KeyBuilder 
 
-import mimetypes
-from pathlib import Path
-from typing import Any, Optional
+# 尝试导入 boto3，如果是在本地没装环境，允许失败（只要不调用就不会崩）
+try:
+    import boto3
+    from botocore.exceptions import ClientError
+except ImportError:
+    boto3 = None
+    ClientError = None
 
-from gateway.adapters.s3_client import get_bucket_name, get_s3_client
-from gateway.app.services.artifact_downloads import build_download_url, storage_available
+logger = logging.getLogger(__name__)
 
-
-def _task_value(task: Any, key: str) -> Optional[str]:
-    if task is None:
+def get_s3_client():
+    settings = get_settings()
+    if not settings.R2_ACCESS_KEY or not settings.R2_SECRET_KEY:
+        logger.warning("R2 credentials not set.")
         return None
-    if isinstance(task, dict):
-        value = task.get(key)
-    else:
-        value = getattr(task, key, None)
-    return str(value) if value is not None else None
+    
+    return boto3.client(
+        's3',
+        endpoint_url=settings.R2_ENDPOINT,
+        aws_access_key_id=settings.R2_ACCESS_KEY,
+        aws_secret_access_key=settings.R2_SECRET_KEY,
+        region_name="auto"
+    )
 
+def storage_available() -> bool:
+    return get_s3_client() is not None
 
-def task_storage_prefix(task: Any, task_id: Optional[str] = None) -> str:
-    resolved_id = task_id or _task_value(task, "task_id") or _task_value(task, "id") or "unknown"
-    return f"tasks/{resolved_id}"
-
-
-def artifact_key(task: Any, filename: str, task_id: Optional[str] = None) -> str:
-    prefix = task_storage_prefix(task, task_id=task_id)
-    return f"{prefix}/{filename.lstrip('/')}"
-
-
-def upload_task_artifact(
-    task: Any,
-    local_path: Path,
-    filename: str,
-    content_type: Optional[str] = None,
-    task_id: Optional[str] = None,
-) -> str:
-    if not storage_available():
-        raise RuntimeError("Storage is not configured")
-    key = artifact_key(task, filename, task_id=task_id)
+def upload_artifact(task_id: str, local_path: str, artifact_name: str, 
+                   tenant_id: str = "default", project_id: str = "default") -> str | None:
+    """
+    上传文件到 R2，使用标准命名空间。
+    返回 Presigned URL 或 Public URL。
+    """
     client = get_s3_client()
-    bucket = get_bucket_name()
-    extra_args = {}
-    inferred_type, _ = mimetypes.guess_type(str(local_path))
-    resolved_type = content_type or inferred_type
-    if resolved_type:
-        extra_args["ContentType"] = resolved_type
-    if extra_args:
-        client.upload_file(str(local_path), bucket, key, ExtraArgs=extra_args)
-    else:
-        client.upload_file(str(local_path), bucket, key)
-    return key
+    if not client:
+        return None
 
+    settings = get_settings()
+    bucket = settings.R2_BUCKET_NAME
+    
+    # === 核心修改：使用 KeyBuilder 生成路径 ===
+    key = KeyBuilder.build(tenant_id, project_id, task_id, artifact_name)
+    # =======================================
 
-def get_download_url(key: str, expires_sec: int = 3600) -> str:
-    return build_download_url(key, expires_sec=expires_sec)
+    try:
+        logger.info(f"Uploading {local_path} to {key}")
+        client.upload_file(local_path, bucket, key)
+        
+        # 生成一个临时下载链接 (1小时有效) 用于回显
+        url = client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': bucket, 'Key': key},
+            ExpiresIn=3600
+        )
+        return url
+    except Exception as e:
+        logger.error(f"Failed to upload artifact {key}: {e}")
+        return None
 
-
-def object_exists(key: str) -> bool:
-    if not storage_available():
+def download_artifact(task_id: str, artifact_name: str, local_path: str,
+                     tenant_id: str = "default", project_id: str = "default") -> bool:
+    """
+    从 R2 下载文件到本地。
+    """
+    client = get_s3_client()
+    if not client:
         return False
+
+    settings = get_settings()
+    bucket = settings.R2_BUCKET_NAME
+    
+    # === 核心修改：使用 KeyBuilder ===
+    key = KeyBuilder.build(tenant_id, project_id, task_id, artifact_name)
+    # ===============================
+
+    try:
+        # 确保本地目录存在
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+        
+        logger.info(f"Downloading {key} to {local_path}")
+        client.download_file(bucket, key, local_path)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to download artifact {key}: {e}")
+        # 兼容性尝试：如果新路径失败，尝试旧路径 (Fallback)
+        try:
+            old_key = f"tasks/{task_id}/{artifact_name}"
+            logger.warning(f"Trying fallback key: {old_key}")
+            client.download_file(bucket, old_key, local_path)
+            return True
+        except Exception as fallback_e:
+            logger.error(f"Fallback download also failed: {fallback_e}")
+            return False
+
+def exists_in_storage(task_id: str, artifact_name: str,
+                     tenant_id: str = "default", project_id: str = "default") -> bool:
     client = get_s3_client()
-    bucket = get_bucket_name()
+    if not client:
+        return False
+        
+    settings = get_settings()
+    bucket = settings.R2_BUCKET_NAME
+    key = KeyBuilder.build(tenant_id, project_id, task_id, artifact_name)
+    
     try:
         client.head_object(Bucket=bucket, Key=key)
         return True
-    except Exception:
+    except:
         return False
-
-
-def get_object_bytes(key: str) -> bytes | None:
-    if not storage_available():
-        return None
-    client = get_s3_client()
-    bucket = get_bucket_name()
-    try:
-        obj = client.get_object(Bucket=bucket, Key=key)
-    except Exception:
-        return None
-    body = obj.get("Body")
-    if body is None:
-        return None
-    return body.read()
