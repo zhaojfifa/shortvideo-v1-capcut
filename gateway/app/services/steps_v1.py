@@ -187,6 +187,8 @@ async def run_pack_step(req: PackRequest):
     workspace = Workspace(task_id)
 
     raw_file = raw_path(task_id)
+    zip_path = pack_zip_path(task_id)
+    zip_path.parent.mkdir(parents=True, exist_ok=True)
 
     # audio：优先 workspace.mm_audio_path（你的 dub 可能输出 mp3），不存在则 fallback 到 wav 命名
     audio_file = workspace.mm_audio_path
@@ -211,6 +213,8 @@ async def run_pack_step(req: PackRequest):
         )
     except PackError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not zip_path.exists():
+        raise RuntimeError(f"Pack zip not found after packing: {zip_path}")
 
     # 兼容两类 pack 返回：
     # 1) 新版 pack：内部已 upload，返回 {"zip_key": "...", "zip_path": "...", ...}
