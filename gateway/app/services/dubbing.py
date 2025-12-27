@@ -18,7 +18,6 @@ from gateway.app.core.workspace import Workspace
 from gateway.app.providers.edge_tts import EdgeTTSError, generate_audio_edge_tts
 from gateway.app.providers import lovo_tts
 from gateway.app.schemas import DubRequest
-from gateway.app.services.steps_v1 import run_dub_step as run_dub_step_v1
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +154,9 @@ async def synthesize_voice(*args: Any, **kwargs: Any) -> Any:
     Routes DubRequest-based calls to steps_v1, otherwise falls back to text synthesis.
     """
     try:
+        from gateway.app.services.steps_v1 import (
+            run_dub_step as run_dub_step_v1,
+        )  # lazy import to avoid circular import
         if args and isinstance(args[0], DubRequest):
             return await run_dub_step_v1(args[0])
 
