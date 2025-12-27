@@ -165,7 +165,7 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 # 确保导入了刚才写的适配器和接口
 from gateway.app.adapters.repo_sql import SQLAlchemyTaskRepository
-from gateway.app.ports.repository import ITaskRepository
+from gateway.ports.repository import ITaskRepository
 
 # 假设 get_db 已经在这个文件里定义了，如果没定义，请确保从 session 模块导入
 # from .session import get_db 

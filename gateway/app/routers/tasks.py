@@ -29,7 +29,7 @@ from ..schemas import (
 # ... 其他 imports ...
 from gateway.app.db import get_db, get_task_repository
 # 1. 确保 Repository 接口存在 (解决 Pylance 报错)
-from gateway.app.ports.repository import ITaskRepository 
+from gateway.ports.repository import ITaskRepository 
 
 # 2. 确保 steps 路径正确 (PR-0D 修复)
 from gateway.app.steps.dubbing import run_dub_step
