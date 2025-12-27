@@ -1,8 +1,0 @@
-{
-  "schema_version": "0.1",
-  "task_id": "smokedub123",
-  "provider": "skipped",
-  "voice_id": null,
-  "outputs": {},
-  "reason": "DUB_SKIP=1"
-}
