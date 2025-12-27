@@ -3,6 +3,9 @@ import logging
 import tempfile
 from gateway.app.config import get_settings, get_storage_service
 from gateway.app.utils.keys import KeyBuilder
+from pathlib import Path
+from urllib.parse import unquote
+
 
 # 允许本地开发没装 boto3 时不崩
 try:
@@ -36,6 +39,19 @@ def download_artifact(task_id: str, artifact_name: str, local_path: str,
         logger.error(f"Download failed: {e}")
         return False
 
+def _local_path_from_file_url(key: str) -> Path | None:
+    if not key or not isinstance(key, str):
+        return None
+    if not key.startswith("file://"):
+        return None
+
+    # handle Windows: file://D:/a/b or file:///D:/a/b
+    p = key[len("file://"):]
+    if p.startswith("/"):
+        p = p.lstrip("/")  # tolerate file:///D:/...
+    p = unquote(p)
+    return Path(p)
+
 # =========================================================
 # 2. Legacy Wrappers (Hotfix for tasks.py / main.py compatibility)
 # 这些是旧代码依赖的函数名，我们用新架构实现它们，保持接口不变。
@@ -43,46 +59,103 @@ def download_artifact(task_id: str, artifact_name: str, local_path: str,
 
 def upload_task_artifact(task, local_path, artifact_name, task_id=None, **kwargs):
     """
-    兼容旧的 upload_task_artifact 调用。
-    参数 task 可能是 ORM 对象或字典，也可能传了 task_id。
+    Legacy wrapper: accept task object/dict and local file path, upload to storage.
+    Compatible with routers/tasks.py and older call sites.
     """
-    # 尝试解析 ID 和租户信息
-    t_id = task_id or getattr(task, "id", None) or (task.get("id") if isinstance(task, dict) else "unknown")
-    
-    # 尝试获取租户信息 (如果 task 对象里没有，就由 KeyBuilder 使用默认值)
-    tenant = getattr(task, "tenant_id", "default")
-    project = getattr(task, "project_id", "default")
-    
-    return upload_artifact(str(local_path), artifact_name, tenant_id=tenant, project_id=project, task_id=t_id)
+    # 1) Resolve task_id
+    t_id = (
+        task_id
+        or getattr(task, "task_id", None)
+        or getattr(task, "id", None)
+        or (task.get("task_id") if isinstance(task, dict) else None)
+        or (task.get("id") if isinstance(task, dict) else None)
+        or "unknown"
+    )
 
-def get_download_url(task_id: str, artifact_name: str, tenant_id: str = "default", project_id: str = "default") -> str:
+    # 2) Resolve tenant/project
+    tenant = (
+        getattr(task, "tenant_id", None)
+        or getattr(task, "tenant", None)
+        or (task.get("tenant_id") if isinstance(task, dict) else None)
+        or (task.get("tenant") if isinstance(task, dict) else None)
+        or "default"
+    )
+    project = (
+        getattr(task, "project_id", None)
+        or getattr(task, "project", None)
+        or (task.get("project_id") if isinstance(task, dict) else None)
+        or (task.get("project") if isinstance(task, dict) else None)
+        or "default"
+    )
+
+    # ✅ Correct argument order: (task_id, local_path, artifact_name, ...)
+    return upload_artifact(
+        str(t_id),
+        str(local_path),
+        str(artifact_name),
+        tenant_id=str(tenant),
+        project_id=str(project),
+    )
+
+
+def get_download_url(task_or_key: str, artifact_name: str | None = None,
+                     tenant_id: str = "default", project_id: str = "default") -> str:
     """
-    兼容旧的 get_download_url 调用。返回签名链接。
+    Backward compatible:
+    - get_download_url(key)
+    - get_download_url(task_id, artifact_name, tenant_id=..., project_id=...)
     """
     storage = get_storage_service()
-    key = KeyBuilder.build(tenant_id, project_id, task_id, artifact_name)
-    # 默认 1 小时有效期
+    if artifact_name is None:
+        # treat first arg as full storage key
+        key = task_or_key
+    else:
+        key = KeyBuilder.build(tenant_id, project_id, task_or_key, artifact_name)
     return storage.generate_presigned_url(key, expiration=3600)
 
-def object_exists(task_id: str, artifact_name: str, tenant_id: str = "default", project_id: str = "default") -> bool:
-    """
-    兼容旧的 object_exists 调用。
-    """
+
+def object_exists(task_or_key: str, artifact_name: str | None = None,
+                  tenant_id: str = "default", project_id: str = "default") -> bool:
     storage = get_storage_service()
-    key = KeyBuilder.build(tenant_id, project_id, task_id, artifact_name)
+
+    if artifact_name is None:
+        key = task_or_key
+
+        # ✅ local file url shortcut
+        lp = _local_path_from_file_url(key)
+        if lp is not None:
+            return lp.exists()
+
+    else:
+        key = KeyBuilder.build(tenant_id, project_id, task_or_key, artifact_name)
+
     return storage.exists(key)
 
-def get_object_bytes(task_id: str, artifact_name: str, tenant_id: str = "default", project_id: str = "default") -> bytes | None:
-    """
-    兼容旧的 get_object_bytes 调用。下载到临时文件读取后返回二进制。
-    """
+
+
+def get_object_bytes(task_or_key: str, artifact_name: str | None = None,
+                     tenant_id: str = "default", project_id: str = "default") -> bytes | None:
+    import os
+    import tempfile
+
     storage = get_storage_service()
-    key = KeyBuilder.build(tenant_id, project_id, task_id, artifact_name)
-    
-    # 创建临时文件
+
+    if artifact_name is None:
+        key = task_or_key
+
+        # ✅ local file url shortcut
+        lp = _local_path_from_file_url(key)
+        if lp is not None:
+            try:
+                return lp.read_bytes()
+            except Exception as e:
+                logger.error(f"Failed to read local file bytes from {lp}: {e}")
+                return None
+    else:
+        key = KeyBuilder.build(tenant_id, project_id, task_or_key, artifact_name)
+
     fd, temp_path = tempfile.mkstemp()
-    os.close(fd) # 关闭句柄，让 storage 服务去写
-    
+    os.close(fd)
     try:
         storage.download_file(key, temp_path)
         with open(temp_path, "rb") as f:
@@ -91,9 +164,8 @@ def get_object_bytes(task_id: str, artifact_name: str, tenant_id: str = "default
         logger.error(f"Failed to read bytes from {key}: {e}")
         return None
     finally:
-        # 清理垃圾
-        if os.path.exists(temp_path):
-            try:
+        try:
+            if os.path.exists(temp_path):
                 os.remove(temp_path)
-            except:
-                pass
+        except Exception:
+            pass
