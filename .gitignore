@@ -22,10 +22,13 @@ Thumbs.db
 
 # Local DB
 *.db
+*.sqlite
+*.sqlite3
 
 # Workspace / runtime artifacts
 data_debug/
 video_workspace/
+tv1_validation/
 workspace/
 tmp/
 temp/
@@ -41,5 +44,8 @@ temp/
 # Smoke / local test helpers
 tmp_*.json
 tmp_*.txt
+tmp_*.srt
+tmp_*.wav
+tmp_*.mp3
 smoke_*.py
 *_smoke.ps1

@@ -129,8 +129,8 @@ def get_storage_service():
         # 动态导入 R2 适配器
         from gateway.app.adapters.storage_r2 import R2StorageService
         _storage_service_instance = R2StorageService(
-            access_key=settings.R2_ACCESS_KEY,
-            secret_key=settings.R2_SECRET_KEY,
+            access_key_id=settings.R2_ACCESS_KEY,
+            secret_access_key=settings.R2_SECRET_KEY,
             endpoint_url=settings.R2_ENDPOINT,
             bucket_name=settings.R2_BUCKET_NAME
         )
