@@ -37,11 +37,21 @@ class R2StorageService(IStorageService):
         self,
         file_path: str,
         key: str,
-        content_type: str = "application/octet-stream",
+        content_type: str | None = None,
     ) -> str:
         if not content_type:
             guess, _ = mimetypes.guess_type(file_path)
-            content_type = guess or "application/octet-stream"
+            content_type = guess
+            if not content_type:
+                lower_path = str(file_path).lower()
+                if lower_path.endswith(".mp3"):
+                    content_type = "audio/mpeg"
+                elif lower_path.endswith(".zip"):
+                    content_type = "application/zip"
+                elif lower_path.endswith(".srt"):
+                    content_type = "text/plain; charset=utf-8"
+                else:
+                    content_type = "application/octet-stream"
         self.s3_client.upload_file(
             file_path,
             self.bucket_name,
@@ -64,8 +74,15 @@ class R2StorageService(IStorageService):
                 raise
 
     def generate_presigned_url(self, key: str, expiration: int = 3600) -> str:
+        params = {"Bucket": self.bucket_name, "Key": key}
+        key_lower = key.lower()
+        if key_lower.endswith(".zip"):
+            params["ResponseContentType"] = "application/zip"
+            params["ResponseContentDisposition"] = 'attachment; filename="capcut_pack.zip"'
+        elif key_lower.endswith(".mp3"):
+            params["ResponseContentType"] = "audio/mpeg"
         return self.s3_client.generate_presigned_url(
             'get_object',
-            Params={'Bucket': self.bucket_name, 'Key': key},
+            Params=params,
             ExpiresIn=expiration
         )

@@ -1,10 +1,17 @@
 """Reusable pipeline step functions shared by /v1 routes and background tasks."""
 
 import logging
+import os
+import re
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import HTTPException
 
+from gateway.app.config import get_storage_service
 from gateway.app.core.workspace import (
     Workspace,
     pack_zip_path,
@@ -14,12 +21,12 @@ from gateway.app.core.workspace import (
 )
 from gateway.app.db import SessionLocal
 from gateway.app import models
-from gateway.app.services.artifact_storage import get_download_url, upload_task_artifact
+from gateway.app.services.artifact_storage import upload_task_artifact
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
-from gateway.app.services.pack import PackError, create_capcut_pack
 from gateway.app.services.parse import detect_platform, parse_douyin_video
 from gateway.app.services.subtitles import generate_subtitles
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
+from gateway.app.utils.keys import KeyBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +39,86 @@ ORIGIN_SRT_ARTIFACT = "subs/origin.srt"
 MM_SRT_ARTIFACT = "subs/mm.srt"
 MM_TXT_ARTIFACT = "subs/mm.txt"
 CAPCUT_PACK_ARTIFACT = "artifacts/capcut_pack.zip"
+
+README_TEMPLATE = """CapCut pack usage
+
+1. Create a new CapCut project and import the extracted zip files.
+2. Place raw.mp4 on the video track.
+3. Import subs_mm.srt (or subs_origin.srt) and adjust styling.
+4. Place {audio_filename} on the audio track and align with subtitles.
+5. For plain text subtitles, use subs_mm.txt (no timecodes).
+6. Add transitions or stickers as needed.
+"""
+
+
+class PackError(Exception):
+    """Raised when packing fails."""
+
+
+_SRT_TIME_RE = re.compile(
+    r"\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}"
+)
+
+
+def _srt_to_txt(srt_text: str) -> str:
+    blocks = [b for b in srt_text.split("\n\n") if b.strip()]
+    lines_out: list[str] = []
+    for block in blocks:
+        text_lines: list[str] = []
+        for line in block.splitlines():
+            s = line.strip()
+            if not s:
+                continue
+            if s.isdigit():
+                continue
+            if "-->" in s or _SRT_TIME_RE.search(s):
+                continue
+            text_lines.append(s)
+        if text_lines:
+            lines_out.append(" ".join(text_lines))
+    return "\n".join(lines_out).strip() + ("\n" if lines_out else "")
+
+
+def _ensure_txt_from_srt(dst_txt: Path, src_srt: Path) -> None:
+    srt_text = src_srt.read_text(encoding="utf-8")
+    dst_txt.write_text(_srt_to_txt(srt_text), encoding="utf-8")
+
+
+def _ensure_silence_audio_ffmpeg(out_path: Path, seconds: int = 1) -> None:
+    """Create a silent WAV via ffmpeg."""
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise PackError("ffmpeg not found in PATH (required). Please install ffmpeg.")
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "anullsrc=r=16000:cl=mono",
+        "-t",
+        str(seconds),
+        "-acodec",
+        "pcm_s16le",
+        str(out_path),
+    ]
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if p.returncode != 0 or not out_path.exists() or out_path.stat().st_size == 0:
+        raise PackError(f"ffmpeg silence generation failed: {p.stderr[-800:]}")
+
+
+def _maybe_fill_missing_for_pack(*, raw_path: Path, audio_path: Path, subs_path: Path) -> None:
+    """Allow pack to proceed by generating silence audio if DUB_SKIP=1."""
+
+    dub_skip = os.getenv("DUB_SKIP", "").strip().lower() in ("1", "true", "yes")
+    if not dub_skip:
+        return
+
+    if audio_path and not audio_path.exists():
+        _ensure_silence_audio_ffmpeg(audio_path, seconds=1)
 
 
 async def run_parse_step(req: ParseRequest):
@@ -189,8 +276,6 @@ async def run_pack_step(req: PackRequest):
     raw_file = raw_path(task_id)
     zip_path = pack_zip_path(task_id)
     zip_path.parent.mkdir(parents=True, exist_ok=True)
-    zip_path = pack_zip_path(task_id)
-    zip_path.parent.mkdir(parents=True, exist_ok=True)
 
     # audio：优先 workspace.mm_audio_path（你的 dub 可能输出 mp3），不存在则 fallback 到 wav 命名
     audio_file = workspace.mm_audio_path
@@ -206,37 +291,72 @@ async def run_pack_step(req: PackRequest):
     subs_mm_txt = subs_mm_srt.with_suffix(".txt")
 
     try:
-        packed = create_capcut_pack(
-            task_id,
-            raw_file,
-            audio_file,
-            subs_mm_srt,
-            subs_mm_txt,
-            pack_path=zip_path,
+        _maybe_fill_missing_for_pack(
+            raw_path=raw_file,
+            audio_path=audio_file,
+            subs_path=subs_mm_srt,
         )
+
+        required = [raw_file, audio_file, subs_mm_srt]
+        missing = [p for p in required if not p.exists()]
+        if missing:
+            names = ", ".join(str(p) for p in missing)
+            raise PackError(f"missing required files: {names}")
+
+        audio_filename = audio_file.name
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir) / f"pack_{task_id}"
+            tmp_path.mkdir(parents=True, exist_ok=True)
+
+            shutil.copy(raw_file, tmp_path / "raw.mp4")
+            shutil.copy(audio_file, tmp_path / audio_filename)
+            shutil.copy(subs_mm_srt, tmp_path / "subs_mm.srt")
+
+            txt_dst = tmp_path / "subs_mm.txt"
+            resolved_txt = subs_mm_txt if subs_mm_txt.exists() else subs_mm_srt.with_suffix(".txt")
+            if resolved_txt.exists():
+                shutil.copy(resolved_txt, txt_dst)
+            else:
+                _ensure_txt_from_srt(txt_dst, subs_mm_srt)
+
+            (tmp_path / "README.txt").write_text(
+                README_TEMPLATE.format(audio_filename=audio_filename),
+                encoding="utf-8",
+            )
+
+            with ZipFile(zip_path, "w", compression=ZIP_DEFLATED) as zf:
+                for item in tmp_path.iterdir():
+                    zf.write(item, arcname=item.name)
     except PackError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not zip_path.exists():
         raise RuntimeError(f"Pack zip not found after packing: {zip_path}")
-    if not zip_path.exists():
-        raise RuntimeError(f"Pack zip not found after packing: {zip_path}")
 
-    # 兼容两类 pack 返回：
-    # 1) 新版 pack：内部已 upload，返回 {"zip_key": "...", "zip_path": "...", ...}
-    # 2) 旧版 pack：只返回 zip_path / files，本地 zip 在 pack_zip_path(task_id)
-    pack_key = None
-    if isinstance(packed, dict):
-        pack_key = packed.get("zip_key")
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        tenant_id = getattr(task, "tenant_id", None) or getattr(task, "tenant", None) or "default"
+        project_id = getattr(task, "project_id", None) or getattr(task, "project", None) or "default"
+    finally:
+        db.close()
 
-    if not pack_key:
-        # fallback：从本地 pack_zip_path 上传
-        if zip_path.exists():
-            pack_key = _upload_artifact(task_id, zip_path, CAPCUT_PACK_ARTIFACT)
+    zip_key = KeyBuilder.build(str(tenant_id), str(project_id), task_id, CAPCUT_PACK_ARTIFACT)
+    storage = get_storage_service()
+    storage.upload_file(str(zip_path), zip_key, content_type="application/zip")
+
+    files = [
+        "raw.mp4",
+        audio_filename,
+        "subs_mm.srt",
+        "subs_mm.txt",
+        "README.txt",
+    ]
 
     # 更新任务：pack_path 必须存 key（供 /v1/tasks/{id}/pack 302 → /files/<key>）
     _update_task(
         task_id,
-        pack_path=pack_key,
+        pack_path=zip_key,
         status="ready",
         last_step="pack",
         error_message=None,
@@ -244,18 +364,14 @@ async def run_pack_step(req: PackRequest):
     )
 
     # 返回值对 UI/调试友好：保留 zip_path/files
-    zip_path_value = packed.get("zip_path") if isinstance(packed, dict) else None
-    if not zip_path_value:
-        if zip_path.exists():
-            zip_path_value = relative_to_workspace(zip_path)
-
-    download_url = get_download_url(pack_key) if pack_key else None
+    zip_path_value = relative_to_workspace(zip_path) if zip_path.exists() else None
+    download_url = storage.generate_presigned_url(zip_key, expiration=3600)
     return {
         "task_id": task_id,
-        "zip_key": pack_key,
+        "zip_key": zip_key,
         "zip_path": zip_path_value,
         "download_url": download_url,
-        "files": packed.get("files") if isinstance(packed, dict) else None,
+        "files": files,
     }
 
 

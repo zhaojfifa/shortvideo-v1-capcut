@@ -20,11 +20,15 @@ def get_s3_client():
     if not (R2_ENDPOINT and R2_ACCESS_KEY and R2_SECRET_KEY):
         raise RuntimeError("R2 S3 client is not configured")
     import boto3  # noqa: PLC0415
+    from botocore.config import Config  # noqa: PLC0415
 
+    endpoint_url = (R2_ENDPOINT or "").rstrip("/")
+    config = Config(signature_version="s3v4", s3={"addressing_style": "path"})
     return boto3.client(
         "s3",
-        endpoint_url=R2_ENDPOINT,
+        endpoint_url=endpoint_url,
         aws_access_key_id=R2_ACCESS_KEY,
         aws_secret_access_key=R2_SECRET_KEY,
         region_name="auto",
+        config=config,
     )
