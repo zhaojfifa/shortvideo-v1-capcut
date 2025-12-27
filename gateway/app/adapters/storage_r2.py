@@ -33,8 +33,13 @@ class R2StorageService(IStorageService):
             aws_secret_access_key=aws_secret_access_key
         )
 
-    def upload_file(self, file_path: str, key: str, content_type: str | None = None) -> str:
-        if content_type is None:
+    def upload_file(
+        self,
+        file_path: str,
+        key: str,
+        content_type: str = "application/octet-stream",
+    ) -> str:
+        if not content_type:
             guess, _ = mimetypes.guess_type(file_path)
             content_type = guess or "application/octet-stream"
         self.s3_client.upload_file(

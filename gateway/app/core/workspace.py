@@ -184,7 +184,7 @@ def workspace_root() -> Path:
 
 
 def raw_path(task_id: str) -> Path:
-    path = task_base_dir(task_id) / "raw" / f"{task_id}.mp4"
+    path = task_base_dir(task_id) / "raw" / "raw.mp4"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -238,8 +238,8 @@ def ensure_public_audio(path: Path) -> Path:
     return target
 
 
-def packs_dir(_task_id: str) -> Path:
-    path = workspace_root() / "pack"
+def packs_dir(task_id: str) -> Path:
+    path = task_base_dir(task_id) / "pack"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -257,14 +257,14 @@ def audio_wav_path(task_id: str) -> Path:
 
 
 def origin_srt_path(task_id: str) -> Path:
-    path = subs_dir(task_id) / f"{task_id}_origin.srt"
+    path = subs_dir(task_id) / "origin.srt"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def translated_srt_path(task_id: str, target_lang: str) -> Path:
     suffix = target_lang or "mm"
-    path = subs_dir(task_id) / f"{task_id}_{suffix}.srt"
+    path = subs_dir(task_id) / f"{suffix}.srt"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 

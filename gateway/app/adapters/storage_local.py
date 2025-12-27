@@ -12,7 +12,12 @@ class LocalStorageService(IStorageService):
         # 确保根目录存在
         os.makedirs(self.root_dir, exist_ok=True)
 
-    def upload_file(self, local_path: str, remote_key: str) -> str:
+    def upload_file(
+        self,
+        local_path: str,
+        remote_key: str,
+        content_type: str = "application/octet-stream",
+    ) -> str:
         # 拼接完整的目标路径
         dest_path = os.path.join(self.root_dir, remote_key)
         

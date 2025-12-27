@@ -14,7 +14,7 @@ from gateway.app.core.workspace import (
 )
 from gateway.app.db import SessionLocal
 from gateway.app import models
-from gateway.app.services.artifact_storage import upload_task_artifact
+from gateway.app.services.artifact_storage import get_download_url, upload_task_artifact
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.pack import PackError, create_capcut_pack
 from gateway.app.services.parse import detect_platform, parse_douyin_video
@@ -27,11 +27,10 @@ logger = logging.getLogger(__name__)
 # Artifact name conventions
 # -------------------------
 # 强制所有 key 都落到 artifacts/ 下，确保 /files/<key> 路径一致、可预期
-RAW_ARTIFACT = "artifacts/raw.mp4"
-ORIGIN_SRT_ARTIFACT = "artifacts/origin.srt"
-MM_SRT_ARTIFACT = "artifacts/mm.srt"
-MM_TXT_ARTIFACT = "artifacts/mm.txt"
-MM_AUDIO_ARTIFACT = "artifacts/mm_audio.mp3"
+RAW_ARTIFACT = "raw/raw.mp4"
+ORIGIN_SRT_ARTIFACT = "subs/origin.srt"
+MM_SRT_ARTIFACT = "subs/mm.srt"
+MM_TXT_ARTIFACT = "subs/mm.txt"
 CAPCUT_PACK_ARTIFACT = "artifacts/capcut_pack.zip"
 
 
@@ -166,7 +165,8 @@ async def run_dub_step(req: DubRequest):
             p = workspace.mm_audio_path
 
         if p.exists():
-            audio_key = _upload_artifact(req.task_id, p, MM_AUDIO_ARTIFACT)
+            audio_artifact = f"audio/{p.name}"
+            audio_key = _upload_artifact(req.task_id, p, audio_artifact)
 
     _update_task(req.task_id, mm_audio_path=audio_key, last_step="dub")
 
@@ -187,6 +187,8 @@ async def run_pack_step(req: PackRequest):
     workspace = Workspace(task_id)
 
     raw_file = raw_path(task_id)
+    zip_path = pack_zip_path(task_id)
+    zip_path.parent.mkdir(parents=True, exist_ok=True)
     zip_path = pack_zip_path(task_id)
     zip_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -210,9 +212,12 @@ async def run_pack_step(req: PackRequest):
             audio_file,
             subs_mm_srt,
             subs_mm_txt,
+            pack_path=zip_path,
         )
     except PackError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not zip_path.exists():
+        raise RuntimeError(f"Pack zip not found after packing: {zip_path}")
     if not zip_path.exists():
         raise RuntimeError(f"Pack zip not found after packing: {zip_path}")
 
@@ -225,9 +230,8 @@ async def run_pack_step(req: PackRequest):
 
     if not pack_key:
         # fallback：从本地 pack_zip_path 上传
-        pack_file = pack_zip_path(task_id)
-        if pack_file.exists():
-            pack_key = _upload_artifact(task_id, pack_file, CAPCUT_PACK_ARTIFACT)
+        if zip_path.exists():
+            pack_key = _upload_artifact(task_id, zip_path, CAPCUT_PACK_ARTIFACT)
 
     # 更新任务：pack_path 必须存 key（供 /v1/tasks/{id}/pack 302 → /files/<key>）
     _update_task(
@@ -242,14 +246,15 @@ async def run_pack_step(req: PackRequest):
     # 返回值对 UI/调试友好：保留 zip_path/files
     zip_path_value = packed.get("zip_path") if isinstance(packed, dict) else None
     if not zip_path_value:
-        pack_file = pack_zip_path(task_id)
-        if pack_file.exists():
-            zip_path_value = relative_to_workspace(pack_file)
+        if zip_path.exists():
+            zip_path_value = relative_to_workspace(zip_path)
 
+    download_url = get_download_url(pack_key) if pack_key else None
     return {
         "task_id": task_id,
         "zip_key": pack_key,
         "zip_path": zip_path_value,
+        "download_url": download_url,
         "files": packed.get("files") if isinstance(packed, dict) else None,
     }
 

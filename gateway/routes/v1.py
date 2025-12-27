@@ -3,7 +3,9 @@
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from gateway.app.services.artifact_storage import get_download_url, object_exists
+from gateway.app.utils.keys import KeyBuilder
 from gateway.app.config import get_settings
 from gateway.app.db import SessionLocal
 from gateway.app import models
@@ -124,17 +126,17 @@ async def download_pack(task_id: str):
     db = SessionLocal()
     try:
         task = db.query(models.Task).filter(models.Task.id == task_id).first()
-        if task and task.pack_path:
-            ws_root = Path(get_settings().workspace_root)
-            pack_file = ws_root / task.pack_path
-            if pack_file.exists():
-                return FileResponse(
-                    pack_file, media_type="application/zip", filename=pack_file.name
-                )
+        if task:
+            if task.pack_path:
+                key = str(task.pack_path)
+            else:
+                tenant = getattr(task, "tenant_id", "default")
+                project = getattr(task, "project_id", "default")
+                key = KeyBuilder.build(tenant, project, task_id, "artifacts/capcut_pack.zip")
+
+            if object_exists(key):
+                return RedirectResponse(url=get_download_url(key), status_code=302)
     finally:
         db.close()
 
-    pack_file = pack_zip_path(task_id)
-    if not pack_file.exists():
-        raise HTTPException(status_code=404, detail="pack not found")
-    return FileResponse(pack_file, media_type="application/zip", filename=pack_file.name)
+    raise HTTPException(status_code=404, detail="pack not found")

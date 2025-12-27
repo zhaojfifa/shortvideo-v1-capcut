@@ -3,7 +3,12 @@ from typing import Dict, Any
 
 class IStorageService(ABC):
     @abstractmethod
-    def upload_file(self, file_path: str, key: str, content_type: str) -> str:
+    def upload_file(
+        self,
+        file_path: str,
+        key: str,
+        content_type: str = "application/octet-stream",
+    ) -> str:
         pass
 
     @abstractmethod
