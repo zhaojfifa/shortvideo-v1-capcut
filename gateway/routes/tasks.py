@@ -22,7 +22,7 @@ from gateway.app.core.workspace import (
 from gateway.app.db import get_db
 from gateway.app.web.templates import get_templates
 from gateway.app.schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary
-from gateway.app.services.pipeline_v1 import run_pipeline_background
+from gateway.app.steps.pipeline_v1 import run_pipeline_background
 
 router = APIRouter(prefix="/tasks")
 pages_router = APIRouter()
