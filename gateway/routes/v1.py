@@ -103,43 +103,8 @@ async def pack(request: PackRequest):
         task = db.query(models.Task).filter(models.Task.id == request.task_id).first()
         if not task:
             return result
-
-        rel_pack = None
-        if isinstance(result, dict):
-            rel_pack = (
-                result.get("pack_path")
-                or result.get("zip_path")
-                or result.get("pack")
-                or result.get("path")
-            )
-
-        if not rel_pack and task.pack_path:
-            rel_pack = task.pack_path
-
-        pack_file = None
-        if rel_pack:
-            ws_root = Path(get_settings().workspace_root)
-            candidate = ws_root / rel_pack
-            if candidate.exists():
-                pack_file = candidate
-
-        if not pack_file:
-            candidates = [
-                pack_zip_path(request.task_id),
-                Path(get_settings().workspace_root)
-                / "files"
-                / "pack"
-                / f"{request.task_id}_capcut_pack.zip",
-                Path(get_settings().workspace_root)
-                / "pack"
-                / f"{request.task_id}_capcut_pack.zip",
-            ]
-            for candidate in candidates:
-                if candidate.exists():
-                    pack_file = candidate
-                    break
-
-        if pack_file and pack_file.exists():
+        pack_file = pack_zip_path(request.task_id)
+        if pack_file.exists():
             task.pack_path = relative_to_workspace(pack_file)
 
         task.status = "ready"

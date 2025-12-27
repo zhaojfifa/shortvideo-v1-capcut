@@ -8,64 +8,20 @@ IMPORTANT:
 
 from __future__ import annotations
 
-import importlib
 import logging
 import re
-from typing import Any, Callable, Optional
+from typing import Any
 
 from gateway.app.config import get_settings
 from gateway.app.core.workspace import Workspace
 from gateway.app.providers.edge_tts import EdgeTTSError, generate_audio_edge_tts
 from gateway.app.providers import lovo_tts
-from gateway.app.schemas import DubRequest
 
 logger = logging.getLogger(__name__)
 
 
 class DubbingError(RuntimeError):
     """Raised when dubbing synthesis fails."""
-
-
-def _resolve_callable() -> Callable[..., Any]:
-    """
-    Try to find the real dubbing entrypoint in the refactored codebase.
-    We intentionally support multiple candidates to avoid tight coupling.
-    """
-    candidates = [
-        # Prefer v1 steps (DubRequest-based)
-        ("gateway.app.services.steps_v1", "run_dub_step"),
-
-        # Most likely: steps layer
-        ("gateway.app.steps.dub", "synthesize_voice"),
-        ("gateway.app.steps.dubbing", "synthesize_voice"),
-
-        # Alternative: usecase/application layer naming
-        ("gateway.app.usecases.dub", "run_dub_step"),
-        ("gateway.app.usecases.dubbing", "run_dub_step"),
-        ("gateway.app.usecases.dub", "synthesize_voice"),
-        ("gateway.app.usecases.dubbing", "synthesize_voice"),
-
-        # Sometimes people put it under services/steps_v1 during migration
-        ("gateway.app.steps_v1.dub", "run_dub_step"),
-        ("gateway.app.steps_v1.dubbing", "run_dub_step"),
-    ]
-
-    last_err: Optional[Exception] = None
-    for mod_name, attr in candidates:
-        try:
-            mod = importlib.import_module(mod_name)
-            fn = getattr(mod, attr, None)
-            if callable(fn):
-                return fn  # type: ignore[return-value]
-        except Exception as e:
-            last_err = e
-
-    raise ImportError(
-        "Cannot resolve dubbing entrypoint. "
-        "Expected run_dub_step/synthesize_voice in one of: "
-        + ", ".join([f"{m}.{a}" for m, a in candidates])
-        + (f". Last error: {last_err}" if last_err else "")
-    )
 
 
 _SRT_TIME_RE = re.compile(
@@ -151,40 +107,26 @@ async def _synthesize_from_text(
 async def synthesize_voice(*args: Any, **kwargs: Any) -> Any:
     """
     Legacy API surface preserved.
-    Routes DubRequest-based calls to steps_v1, otherwise falls back to text synthesis.
+    Only supports text-based synthesis in the services layer.
     """
     try:
-        from gateway.app.services.steps_v1 import (
-            run_dub_step as run_dub_step_v1,
-        )  # lazy import to avoid circular import
-        if args and isinstance(args[0], DubRequest):
-            return await run_dub_step_v1(args[0])
+        if "mm_srt_text" not in kwargs:
+            raise DubbingError(
+                "mm_srt_text is required; use steps_v1.run_dub_step for DubRequest-based flow"
+            )
 
         task_id = kwargs.get("task_id")
-        if task_id and "mm_srt_text" not in kwargs:
-            req = DubRequest(
-                task_id=task_id,
-                voice_id=kwargs.get("voice_id"),
-                target_lang=kwargs.get("target_lang") or "my",
-                force=bool(kwargs.get("force", False)),
-            )
-            return await run_dub_step_v1(req)
+        if not task_id:
+            raise DubbingError("task_id is required for dubbing synthesis")
 
-        if "mm_srt_text" in kwargs:
-            return await _synthesize_from_text(
-                task_id=task_id,
-                target_lang=kwargs.get("target_lang"),
-                voice_id=kwargs.get("voice_id"),
-                force=bool(kwargs.get("force", False)),
-                mm_srt_text=kwargs.get("mm_srt_text") or "",
-                workspace=kwargs.get("workspace"),
-            )
-
-        fn = _resolve_callable()
-        result = fn(*args, **kwargs)
-        if hasattr(result, "__await__"):
-            return await result
-        return result
+        return await _synthesize_from_text(
+            task_id=task_id,
+            target_lang=kwargs.get("target_lang"),
+            voice_id=kwargs.get("voice_id"),
+            force=bool(kwargs.get("force", False)),
+            mm_srt_text=kwargs.get("mm_srt_text") or "",
+            workspace=kwargs.get("workspace"),
+        )
     except Exception as e:
         # keep a stable error type for callers
         raise DubbingError(str(e)) from e
