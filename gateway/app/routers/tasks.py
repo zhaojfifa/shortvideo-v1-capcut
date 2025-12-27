@@ -4,18 +4,18 @@ import asyncio
 import logging
 import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from uuid import uuid4
-
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from pydantic import BaseModel
+
 from ..config import get_settings
 from ..core.features import get_features
-from gateway.app.web.templates import get_templates
-from gateway.app.deps import get_task_repository
 from ..schemas import (
     DubRequest,
     PackRequest,
@@ -26,35 +26,99 @@ from ..schemas import (
     TaskListResponse,
     TaskSummary,
 )
-# ... 其他 imports ...
-from gateway.app.db import get_db, get_task_repository
-# 1. 确保 Repository 接口存在 (解决 Pylance 报错)
-from gateway.app.ports.repository import ITaskRepository 
 
-# 2. 确保 steps 路径正确 (PR-0D 修复)
-from gateway.app.steps.dubbing import run_dub_step
-# from gateway.app.steps.pack import run_pack_step  # 如果你有这个文件的话
-# from gateway.app.steps.subtitles import run_subtitles_step # 如果你有这个文件的话
+from gateway.app.web.templates import get_templates
+from gateway.app.deps import get_task_repository  # 只保留这一处依赖注入入口
 
-# 3. 确保 artifact_storage 引用正确 (包含所有4个兼容函数)
-from gateway.app.services.artifact_storage import (
-    upload_task_artifact, 
-    get_download_url, 
-    get_object_bytes, 
-    object_exists
-)
-# ...
-from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
-from gateway.app.steps.dubbing import run_dub_step
-from gateway.app.services.artifact_storage import upload_task_artifact
-from gateway.app.services.artifact_storage import get_download_url, get_object_bytes, object_exists
-from gateway.app.services.task_cleanup import delete_task_record, purge_task_artifacts
+# Ports / typing
+from gateway.ports.repository import ITaskRepository  # 如路径不对，按你们 ports 实际文件修
+
+# Canonical SSOT dubbing step (v1.62+)
+from gateway.app.steps.dubbing import run_dub_step as run_dub_step_ssot
+
+# Legacy v1 pipeline steps (parse/subtitles/pack). Dubbing 保留 v1 名称但必须显式别名，避免覆盖 SSOT
 from ..services.steps_v1 import (
-    run_dub_step,
-    run_pack_step,
-    run_parse_step,
-    run_subtitles_step,
+    run_pack_step as run_pack_step_v1,
+    run_parse_step as run_parse_step_v1,
+    run_subtitles_step as run_subtitles_step_v1,
+    run_dub_step as run_dub_step_v1,
 )
+def coerce_datetime(v: Any) -> Optional[datetime]:
+    """
+    Best-effort convert repository stored value into a timezone-aware datetime.
+    Accepts:
+      - datetime (naive/aware)
+      - ISO8601 string (with/without 'Z', with/without timezone)
+      - epoch seconds/ms (int/float or numeric string)
+    Returns:
+      - datetime (tz-aware, UTC) or None if cannot parse
+    """
+    if v is None:
+        return None
+
+    # already datetime
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+
+    # epoch seconds / milliseconds
+    if isinstance(v, (int, float)):
+        ts = float(v)
+        if ts > 1e12:  # ms
+            ts = ts / 1000.0
+        try:
+            return datetime.fromtimestamp(ts, tz=timezone.utc)
+        except Exception:
+            return None
+
+    # strings
+    if isinstance(v, str):
+        s = v.strip()
+        if not s:
+            return None
+
+        # numeric string -> epoch
+        if s.isdigit():
+            try:
+                ts = float(s)
+                if ts > 1e12:
+                    ts = ts / 1000.0
+                return datetime.fromtimestamp(ts, tz=timezone.utc)
+            except Exception:
+                return None
+
+        # ISO8601 variants
+        # handle "Z"
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+
+        # allow "YYYY-mm-dd HH:MM:SS" -> fromisoformat can parse, but ensure 'T' optional ok
+        try:
+            dt = datetime.fromisoformat(s)
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            return None
+
+    # unknown type
+    return None
+
+
+def coerce_datetime_or_epoch(v: Any) -> datetime:
+    """
+    Safe non-null datetime for response models that disallow None.
+    """
+    return coerce_datetime(v) or datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+# Artifact storage helpers（只 import 一次，禁止在文件底部重定义同名函数）
+from gateway.app.services.artifact_storage import (
+    upload_task_artifact,
+    get_download_url,
+    get_object_bytes,
+    object_exists,
+)
+
+from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
+from gateway.app.services.task_cleanup import delete_task_record, purge_task_artifacts
+
 from ..core.workspace import (
     Workspace,
     origin_srt_path,
@@ -65,6 +129,7 @@ from ..core.workspace import (
 )
 
 logger = logging.getLogger(__name__)
+
 
 
 class DubProviderRequest(BaseModel):
@@ -79,6 +144,42 @@ class EditedTextRequest(BaseModel):
 pages_router = APIRouter()
 api_router = APIRouter(prefix="/api", tags=["tasks"])
 templates = get_templates()
+def _coerce_datetime(value) -> datetime:
+    # Pydantic TaskDetail.created_at expects datetime, so guarantee it.
+    if isinstance(value, datetime):
+        return value
+
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(value, tz=timezone.utc)
+
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return datetime.now(timezone.utc)
+
+        # unix seconds in string
+        if s.isdigit():
+            return datetime.fromtimestamp(int(s), tz=timezone.utc)
+
+        # ISO with Z
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+
+        # Try ISO formats
+        try:
+            dt = datetime.fromisoformat(s)
+            # If naive, assume UTC
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            pass
+
+        # Common fallback: "YYYY-MM-DD HH:MM:SS"
+        try:
+            return datetime.strptime(s, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        except Exception:
+            return datetime.now(timezone.utc)
+
+    return datetime.now(timezone.utc)
 
 
 def _infer_platform_from_url(url: str) -> Optional[str]:
@@ -357,54 +458,69 @@ def _resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
         "pack_path": pack_url,
     }
 
+def _model_allowed_fields(model_cls) -> set[str]:
+    # pydantic v2: model_fields; v1: __fields__
+    if hasattr(model_cls, "model_fields"):
+        return set(model_cls.model_fields.keys())
+    if hasattr(model_cls, "__fields__"):
+        return set(model_cls.__fields__.keys())
+    return set()
 
 def _task_to_detail(task: dict) -> TaskDetail:
     paths = _resolve_download_urls(task)
     status = task.get("status") or "pending"
-    if status != "error" and paths["pack_path"]:
+    if status != "error" and paths.get("pack_path"):
         status = "ready"
 
-    return TaskDetail(
-        task_id=str(task.get("task_id") or task.get("id")),
-        title=task.get("title"),
-        source_url=str(task.get("source_url")) if task.get("source_url") else None,
-        source_link_url=_extract_first_http_url(task.get("source_url")),
-        platform=task.get("platform"),
-        account_id=task.get("account_id"),
-        account_name=task.get("account_name"),
-        video_type=task.get("video_type"),
-        template=task.get("template"),
-        category_key=task.get("category_key") or "beauty",
-        content_lang=task.get("content_lang") or "my",
-        ui_lang=task.get("ui_lang") or "en",
-        style_preset=task.get("style_preset"),
-        face_swap_enabled=bool(task.get("face_swap_enabled")),
-        status=status,
-        last_step=task.get("last_step"),
-        duration_sec=task.get("duration_sec"),
-        thumb_url=task.get("thumb_url"),
-        raw_path=paths["raw_path"],
-        origin_srt_path=paths["origin_srt_path"],
-        mm_srt_path=paths["mm_srt_path"],
-        mm_audio_path=paths["mm_audio_path"],
-        pack_path=paths["pack_path"],
-        created_at=task.get("created_at"),
-        error_message=task.get("error_message"),
-        error_reason=task.get("error_reason"),
-        parse_provider=task.get("parse_provider"),
-        subtitles_provider=task.get("subtitles_provider"),
-        dub_provider=task.get("dub_provider"),
-        pack_provider=task.get("pack_provider"),
-        face_swap_provider=task.get("face_swap_provider"),
-        publish_status=task.get("publish_status"),
-        publish_provider=task.get("publish_provider"),
-        publish_key=task.get("publish_key"),
-        publish_url=task.get("publish_url"),
-        published_at=task.get("published_at"),
-        priority=task.get("priority"),
-        assignee=task.get("assignee"),
-        ops_notes=task.get("ops_notes"),
-    )
+    payload = {
+        "task_id": str(task.get("task_id") or task.get("id")),
+        "title": task.get("title"),
+        "source_url": str(task.get("source_url")) if task.get("source_url") else None,
+        "source_link_url": _extract_first_http_url(task.get("source_url")),
+        "platform": task.get("platform"),
+        "account_id": task.get("account_id"),
+        "account_name": task.get("account_name"),
+        "video_type": task.get("video_type"),
+        "template": task.get("template"),
+        "category_key": task.get("category_key") or "beauty",
+        "content_lang": task.get("content_lang") or "my",
+        "ui_lang": task.get("ui_lang") or "en",
+        "style_preset": task.get("style_preset"),
+        "face_swap_enabled": bool(task.get("face_swap_enabled")),
+        "status": status,
+        "last_step": task.get("last_step"),
+        "duration_sec": task.get("duration_sec"),
+        "thumb_url": task.get("thumb_url"),
+
+        "raw_path": paths.get("raw_path"),
+        "origin_srt_path": paths.get("origin_srt_path"),
+        "mm_srt_path": paths.get("mm_srt_path"),
+        "mm_audio_path": paths.get("mm_audio_path"),
+        "pack_path": paths.get("pack_path"),
+
+        "created_at": _coerce_datetime(task.get("created_at") or task.get("created") or task.get("createdAt")),
+        "error_message": task.get("error_message"),
+        "error_reason": task.get("error_reason"),
+
+        # 下面这些字段如果 TaskDetail 没定义，会被过滤掉，不再触发 500
+        "parse_provider": task.get("parse_provider"),
+        "subtitles_provider": task.get("subtitles_provider"),
+        "dub_provider": task.get("dub_provider"),
+        "pack_provider": task.get("pack_provider"),
+        "face_swap_provider": task.get("face_swap_provider"),
+        "publish_status": task.get("publish_status"),
+        "publish_provider": task.get("publish_provider"),
+        "publish_key": task.get("publish_key"),
+        "publish_url": task.get("publish_url"),
+        "published_at": task.get("published_at"),
+        "priority": task.get("priority"),
+        "assignee": task.get("assignee"),
+        "ops_notes": task.get("ops_notes"),
+    }
+
+    allowed = _model_allowed_fields(TaskDetail)
+    payload = {k: v for k, v in payload.items() if k in allowed}
+    return TaskDetail(**payload)
 
 
 def _extract_first_http_url(text: str | None) -> str | None:
@@ -443,7 +559,7 @@ def _run_pipeline_background(task_id: str, repo) -> None:
             platform=task.get("platform"),
             link=task.get("source_url") or task.get("link") or "",
         )
-        parse_res = asyncio.run(run_parse_step(parse_req))
+        parse_res = asyncio.run(run_parse_step_v1(parse_req))
         raw_file = raw_path(task_id)
         raw_key = None
         if raw_file.exists():
@@ -469,7 +585,7 @@ def _run_pipeline_background(task_id: str, repo) -> None:
             translate=True,
             with_scenes=True,
         )
-        asyncio.run(run_subtitles_step(subs_req))
+        asyncio.run(run_subtitles_step_v1(subs_req))
         workspace = Workspace(task_id)
         origin_key = (
             upload_task_artifact(task, workspace.origin_srt_path, "origin.srt", task_id=task_id)
@@ -503,7 +619,20 @@ def _run_pipeline_background(task_id: str, repo) -> None:
             force=False,
             target_lang=target_lang,
         )
-        asyncio.run(run_dub_step(dub_req))
+        
+        # dubbing：强制走 SSOT（读取 artifacts/subtitles.json）
+        class TaskAdapter:
+            def __init__(self, t: dict, voice_override: str | None, target_lang: str):
+                self.task_id = t.get("task_id") or t.get("id")  # 必须能拿到真实 task_id
+                self.id = self.task_id  # 兼容某些 step 只读 .id
+                self.tenant_id = t.get("tenant_id") or t.get("tenant") or "default"
+                self.project_id = t.get("project_id") or t.get("project") or "default"
+                self.target_lang = target_lang
+                self.voice_id = voice_override or t.get("voice_id")
+                self.dub_provider = t.get("dub_provider") or "edge-tts"
+
+        task_adapter = TaskAdapter(task, voice_override=voice_id, target_lang=target_lang)
+        asyncio.run(run_dub_step_ssot(task_adapter))
         audio_key = None
         if workspace.mm_audio_exists():
             audio_path = workspace.mm_audio_path
@@ -521,7 +650,7 @@ def _run_pipeline_background(task_id: str, repo) -> None:
         current_step = "pack"
         _repo_upsert(repo, task_id, {**status_update, "last_step": current_step})
         pack_req = PackRequest(task_id=task_id)
-        asyncio.run(run_pack_step(pack_req))
+        asyncio.run(run_pack_step_v1(pack_req))
         pack_file = pack_zip_path(task_id)
         pack_key = None
         if pack_file.exists():
@@ -718,7 +847,7 @@ def list_tasks(
                 duration_sec=t.get("duration_sec"),
                 thumb_url=t.get("thumb_url"),
                 pack_path=pack_path,
-                created_at=t.get("created_at"),
+                created_at=(coerce_datetime(t.get("created_at") or t.get("created") or t.get("createdAt")) or datetime(1970, 1, 1, tzinfo=timezone.utc)),
                 error_message=t.get("error_message"),
                 error_reason=t.get("error_reason"),
                 parse_provider=t.get("parse_provider"),
@@ -809,72 +938,66 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
 @api_router.post("/tasks/{task_id}/dub", response_model=TaskDetail)
 async def rerun_dub(
     task_id: str,
-    payload: DubRequest, # 请确认头部 import 了 DubRequest
+    payload: DubProviderRequest,
     repo: ITaskRepository = Depends(get_task_repository),
 ):
-    """Re-run dubbing for a task with a selected provider."""
+    """Re-run dubbing for a task (SSOT: reads artifacts/subtitles.json)."""
 
-    # 1. 检查任务
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    # 2. 检查参数
     provider = (payload.provider or "edge-tts").lower()
-    if provider == "edge": provider = "edge-tts"
+    if provider == "edge":
+        provider = "edge-tts"
     if provider not in {"edge-tts", "lovo"}:
         raise HTTPException(status_code=400, detail="Unsupported dub provider")
 
     settings = get_settings()
-    if provider == "lovo" and not settings.lovo_api_key:
+    if provider == "lovo" and not getattr(settings, "lovo_api_key", None):
         raise HTTPException(status_code=400, detail="LOVO_API_KEY is not configured")
 
-    # 3. 执行新步骤 (SSOT)
     try:
-        # 构造适配器对象
         class TaskAdapter:
-            def __init__(self, t, voice_override=None):
-                getter = t.get if isinstance(t, dict) else lambda k, d=None: getattr(t, k, d)
-                self.id = getter("id", None)
-                self.tenant_id = getter("tenant_id", "default")
-                self.project_id = getter("project_id", "default")
-                self.target_lang = getter("target_lang", getter("content_lang", "my"))
-                self.voice_id = voice_override or getter("voice_id", None)
+            def __init__(self, t: dict, voice_override: str | None, provider: str):
+                self.task_id = t.get("task_id") or t.get("id")
+                self.id = self.task_id
+                self.tenant_id = t.get("tenant_id") or t.get("tenant") or "default"
+                self.project_id = t.get("project_id") or t.get("project") or "default"
+                self.target_lang = t.get("target_lang") or t.get("content_lang") or "my"
+                self.voice_id = voice_override or t.get("voice_id")
+                self.dub_provider = provider
 
-        task_adapter = TaskAdapter(task, voice_override=payload.voice_id)
+        task_adapter = TaskAdapter(task, voice_override=payload.voice_id, provider=provider)
 
-        # 核心：调用 run_dub_step
-        # 注意：这个步骤会自动读取 subtitles.json -> 生成音频 -> 上传到 R2
-        from gateway.app.steps.dubbing import run_dub_step
-        await run_dub_step(task_adapter)
-        
-        # 4. 获取结果路径 (直接推算，不需要从 step 返回)
+        # 核心：SSOT dubbing
+        await run_dub_step_ssot(task_adapter)
+
         from gateway.app.utils.keys import KeyBuilder
         audio_key = KeyBuilder.build(
-            task_adapter.tenant_id, 
-            task_adapter.project_id, 
-            task_adapter.id, 
-            "artifacts/voice/full.mp3"
+            task_adapter.tenant_id,
+            task_adapter.project_id,
+            task_adapter.task_id,
+            "artifacts/voice/full.mp3",
         )
 
     except Exception as exc:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Dubbing step failed: {str(exc)}")
+        logger.exception("Dubbing step failed for task_id=%s", task_id)
+        raise HTTPException(status_code=500, detail=f"Dubbing step failed: {exc}")
 
-    # 5. 更新数据库 (仅更新路径引用，不需要再上传)
-    repo.update(
+    # repo.update 未必存在；用 upsert 更稳
+    repo.upsert(
         task_id,
         {
-            "mm_audio_path": audio_key, # 直接存 R2 Key
+            "mm_audio_path": audio_key,
             "dub_provider": provider,
-            "last_step": "dubbing"      # 更新状态
+            "last_step": "dubbing",
         },
     )
-    
-    # 6. 返回结果
+
     stored = repo.get(task_id)
     return _task_to_detail(stored)
+
 
 
 @api_router.delete("/tasks/{task_id}")
@@ -904,42 +1027,7 @@ def delete_task(
 
     return {"ok": True, "task_id": task_id, "deleted_assets": bool(delete_assets), "purged": purged}
 
-# ============================================================
-# Helper for reading small files (e.g. JSON/TXT)
-# ============================================================
-def get_object_bytes(task_id: str, artifact_name: str, tenant_id: str = "default", project_id: str = "default") -> bytes | None:
-    """
-    读取文件内容到内存。仅用于读取 JSON/Text 等小文件。
-    """
-    import os
-    from gateway.app.config import get_storage_service, get_settings
-    from gateway.app.utils.keys import KeyBuilder
-    
-    storage = get_storage_service()
-    settings = get_settings()
-    key = KeyBuilder.build(tenant_id, project_id, task_id, artifact_name)
-    
-    # 因为 IStorageService 没有 read_bytes 接口，我们先下载到临时文件再读取
-    # 这是一个妥协方案，未来应该在 IStorageService 加 read 方法
-    temp_path = f"/tmp/{task_id}_{artifact_name.replace('/', '_')}"
-    # Windows 兼容
-    if os.name == 'nt':
-        temp_path = os.path.join(os.environ.get("TEMP", "."), f"{task_id}_{artifact_name.replace('/', '_')}")
-        
-    try:
-        storage.download_file(key, temp_path)
-        with open(temp_path, "rb") as f:
-            return f.read()
-    except Exception as e:
-        logger.error(f"Failed to read bytes from {key}: {e}")
-        return None
-    finally:
-        if os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except:
-                pass
-# Backwards-compatible export for existing imports
+
 router = api_router
 
 __all__ = ["api_router", "pages_router", "router"]

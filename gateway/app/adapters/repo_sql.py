@@ -1,6 +1,6 @@
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
-from gateway.app.ports.repository import ITaskRepository
+from gateway.ports.repository import ITaskRepository
 from gateway.app.models import Task
 
 class SQLAlchemyTaskRepository(ITaskRepository):
