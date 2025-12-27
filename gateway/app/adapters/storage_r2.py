@@ -1,4 +1,5 @@
 import boto3
+import mimetypes
 import os
 from gateway.app.ports.storage import IStorageService
 from gateway.app.utils.keys import KeyBuilder
@@ -32,8 +33,16 @@ class R2StorageService(IStorageService):
             aws_secret_access_key=aws_secret_access_key
         )
 
-    def upload_file(self, file_path: str, key: str, content_type: str) -> str:
-        self.s3_client.upload_file(file_path, self.bucket_name, key, ExtraArgs={'ContentType': content_type})
+    def upload_file(self, file_path: str, key: str, content_type: str | None = None) -> str:
+        if content_type is None:
+            guess, _ = mimetypes.guess_type(file_path)
+            content_type = guess or "application/octet-stream"
+        self.s3_client.upload_file(
+            file_path,
+            self.bucket_name,
+            key,
+            ExtraArgs={"ContentType": content_type},
+        )
         return key
 
     def download_file(self, key: str, destination_path: str) -> None:
