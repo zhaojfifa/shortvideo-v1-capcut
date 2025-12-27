@@ -4,7 +4,26 @@ from gateway.app.ports.storage import IStorageService
 from gateway.app.utils.keys import KeyBuilder
 
 class R2StorageService(IStorageService):
-    def __init__(self, bucket_name: str, endpoint_url: str, aws_access_key_id: str, aws_secret_access_key: str):
+    def __init__(
+        self,
+        bucket_name: str,
+        endpoint_url: str,
+        aws_access_key_id: str | None = None,
+        aws_secret_access_key: str | None = None,
+        access_key_id: str | None = None,
+        secret_access_key: str | None = None,
+        access_key: str | None = None,
+        secret_key: str | None = None,
+        **kwargs,
+    ):
+        if aws_access_key_id is None and access_key_id:
+            aws_access_key_id = access_key_id
+        if aws_secret_access_key is None and secret_access_key:
+            aws_secret_access_key = secret_access_key
+        if aws_access_key_id is None and access_key:
+            aws_access_key_id = access_key
+        if aws_secret_access_key is None and secret_key:
+            aws_secret_access_key = secret_key
         self.bucket_name = bucket_name
         self.s3_client = boto3.client(
             "s3",
