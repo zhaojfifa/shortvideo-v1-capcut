@@ -1,0 +1,41 @@
+# === Local Verification Scripts (不需要上传的验证脚本) ===
+verify_pr*.py
+scripts/verify_*.py
+scripts/check_infra.py
+# === Cline / AI Configs (不需要上传的个人AI配置) ===
+.cline*
+.clinerules
+.clineignore
+# 依赖库与环境（绝对不能读，超级大）
+node_modules/
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# 媒体文件（AI 读不懂二进制，纯浪费钱）
+*.mp4
+*.mp3
+*.wav
+*.mov
+*.png
+*.jpg
+*.jpeg
+*.zip
+*.tar.gz
+
+# 临时输出与构建产物
+dist/
+build/
+output/
+temp/
+*.log
+
+# 版本控制与大文本
+.git/
+package-lock.json
+yarn.lock
+poetry.lock
+
+# 其他
+.DS_Store

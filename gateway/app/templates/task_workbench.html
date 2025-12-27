@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Task Workbench · {{ task.task_id }}</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #f3f4f6;
+      color: #0f172a;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+    .card {
+      background: #ffffff;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      padding: 16px;
+    }
+    .header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    h1 { margin: 0; font-size: 1.6rem; font-weight: 800; }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 700; }
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 16px; margin-top: 12px; }
+    .meta-item { font-size: 0.95rem; color: #374151; }
+    .meta-item strong { display: block; color: #0f172a; font-size: 0.9rem; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .badge { padding: 6px 10px; border-radius: 999px; font-size: 0.85rem; font-weight: 700; display: inline-block; }
+    .badge-ready { background: #dcfce7; color: #15803d; }
+    .badge-processing { background: #fef3c7; color: #b45309; }
+    .badge-error { background: #fee2e2; color: #b91c1c; }
+    .badge-unknown { background: #e5e7eb; color: #374151; }
+    .downloads { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 0.95rem; }
+    .downloads a { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .downloads a.disabled { color: #9ca3af; pointer-events: none; text-decoration: none; }
+    .downloads span.label { font-weight: 700; color: #111827; margin-right: 4px; }
+    section { border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+    section h2 { margin-top: 0; font-size: 1.2rem; }
+    button {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover { background: #1d4ed8; }
+    button:disabled { background: #cbd5e1; cursor: not-allowed; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    label { font-weight: 700; color: #111827; font-size: 0.9rem; }
+    select, input { padding: 8px 10px; border-radius: 8px; border: 1px solid #e5e7eb; font-size: 0.95rem; min-width: 180px; }
+    pre { background: #0b1727; color: #e5e7eb; border-radius: 12px; padding: 12px; overflow: auto; max-height: 240px; white-space: pre-wrap; border: 1px solid #0f172a; }
+    .log { max-height: 200px; }
+    .env { display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.9rem; color: #4b5563; }
+    .env code { background: #f3f4f6; padding: 4px 6px; border-radius: 6px; }
+    .mobile-only { display: none; }
+    .desktop-only { display: block; }
+    @media (max-width: 768px) {
+      .mobile-only { display: block; }
+      .desktop-only { display: none; }
+      button { width: 100%; }
+    }
+  </style>
+</head>
+<body class="{{ 'mobile' if is_mobile else 'desktop' }}">
+  <div class="page">
+    <div class="header">
+      <a class="back-link" href="/tasks">← Back to Task Board</a>
+      <h1>{{ t_primary("task_workbench") }}</h1>
+      <div id="status-badge" class="badge badge-unknown">{{ task.status }}</div>
+    </div>
+
+    <div class="card">
+      <div class="meta-grid">
+        <div class="meta-item"><strong>Task ID</strong><span>{{ task.task_id }}</span></div>
+        <div class="meta-item"><strong>Platform</strong><span>{{ task.platform or '-' }}</span></div>
+        <div class="meta-item"><strong>Category</strong><span>{{ task.category_key or '-' }}</span></div>
+        <div class="meta-item"><strong>Lang</strong><span>{{ task.content_lang or '-' }}</span></div>
+        <div class="meta-item"><strong>Status</strong><span>{{ task.status }}</span></div>
+        <div class="meta-item"><strong>Created</strong><span>{{ task.created_at }}</span></div>
+        <div class="meta-item">
+          <strong>Source URL</strong>
+          {% if task_view.source_url_open %}
+            <div><a href="{{ task_view.source_url_open }}" target="_blank" rel="noopener">Open source link</a></div>
+          {% else %}
+            <div class="muted">No clickable URL found in source text.</div>
+          {% endif %}
+          {% if task.source_url %}
+            <div style="margin-top:6px; white-space:pre-wrap; word-break:break-word; color:#111827;">
+              {{ task.source_url }}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="env" style="margin-top:12px;">
+        <div>Workspace: <code>{{ env_summary.workspace_root }}</code></div>
+        <div>Douyin API: <code>{{ env_summary.douyin_api_base }}</code></div>
+        <div>ASR: <code>{{ env_summary.asr_backend }}</code></div>
+        <div>Subtitles: <code>{{ env_summary.subtitles_backend }}</code></div>
+        <div>Whisper: <code>{{ env_summary.whisper_model }}</code></div>
+        <div>Gemini: <code>{{ env_summary.gemini_model }}</code></div>
+        <div>GPT: <code>{{ env_summary.gpt_model }}</code></div>
+        {% if env_summary.defaults %}
+          <div>Defaults: <code>{{ env_summary.defaults }}</code></div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card mobile-only">
+      <h2>{{ t_primary("downloads") }}</h2>
+      {% if ui_show_secondary %}
+        <div class="muted">{{ t_secondary("downloads") }}</div>
+      {% endif %}
+      <div class="downloads" style="margin-top:8px;">
+        <a id="mobile-raw-link" class="disabled" href="#" target="_blank" rel="noopener">raw.mp4</a>
+        <a id="mobile-audio-link" class="disabled" href="#" target="_blank" rel="noopener">mm_audio</a>
+        <a id="mobile-mm-link" class="disabled" href="#" target="_blank" rel="noopener">mm.srt</a>
+        <a id="mobile-mm-txt-link" class="disabled" href="#" target="_blank" rel="noopener">mm.txt</a>
+        {% if features.allow_pack_download %}
+          <a id="mobile-pack-link" class="disabled" href="#" target="_blank" rel="noopener">capcut_pack.zip</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card desktop-only">
+      <div class="downloads" id="downloads">
+        <span class="label">Downloads:</span>
+        <a id="raw-link" class="disabled" href="#" target="_blank" rel="noopener">raw.mp4</a>
+        <a id="origin-link" class="disabled" href="#" target="_blank" rel="noopener">origin.srt</a>
+        <a id="mm-link" class="disabled" href="#" target="_blank" rel="noopener">mm.srt</a>
+        <a id="mm-txt-link" class="disabled" href="#" target="_blank" rel="noopener">mm.txt</a>
+        <a id="audio-link" class="disabled" href="#" target="_blank" rel="noopener">mm_audio</a>
+        {% if features.allow_pack_download %}
+          <a id="pack-link" class="disabled" href="#" target="_blank" rel="noopener">capcut_pack.zip</a>
+        {% endif %}
+      </div>
+      <div style="margin-top:8px;">
+        <audio id="audio-preview" controls style="display:none; width: 100%; max-width: 360px;"></audio>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        {{ t_primary("publish") }}
+        {% if ui_show_secondary %}
+          <span class="muted">{{ t_secondary("publish") }}</span>
+        {% endif %}
+      </div>
+
+      <div class="row">
+        <div class="muted">
+          {{ t_primary("publish_provider") }}: <span id="publish-provider">-</span>
+          &nbsp;|&nbsp;
+          {{ t_primary("published") }}: <span id="published-at">-</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="publish-btn" class="btn">
+          {{ t_primary("publish_now") }}
+          {% if ui_show_secondary %}
+            <span class="muted">{{ t_secondary("publish_now") }}</span>
+          {% endif %}
+        </button>
+        <span id="publish-status" class="muted" style="margin-left:10px;">-</span>
+      </div>
+
+      <div class="row">
+        <div class="muted">{{ t_primary("publish_key") }}: <code id="publish-key">-</code></div>
+      </div>
+      <div class="row">
+        <div class="muted">{{ t_primary("publish_url") }}: <a id="publish-url" href="#" target="_blank">-</a></div>
+      </div>
+    </div>
+
+    <section>
+      <h2>Step 1 · Parse & Download</h2>
+      <p>Call /v1/parse for this task.</p>
+      <button id="btn-parse">Execute parse</button>
+    </section>
+
+    <section>
+      <h2>{{ t_primary("step2") }} · Transcribe & Translate</h2>
+      <p>Generate subtitles via /v1/subtitles.</p>
+      <button id="btn-subtitles">Generate subtitles</button>
+
+      <details id="subs-compare" style="margin-top:12px;">
+        <summary style="cursor:pointer; font-weight:700;">Subtitles (origin vs mm) · compare / copy / edit</summary>
+        <div style="margin-top:12px; display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+          <div>
+            <div class="row" style="justify-content:space-between;">
+              <label style="margin:0;">Origin (SRT)</label>
+              <button type="button" id="btn-copy-origin" class="btn" style="padding:6px 10px;">Copy</button>
+            </div>
+            <pre id="origin-text" style="max-height:220px;"></pre>
+          </div>
+          <div>
+            <div class="row" style="justify-content:space-between;">
+              <label style="margin:0;">MM (TXT)</label>
+              <button type="button" id="btn-copy-mm" class="btn" style="padding:6px 10px;">Copy</button>
+            </div>
+            <pre id="mm-text" style="max-height:220px;"></pre>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <div class="row" style="justify-content:space-between;">
+            <label for="mm-edit" style="margin:0;">MM Edited (mm_edited.txt)</label>
+            <div class="row" style="gap:8px;">
+              <button type="button" id="btn-load-edited" class="btn" style="padding:6px 10px;">Reload</button>
+              <button type="button" id="btn-save-edited" class="btn" style="padding:6px 10px;">Save</button>
+            </div>
+          </div>
+          <textarea id="mm-edit" rows="6" style="width:100%; margin-top:8px; border-radius:10px; border:1px solid #e5e7eb; padding:10px;"></textarea>
+          <div class="muted" id="mm-edit-status" style="margin-top:6px;">-</div>
+        </div>
+      </details>
+    </section>
+
+    <section>
+      <h2>{{ t_primary("step3") }} · Burmese Voiceover</h2>
+      <div class="row">
+        <div class="field">
+          <label for="voice-id">Voice ID</label>
+          <select id="voice-id">
+            <option value="mm_female_1">mm_female_1</option>
+            <option value="mm_male_1">mm_male_1</option>
+            <option value="mm_female_2">mm_female_2</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="dub-provider">Dub provider</label>
+          <select id="dub-provider">
+            <option value="edge-tts">edge-tts</option>
+            <option value="lovo">lovo</option>
+          </select>
+        </div>
+        <div class="field" style="justify-content:flex-end;">
+          <label>&nbsp;</label>
+          <button id="btn-dub">Generate dub</button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>{{ t_primary("step4") }} · Pack for CapCut</h2>
+      <p>Bundle the CapCut project for this task.</p>
+      <button id="btn-pack">Build pack</button>
+    </section>
+
+    <section>
+      <h2>{{ t_primary("log") }}</h2>
+      <pre id="log-output" class="log">Ready.</pre>
+    </section>
+  </div>
+
+  <script>
+    window.__FEATURES__ = {{ features | tojson | safe }};
+    window.currentTask = {{ task_json | tojson | safe }};
+
+    function appendLog(line) {
+      const logEl = document.getElementById("log-output");
+      if (!logEl) return;
+      const now = new Date().toISOString();
+      logEl.textContent += `\n[${now}] ${line}`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function updateStatusBadge(data) {
+      const badge = document.getElementById("status-badge");
+      if (!badge) return;
+      const status = data.status || "unknown";
+      badge.textContent = status;
+      badge.className = "badge " + (status === "ready"
+        ? "badge-ready"
+        : status === "processing"
+        ? "badge-processing"
+        : status === "error"
+        ? "badge-error"
+        : "badge-unknown");
+    }
+
+    function setDownloadLink(id, href) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (href) {
+        el.href = href;
+        el.classList.remove("disabled");
+        el.removeAttribute("aria-disabled");
+      } else {
+        el.href = "#";
+        el.classList.add("disabled");
+        el.setAttribute("aria-disabled", "true");
+      }
+    }
+
+    function taskEndpoint(taskId, kind) {
+      const id = encodeURIComponent(taskId);
+      const map = {
+        raw: `/v1/tasks/${id}/raw`,
+        origin_srt: `/v1/tasks/${id}/subs_origin`,
+        mm_srt: `/v1/tasks/${id}/subs_mm`,
+        mm_txt: `/v1/tasks/${id}/mm_txt`,
+        audio_mm: `/v1/tasks/${id}/audio_mm`,
+        pack: `/v1/tasks/${id}/pack`,
+      };
+      return map[kind] || null;
+    }
+
+    function isPresignedLike(url) {
+      if (!url) return false;
+      const u = String(url);
+      return /X-Amz-|Signature=|cloudflarestorage|AWS4-HMAC-SHA256/i.test(u);
+    }
+
+    function mmTxtLink(data) {
+      const hasMmTxt = !!(data.mm_txt_path || data.mm_srt_path);
+      return hasMmTxt ? taskEndpoint(data.task_id, "mm_txt") : null;
+    }
+
+    function updateDownloadsFromTask(data) {
+      const taskId = data.task_id;
+      const hasRaw = !!data.raw_path;
+      const hasOrigin = !!data.origin_srt_path;
+      const hasMmSrt = !!data.mm_srt_path;
+      const hasMmTxt = !!(data.mm_txt_path || data.mm_srt_path);
+      const hasAudio = !!data.mm_audio_path;
+      const hasPack = !!data.pack_path;
+
+      setDownloadLink("raw-link", hasRaw ? taskEndpoint(taskId, "raw") : null);
+      setDownloadLink("origin-link", hasOrigin ? taskEndpoint(taskId, "origin_srt") : null);
+      setDownloadLink("mm-link", hasMmSrt ? taskEndpoint(taskId, "mm_srt") : null);
+      setDownloadLink("mm-txt-link", hasMmTxt ? taskEndpoint(taskId, "mm_txt") : null);
+      setDownloadLink("audio-link", hasAudio ? taskEndpoint(taskId, "audio_mm") : null);
+      setDownloadLink("pack-link", hasPack ? taskEndpoint(taskId, "pack") : null);
+      setDownloadLink("mobile-raw-link", hasRaw ? taskEndpoint(taskId, "raw") : null);
+      setDownloadLink("mobile-audio-link", hasAudio ? taskEndpoint(taskId, "audio_mm") : null);
+      setDownloadLink("mobile-mm-link", hasMmSrt ? taskEndpoint(taskId, "mm_srt") : null);
+      setDownloadLink("mobile-mm-txt-link", hasMmTxt ? taskEndpoint(taskId, "mm_txt") : null);
+      setDownloadLink("mobile-pack-link", hasPack ? taskEndpoint(taskId, "pack") : null);
+
+      const audioEl = document.getElementById("audio-preview");
+      const audioLink = document.getElementById("audio-link");
+      if (audioEl) {
+        if (hasAudio) {
+          audioEl.src = taskEndpoint(taskId, "audio_mm");
+          audioEl.style.display = "block";
+        } else {
+          audioEl.removeAttribute("src");
+          audioEl.style.display = "none";
+        }
+      }
+      if (audioLink) {
+        audioLink.textContent = "mm_audio";
+      }
+    }
+
+
+    function updateStepButtons(data) {
+      const parseBtn = document.getElementById("btn-parse");
+      const subsBtn = document.getElementById("btn-subtitles");
+      const dubBtn = document.getElementById("btn-dub");
+      const packBtn = document.getElementById("btn-pack");
+
+      if (parseBtn) {
+        parseBtn.textContent = data.raw_path ? "Re-run parse" : "Execute parse";
+      }
+      if (subsBtn) {
+        const hasSubs = data.mm_srt_path || data.origin_srt_path;
+        subsBtn.textContent = hasSubs ? "Re-run subtitles" : "Generate subtitles";
+      }
+      if (dubBtn) {
+        dubBtn.textContent = data.mm_audio_path ? "Re-run dub" : "Generate dub";
+      }
+      if (packBtn) {
+        packBtn.textContent = data.pack_path ? "Re-run pack" : "Build pack";
+      }
+    }
+
+    function refreshPublishInfo(data) {
+      const provider = data.publish_provider || "-";
+      const key = data.publish_key || "-";
+      const at = data.published_at || "-";
+      const status = data.publish_status || "-";
+      const taskId = data.task_id;
+      let url = data.publish_url || "-";
+      if (url === "-" || isPresignedLike(url)) {
+        url = data.pack_path ? taskEndpoint(taskId, "pack") : "-";
+      }
+
+      const providerEl = document.getElementById("publish-provider");
+      const keyEl = document.getElementById("publish-key");
+      const atEl = document.getElementById("published-at");
+      const statusEl = document.getElementById("publish-status");
+      const urlEl = document.getElementById("publish-url");
+      if (providerEl) providerEl.textContent = provider;
+      if (keyEl) keyEl.textContent = key;
+      if (atEl) atEl.textContent = at;
+      if (statusEl) statusEl.textContent = status;
+      if (urlEl) {
+        urlEl.textContent = url;
+        urlEl.href = url === "-" ? "#" : url;
+      }
+    }
+
+    // Initialize with server-rendered values in case files already exist.
+    updateDownloadsFromTask(window.currentTask);
+    updateStatusBadge(window.currentTask);
+    updateStepButtons(window.currentTask);
+    refreshPublishInfo(window.currentTask);
+
+    async function refreshTaskState() {
+      const taskId = window.currentTask.task_id;
+      const resp = await fetch(`/api/tasks/${taskId}`);
+      if (!resp.ok) {
+        appendLog(`Failed to refresh task: HTTP ${resp.status}`);
+        return;
+      }
+      const data = await resp.json();
+      window.currentTask = data;
+      updateDownloadsFromTask(data);
+      updateStatusBadge(data);
+      updateStepButtons(data);
+      refreshPublishInfo(data);
+      if (data.error_message) {
+        appendLog(`Last error: ${data.error_message}`);
+      }
+    }
+
+    document.getElementById("btn-parse").addEventListener("click", async () => {
+      const taskId = window.currentTask.task_id;
+      const linkText = window.currentTask.source_url || "";
+      const platform = window.currentTask.platform || null;
+      if (!linkText) {
+        appendLog("Parse failed: source_url is empty for this task.");
+        return;
+      }
+      appendLog(`Calling /v1/parse for ${taskId}...`);
+      const payload = { task_id: taskId, link: linkText };
+      if (platform) payload.platform = platform;
+      const resp = await fetch("/v1/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) {
+        let errorDetail = `HTTP ${resp.status}`;
+        try {
+          const payload = await resp.json();
+          errorDetail = payload?.detail ? `${errorDetail} - ${payload.detail}` : errorDetail;
+        } catch (err) {
+          appendLog(`Parse failed: ${errorDetail}`);
+          return;
+        }
+        appendLog(`Parse failed: ${errorDetail}`);
+        return;
+      }
+      appendLog("Parse call finished.");
+      await refreshTaskState();
+    });
+
+    document.getElementById("btn-subtitles").addEventListener("click", async () => {
+      const taskId = window.currentTask.task_id;
+      appendLog(`Calling /v1/subtitles for ${taskId}...`);
+      const payload = { task_id: taskId };
+      const resp = await fetch("/v1/subtitles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) {
+        appendLog(`Subtitles failed: HTTP ${resp.status}`);
+        return;
+      }
+      appendLog("Subtitles call finished.");
+      await refreshTaskState();
+    });
+
+    document.getElementById("btn-dub").addEventListener("click", async () => {
+      const taskId = window.currentTask.task_id;
+      const voiceId = document.getElementById("voice-id").value;
+      const provider = document.getElementById("dub-provider").value || "edge-tts";
+      appendLog(`Calling /api/tasks/${taskId}/dub (provider=${provider}, voice=${voiceId})...`);
+      const payload = { provider, voice_id: voiceId };
+      const resp = await fetch(`/api/tasks/${taskId}/dub`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) {
+        const detail = await resp.text();
+        appendLog(`Dub failed: HTTP ${resp.status} ${detail}`);
+        return;
+      }
+      appendLog("Dub audio ready.");
+      await refreshTaskState();
+    });
+
+    document.getElementById("btn-pack").addEventListener("click", async () => {
+      const taskId = window.currentTask.task_id;
+      appendLog(`Calling /v1/pack for ${taskId}...`);
+      const payload = { task_id: taskId };
+      const resp = await fetch("/v1/pack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) {
+        appendLog(`Pack failed: HTTP ${resp.status}`);
+        return;
+      }
+      appendLog("Pack ready.");
+      await refreshTaskState();
+    });
+
+    const publishBtn = document.getElementById("publish-btn");
+    if (publishBtn) {
+      publishBtn.addEventListener("click", async () => {
+        const taskId = window.currentTask.task_id;
+        const statusEl = document.getElementById("publish-status");
+        if (statusEl) statusEl.textContent = "Publishing...";
+        try {
+          const resp = await fetch("/v1/publish", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ task_id: taskId, force: false }),
+          });
+          if (!resp.ok) {
+            const detail = await resp.text();
+            if (statusEl) statusEl.textContent = `Publish failed: ${resp.status} ${detail}`;
+            return;
+          }
+          if (statusEl) statusEl.textContent = "Published.";
+          await refreshTaskState();
+        } catch (err) {
+          if (statusEl) statusEl.textContent = `Publish error: ${err}`;
+        }
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      refreshTaskState().catch((err) => {
+        console.error(err);
+        appendLog("Initial refresh failed: " + err);
+      });
+    });
+
+    async function fetchTextOrFallback(url, fallbackMessage) {
+      try {
+        const resp = await fetch(url, { method: "GET" });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        return await resp.text();
+      } catch (err) {
+        console.warn("fetchText failed", url, err);
+        return fallbackMessage || `Failed to load. You can use download links above. (${url})`;
+      }
+    }
+
+    async function loadCompareBlock(forceReload) {
+      const taskId = window.currentTask.task_id;
+      const originPre = document.getElementById("origin-text");
+      const mmPre = document.getElementById("mm-text");
+      const mmEdit = document.getElementById("mm-edit");
+      const statusEl = document.getElementById("mm-edit-status");
+      if (!originPre || !mmPre || !mmEdit) return;
+
+      if (!forceReload && originPre.getAttribute("data-loaded") === "1") {
+        return;
+      }
+
+      originPre.textContent = "Loading…";
+      mmPre.textContent = "Loading…";
+      if (statusEl) statusEl.textContent = "Loading…";
+
+      const originUrl = `/api/tasks/${encodeURIComponent(taskId)}/text?kind=origin_srt`;
+      const mmTxtUrl = `/api/tasks/${encodeURIComponent(taskId)}/text?kind=mm_txt`;
+
+      const originText = await fetchTextOrFallback(
+        originUrl,
+        "Unable to load origin subtitles in-browser (possible CORS redirect). Use Downloads → origin.srt."
+      );
+      const mmText = await fetchTextOrFallback(
+        mmTxtUrl,
+        "Unable to load mm text in-browser (possible CORS redirect). Use Downloads → mm.txt."
+      );
+      originPre.textContent = originText || "";
+      mmPre.textContent = mmText || "";
+      originPre.setAttribute("data-loaded", "1");
+
+      try {
+        const editedUrl = `/api/tasks/${encodeURIComponent(taskId)}/text?kind=mm_edited`;
+        const r = await fetch(editedUrl);
+        if (r.ok) {
+          const text = await r.text();
+          if (text && text.trim().length > 0) {
+            mmEdit.value = text;
+            if (statusEl) statusEl.textContent = "Loaded mm_edited.txt";
+          } else {
+            mmEdit.value = mmText || "";
+            if (statusEl) statusEl.textContent = "No mm_edited.txt; initialized from mm.txt";
+          }
+        } else {
+          mmEdit.value = mmText || "";
+          if (statusEl) statusEl.textContent = `mm_edited load failed: HTTP ${r.status} (fallback to mm.txt)`;
+        }
+      } catch (err) {
+        mmEdit.value = mmText || "";
+        if (statusEl) statusEl.textContent = "mm_edited load error (fallback to mm.txt)";
+      }
+    }
+
+    const detailsEl = document.getElementById("subs-compare");
+    if (detailsEl) {
+      detailsEl.addEventListener("toggle", () => {
+        if (detailsEl.open) loadCompareBlock(false);
+      });
+    }
+
+    const copyBtnOrigin = document.getElementById("btn-copy-origin");
+    if (copyBtnOrigin) {
+      copyBtnOrigin.addEventListener("click", async () => {
+        const t = (document.getElementById("origin-text") || {}).textContent || "";
+        await navigator.clipboard.writeText(t);
+        appendLog("Copied origin subtitles.");
+      });
+    }
+    const copyBtnMm = document.getElementById("btn-copy-mm");
+    if (copyBtnMm) {
+      copyBtnMm.addEventListener("click", async () => {
+        const t = (document.getElementById("mm-text") || {}).textContent || "";
+        await navigator.clipboard.writeText(t);
+        appendLog("Copied mm text.");
+      });
+    }
+
+    const btnReload = document.getElementById("btn-load-edited");
+    if (btnReload) {
+      btnReload.addEventListener("click", async () => {
+        await loadCompareBlock(true);
+        appendLog("Reloaded compare block.");
+      });
+    }
+
+    const btnSave = document.getElementById("btn-save-edited");
+    if (btnSave) {
+      btnSave.addEventListener("click", async () => {
+        const taskId = window.currentTask.task_id;
+        const mmEdit = document.getElementById("mm-edit");
+        const statusEl = document.getElementById("mm-edit-status");
+        const text = mmEdit ? mmEdit.value : "";
+        if (statusEl) statusEl.textContent = "Saving…";
+        try {
+          const resp = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/mm_edited`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text }),
+          });
+          if (!resp.ok) {
+            const detail = await resp.text();
+            if (statusEl) statusEl.textContent = `Save failed: HTTP ${resp.status} ${detail}`;
+            appendLog(`Save mm_edited failed: HTTP ${resp.status}`);
+            return;
+          }
+          if (statusEl) statusEl.textContent = "Saved mm_edited.txt";
+          appendLog("Saved mm_edited.txt");
+        } catch (err) {
+          if (statusEl) statusEl.textContent = `Save error: ${err}`;
+          appendLog("Save mm_edited error: " + err);
+        }
+      });
+    }
+  </script>
+</body>
+</html>

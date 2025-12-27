@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.env
+.env.*
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Local DB
+*.db
+*.sqlite
+*.sqlite3
+
+# Workspace / runtime artifacts
+data_debug/
+video_workspace/
+tv1_validation/
+workspace/
+tmp/
+temp/
+
+# Media & generated artifacts
+*.mp4
+*.mov
+*.wav
+*.mp3
+*.srt
+*.zip
+
+# Smoke / local test helpers
+tmp_*.json
+tmp_*.txt
+tmp_*.srt
+tmp_*.wav
+tmp_*.mp3
+smoke_*.py
+*_smoke.ps1

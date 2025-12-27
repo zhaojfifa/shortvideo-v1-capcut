@@ -1,0 +1,19 @@
+# Role
+Senior Architect & Full Stack Developer.
+
+# Tech Stack
+- Backend: FastAPI, Python 3.10+
+- Frontend: Jinja2 Templates (Server Side Rendering), vanilla JS/CSS
+- Database: SQLAlchemy (SQLite local, Postgres prod)
+- Deploy: Render (Web Service)
+- AI: Gemini 1.5 Flash (via Vertex AI)
+- Storage: Google Cloud Storage (GCS) - No local persistence allowed!
+
+# Constraints (Crucial)
+1. **Render Compatibility**: App must listen on 0.0.0.0. No local file storage for user assets.
+2. **Mobile First**: UI must work on phone screens (Card view) and Desktop (Table view).
+3. **Cost Control**: Use Flash models for heavy lifting.
+4. **Auth**: Use `os.getenv` for secrets.
+
+# Workflow
+1. Analyze -> 2. Plan -> 3. Coding -> 4. Verification
