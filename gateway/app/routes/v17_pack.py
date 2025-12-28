@@ -8,7 +8,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from gateway.app.core.pack_v17_youcut import generate_youcut_pack, zip_youcut_pack
+from gateway.app.core.tts_edge import EdgeTTSError, generate_edge_tts_wav_from_srt
 from gateway.app.config import get_storage_service
+from gateway.app.config import get_settings
 from gateway.app.utils.keys import KeyBuilder
 
 router = APIRouter(prefix="/v1.7/pack", tags=["v1.7-pack"])
@@ -20,6 +22,10 @@ class YouCutPackRequest(BaseModel):
     placeholders: bool = Field(True, description="Create placeholder assets for Day2 acceptance")
     upload: bool = Field(False, description="Whether to upload the zip to R2/local storage")
     expires_in: int = Field(3600, description="Presigned URL expiration in seconds")
+    tts: bool = Field(False, description="Whether to generate voice_my.wav via Edge TTS")
+    voice: Optional[str] = Field(None, description="Edge TTS voice name")
+    rate: Optional[str] = Field(None, description="Edge TTS rate, e.g. +0%")
+    pitch: Optional[str] = Field(None, description="Edge TTS pitch, e.g. +0Hz")
 
 
 @router.post("/youcut")
@@ -40,6 +46,26 @@ def create_youcut_pack(req: YouCutPackRequest) -> Dict[str, Any]:
         pack_root = generate_youcut_pack(task_id=task_id, out_root=out_root, placeholders=req.placeholders)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"generate_youcut_pack failed: {type(e).__name__}: {e}")
+
+    if req.tts:
+        settings = get_settings()
+        voice = req.voice or settings.edge_tts_voice_map.get("mm_female_1") or "my-MM-NilarNeural"
+        rate = req.rate or settings.edge_tts_rate or "+0%"
+        pitch = req.pitch or "+0Hz"
+        srt_path = pack_root / "subs" / "my.srt"
+        audio_path = pack_root / "audio" / "voice_my.wav"
+        if not srt_path.exists():
+            raise HTTPException(status_code=400, detail="subs/my.srt not found for TTS")
+        try:
+            generate_edge_tts_wav_from_srt(
+                srt_path,
+                audio_path,
+                voice=voice,
+                rate=rate,
+                pitch=pitch,
+            )
+        except EdgeTTSError as e:
+            raise HTTPException(status_code=500, detail=f"Edge TTS failed: {e}")
 
     zip_path: Optional[Path] = None
     if req.zip or req.upload:
