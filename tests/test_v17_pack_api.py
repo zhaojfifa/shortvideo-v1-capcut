@@ -31,3 +31,12 @@ def test_v17_pack_youcut_creates_zip(tmp_path: Path, monkeypatch):
 
     assert zip_path.exists()
     assert zip_path.suffix == ".zip"
+
+
+def test_v17_pack_youcut_error_json(monkeypatch):
+    client = TestClient(app)
+    r = client.post("/v1.7/pack/youcut", json={"task_id": " ", "zip": False, "upload": False})
+    assert r.status_code == 400
+    data = r.json()
+    assert "error" in data
+    assert "detail" in data

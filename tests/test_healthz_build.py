@@ -11,3 +11,6 @@ def test_healthz_build_exists():
     assert "git_sha" in data
     assert "has_pack_v17_youcut" in data
     assert data["service"] == "shortvideo-v1-capcut"
+    assert "edge_tts" in data
+    assert "r2_enabled" in data
+    assert data["pack_v17_status"] == "frozen"

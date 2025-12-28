@@ -1,3 +1,4 @@
+import importlib.util
 import logging
 import os
 from typing import Any, Dict
@@ -81,6 +82,14 @@ def healthz_build(response: Response) -> Dict[str, Any]:
         "version": "v1.7-day1",
         "git_sha": git_sha,
         "has_pack_v17_youcut": has_pack_v17_youcut,
+        "edge_tts": importlib.util.find_spec("edge_tts") is not None,
+        "r2_enabled": bool(
+            os.getenv("R2_ENDPOINT")
+            and os.getenv("R2_BUCKET_NAME")
+            and os.getenv("R2_ACCESS_KEY")
+            and os.getenv("R2_SECRET_KEY")
+        ),
+        "pack_v17_status": "frozen",
     }
 
     # Only attach error when import fails (helps debugging; still read-only)

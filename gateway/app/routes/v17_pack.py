@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from gateway.app.core.pack_v17_youcut import generate_youcut_pack, zip_youcut_pack
@@ -36,7 +37,10 @@ def create_youcut_pack(req: YouCutPackRequest) -> Dict[str, Any]:
     """
     task_id = req.task_id.strip()
     if not task_id:
-        raise HTTPException(status_code=400, detail="task_id is required")
+        return JSONResponse(
+            status_code=400,
+            content={"error": "invalid_request", "detail": "task_id is required"},
+        )
 
     # Allow changing output root via env for testing / deployment flexibility.
     # Default remains deliver/packs to match Day1.
@@ -45,7 +49,10 @@ def create_youcut_pack(req: YouCutPackRequest) -> Dict[str, Any]:
     try:
         pack_root = generate_youcut_pack(task_id=task_id, out_root=out_root, placeholders=req.placeholders)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"generate_youcut_pack failed: {type(e).__name__}: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "pack_failed", "detail": f"generate_youcut_pack failed: {type(e).__name__}"},
+        )
 
     if req.tts:
         settings = get_settings()
@@ -55,7 +62,10 @@ def create_youcut_pack(req: YouCutPackRequest) -> Dict[str, Any]:
         srt_path = pack_root / "subs" / "my.srt"
         audio_path = pack_root / "audio" / "voice_my.wav"
         if not srt_path.exists():
-            raise HTTPException(status_code=400, detail="subs/my.srt not found for TTS")
+            return JSONResponse(
+                status_code=400,
+                content={"error": "invalid_request", "detail": "subs/my.srt not found for TTS"},
+            )
         try:
             generate_edge_tts_wav_from_srt(
                 srt_path,
@@ -65,33 +75,48 @@ def create_youcut_pack(req: YouCutPackRequest) -> Dict[str, Any]:
                 pitch=pitch,
             )
         except EdgeTTSError as e:
-            raise HTTPException(status_code=500, detail=f"Edge TTS failed: {e}")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "edge_tts_failed", "detail": "Edge TTS failed"},
+            )
 
     zip_path: Optional[Path] = None
     if req.zip or req.upload:
         try:
             zip_path = zip_youcut_pack(pack_root)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"zip_youcut_pack failed: {type(e).__name__}: {e}")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "pack_failed", "detail": f"zip_youcut_pack failed: {type(e).__name__}"},
+            )
 
     zip_key: Optional[str] = None
     download_url: Optional[str] = None
     if req.upload:
         if zip_path is None:
-            raise HTTPException(status_code=500, detail="zip path is required for upload")
-        storage = get_storage_service()
-        zip_key = KeyBuilder.build("default", "default", task_id, "artifacts/youcut_pack_v17.zip")
-        storage.upload_file(str(zip_path), zip_key, content_type="application/zip")
-        try:
-            download_url = storage.generate_presigned_url(
-                zip_key,
-                expiration=req.expires_in,
-                content_type="application/zip",
-                filename=f"{task_id}_youcut_pack_v17.zip",
-                disposition="attachment",
+            return JSONResponse(
+                status_code=500,
+                content={"error": "pack_failed", "detail": "zip path is required for upload"},
             )
-        except TypeError:
-            download_url = storage.generate_presigned_url(zip_key, expiration=req.expires_in)
+        try:
+            storage = get_storage_service()
+            zip_key = KeyBuilder.build("default", "default", task_id, "artifacts/youcut_pack_v17.zip")
+            storage.upload_file(str(zip_path), zip_key, content_type="application/zip")
+            try:
+                download_url = storage.generate_presigned_url(
+                    zip_key,
+                    expiration=req.expires_in,
+                    content_type="application/zip",
+                    filename=f"{task_id}_youcut_pack_v17.zip",
+                    disposition="attachment",
+                )
+            except TypeError:
+                download_url = storage.generate_presigned_url(zip_key, expiration=req.expires_in)
+        except Exception:
+            return JSONResponse(
+                status_code=500,
+                content={"error": "r2_upload_failed", "detail": "upload or presign failed"},
+            )
 
     resp: Dict[str, Any] = {
         "task_id": task_id,
