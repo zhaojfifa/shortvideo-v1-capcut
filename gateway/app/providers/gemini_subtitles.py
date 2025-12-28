@@ -5,13 +5,13 @@ import json
 import logging
 import os
 import re
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
 import requests
 
 logger = logging.getLogger(__name__)
+_TRAILING_COMMA_RE = re.compile(r",\s*([}\]])")
 
 # Prefer GEMINI_API_KEY, fallback to GOOGLE_API_KEY for compatibility
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -115,29 +115,6 @@ def _extract_text(resp_json: Dict[str, Any]) -> str:
     if not texts:
         raise GeminiSubtitlesError("Gemini response has no text parts")
 
-    return "".join(texts).strip()
-
-
-    finish = candidates[0].get("finishReason")
-    if finish:
-        logger.info("Gemini finishReason=%s", finish)
-
-    texts = _texts_from_candidate(candidates[0])
-    if not texts:
-        for cand in candidates[1:]:
-            texts = _texts_from_candidate(cand)
-            if texts:
-                break
-
-    texts = _texts(candidates[0])
-    if not texts:
-        for cand in candidates[1:]:
-            texts = _texts(cand)
-            if texts:
-                break
-
-    if not texts:
-        raise GeminiSubtitlesError("Gemini response has no text parts")
     return "".join(texts).strip()
 
 
@@ -371,6 +348,7 @@ def parse_gemini_subtitle_payload(
         payload_text = extract_json_block(text)
     except Exception:
         payload_text = text
+    payload_text = _TRAILING_COMMA_RE.sub(r"\1", payload_text)
 
     if write_debug:
         _write_debug_text(debug_dir, "gemini_response_json_block.txt", payload_text)
