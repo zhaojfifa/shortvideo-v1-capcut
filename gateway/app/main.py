@@ -11,6 +11,7 @@ from gateway.app.core.workspace import workspace_root
 from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
 from gateway.app import models
 from gateway.app.routers import admin_publish, publish as publish_router, tasks as tasks_router
+from gateway.app.routes.v17_pack import router as v17_pack_router
 from gateway.routes import admin_tools
 from gateway.routes import v1 as v1_router
 
@@ -49,6 +50,7 @@ app.include_router(admin_publish.router, tags=["admin"])
 app.include_router(admin_tools.router, tags=["admin"])
 app.include_router(admin_tools.pages_router)
 app.include_router(v1_router.router, prefix="/v1")
+app.include_router(v17_pack_router)
 
 
 @app.get("/healthz/build", tags=["health"])
