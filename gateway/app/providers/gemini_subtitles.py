@@ -141,6 +141,50 @@ def _extract_text(resp_json: Dict[str, Any]) -> str:
     return "".join(texts).strip()
 
 
+def _strip_code_fences(text: str) -> str:
+    stripped = (text or "").strip()
+    if stripped.startswith("```"):
+        stripped = re.sub(r"^```(?:json)?\s*", "", stripped, flags=re.IGNORECASE)
+        stripped = re.sub(r"\s*```$", "", stripped)
+    return stripped.strip()
+
+
+def _extract_json_object(text: str) -> str:
+    if not text:
+        return text
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return text[start : end + 1]
+    return text
+
+
+def _remove_trailing_commas(s: str) -> str:
+    return re.sub(r",\s*([}\]])", r"\1", s)
+
+
+def parse_gemini_json_payload(raw_text: str) -> dict:
+    cleaned = _strip_code_fences(raw_text)
+    cleaned = _extract_json_object(cleaned)
+    cleaned = _remove_trailing_commas(cleaned)
+
+    try:
+        payload = json.loads(cleaned)
+    except Exception as exc:
+        snippet = re.sub(r"\s+", " ", (raw_text or "").strip())
+        if len(snippet) > 800:
+            snippet = snippet[:800] + "..."
+        raise GeminiSubtitlesError(f"Gemini JSON parse failed: {snippet}") from exc
+
+    if not isinstance(payload, dict) or not isinstance(payload.get("segments"), list):
+        snippet = re.sub(r"\s+", " ", (raw_text or "").strip())
+        if len(snippet) > 800:
+            snippet = snippet[:800] + "..."
+        raise GeminiSubtitlesError(f"Gemini JSON payload invalid: {snippet}")
+
+    return payload
+
+
 def extract_json_block(raw: str) -> str:
     """
     Extract the most relevant JSON object from Gemini responses.
@@ -321,6 +365,11 @@ def parse_gemini_subtitle_payload(
 
     if write_debug:
         _write_debug_text(debug_dir, "gemini_response_json_block.txt", payload_text)
+
+    try:
+        return parse_gemini_json_payload(payload_text)
+    except GeminiSubtitlesError:
+        pass
 
     try:
         payload_sanitized = sanitize_string_literals(payload_text)
@@ -521,14 +570,10 @@ Rules:
     raw_text = _extract_text(resp_json)
 
     try:
-        data = parse_gemini_subtitle_payload(
-            raw_text,
-            allow_repair=allow_repair,
-            debug_dir=debug_dir,
-        )
-    except ValueError as exc:
+        data = parse_gemini_json_payload(raw_text)
+    except GeminiSubtitlesError as exc:
         logger.error("%s", exc)
-        raise GeminiSubtitlesError(str(exc)) from exc
+        raise
 
     if not isinstance(data, dict):
         raise GeminiSubtitlesError("Gemini subtitles JSON root must be an object")
@@ -541,3 +586,15 @@ Rules:
         raise GeminiSubtitlesError("Gemini subtitles JSON must contain 'segments' and 'scenes'")
 
     return data
+
+
+if __name__ == "__main__":
+    samples = [
+        """```json
+        {"segments":[{"index":1,"start":0.0,"end":1.0,"origin":"a","mm":"b","scene_id":1}]}
+        ```""",
+        """{"segments":[{"index":1,"start":0.0,"end":1.0,"origin":"a","mm":"b","scene_id":1,}],}""",
+        """Some preface text {"segments":[{"index":1,"start":0.0,"end":1.0,"origin":"a","mm":"b","scene_id":1}]} trailing""",
+    ]
+    for sample in samples:
+        print(parse_gemini_json_payload(sample))
