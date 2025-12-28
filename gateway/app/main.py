@@ -1,8 +1,9 @@
 import logging
 import os
+from typing import Any, Dict
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -48,6 +49,47 @@ app.include_router(admin_publish.router, tags=["admin"])
 app.include_router(admin_tools.router, tags=["admin"])
 app.include_router(admin_tools.pages_router)
 app.include_router(v1_router.router, prefix="/v1")
+
+
+@app.get("/healthz/build", tags=["health"])
+def healthz_build(response: Response) -> Dict[str, Any]:
+    """
+    Acceptance-only endpoint for v1.7.
+    Must remain read-only, no side effects, no dependency on external services.
+    """
+    git_sha = (
+        os.getenv("RENDER_GIT_COMMIT")
+        or os.getenv("GIT_SHA")
+        or os.getenv("COMMIT_SHA")
+        or "unknown"
+    )
+
+    # Check whether v1.7 Day1 module exists and is importable in the running container.
+    has_pack_v17_youcut = False
+    import_error = None
+    try:
+        from gateway.app.core.pack_v17_youcut import generate_youcut_pack  # noqa: F401
+
+        has_pack_v17_youcut = True
+    except Exception as e:
+        import_error = f"{type(e).__name__}: {e}"
+
+    payload: Dict[str, Any] = {
+        "service": "shortvideo-v1-capcut",
+        "version": "v1.7-day1",
+        "git_sha": git_sha,
+        "has_pack_v17_youcut": has_pack_v17_youcut,
+    }
+
+    # Only attach error when import fails (helps debugging; still read-only)
+    if import_error:
+        payload["pack_v17_import_error"] = import_error
+
+    # If v1.7 module is missing, mark as degraded to make it obvious in monitoring.
+    if not has_pack_v17_youcut:
+        response.status_code = 503
+
+    return payload
 
 
 @app.get("/ui", response_class=HTMLResponse)
