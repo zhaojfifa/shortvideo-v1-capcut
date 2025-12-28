@@ -301,7 +301,7 @@ def _repair_json_with_gemini(broken: str, timeout: int = 60) -> str:
         ],
         "generationConfig": {
             "responseMimeType": "application/json",
-            "maxOutputTokens": 4096,
+            "maxOutputTokens": GEMINI_MAX_OUTPUT_TOKENS,
             "temperature": 0,
             "candidateCount": 1,
         },
@@ -337,6 +337,14 @@ def parse_gemini_subtitle_payload(
         payload_text = text
 
     payload_text = _TRAILING_COMMA_RE.sub(r"\1", payload_text)
+
+    if allow_repair and ("..." in payload_text or "\u2026" in payload_text):
+        try:
+            repaired_raw = _repair_json_with_gemini(payload_text)
+            payload_text = extract_json_block(repaired_raw)
+            payload_text = _TRAILING_COMMA_RE.sub(r"\1", payload_text)
+        except Exception:
+            pass
 
     if write_debug:
         _write_debug_text(debug_dir, "gemini_response_json_block.txt", payload_text)
@@ -557,7 +565,11 @@ Rules:
     raw_text = _extract_text(resp_json)
 
     try:
-        data = parse_gemini_json_payload(raw_text)
+        data = parse_gemini_subtitle_payload(
+            raw_text,
+            allow_repair=allow_repair,
+            debug_dir=debug_dir,
+        )
     except GeminiSubtitlesError as exc:
         logger.error("%s", exc)
         raise
