@@ -324,21 +324,8 @@ def parse_gemini_subtitle_payload(
     debug_dir: Path | None = None,
     write_debug: bool = False,
 ) -> Any:
-    """
-    Fault-tolerant parser for Gemini subtitle outputs.
-
-    Parsing order:
-    1) Extract JSON block (if any) -> strict json.loads
-    2) Sanitize control chars inside string literals -> json.loads
-    3) ast.literal_eval (for Python-dict-like outputs) on sanitized
-    4) Heuristic: convert single-quoted keys/values -> json.loads
-    5) Repair fallback: call Gemini once to repair -> parse again (strict then sanitized)
-
-    Raises ValueError with a helpful snippet if all strategies fail.
-    """
     text = (raw_text or "").strip()
     snippet = (text[:500]).replace("\n", "\\n")
-    _write_debug_text(debug_dir, "gemini_response_raw.txt", text)
 
     if write_debug:
         _write_debug_text(debug_dir, "gemini_response_raw.txt", text)
@@ -348,44 +335,49 @@ def parse_gemini_subtitle_payload(
         payload_text = extract_json_block(text)
     except Exception:
         payload_text = text
+
     payload_text = _TRAILING_COMMA_RE.sub(r"\1", payload_text)
 
     if write_debug:
         _write_debug_text(debug_dir, "gemini_response_json_block.txt", payload_text)
 
-    try:
-        return parse_gemini_json_payload(payload_text)
-    except GeminiSubtitlesError:
-        pass
-
+    # Sanitize control chars inside quoted string literals (best-effort)
     try:
         payload_sanitized = sanitize_string_literals(payload_text)
     except Exception:
-        # 防御式降级：sanitize 本身不应导致全流程 500
         payload_sanitized = payload_text
-    _write_debug_text(debug_dir, "gemini_payload_sanitized.txt", payload_sanitized)
 
-    # 1) strict JSON
+    if write_debug:
+        _write_debug_text(debug_dir, "gemini_payload_sanitized.txt", payload_sanitized)
+
+    # 1) Prefer sanitized strict JSON parse (highest hit-rate in practice)
     try:
-        return _safe_json_loads(payload_text)
+        return parse_gemini_json_payload(payload_sanitized)
     except GeminiSubtitlesError:
         pass
 
-    # 2) sanitized JSON
+    # 2) safe_json_loads on sanitized (includes extra cleanup like smart quotes, BOM, etc.)
     try:
         return _safe_json_loads(payload_sanitized)
     except GeminiSubtitlesError:
         pass
 
-    # 3) python literal fallback
+    # 3) safe_json_loads on raw extracted block (sometimes sanitize can be neutral)
+    try:
+        return _safe_json_loads(payload_text)
+    except GeminiSubtitlesError:
+        pass
+
+    # 4) python literal fallback (validate structure before returning)
     try:
         data = ast.literal_eval(payload_sanitized)
         if isinstance(data, dict):
-            return data
+            # reuse existing validation: must have segments list
+            return parse_gemini_json_payload(json.dumps(data, ensure_ascii=False))
     except Exception:
         pass
 
-    # 4) heuristic single-quote fix (apply on sanitized)
+    # 5) heuristic single-quote fix (apply on sanitized)
     fixed = re.sub(
         r"(?P<q>')(?P<key>[a-zA-Z_][a-zA-Z0-9_]*)'(?=\s*:)",
         r'"\g<key>"',
@@ -396,19 +388,27 @@ def parse_gemini_subtitle_payload(
         lambda m: '": "{}"'.format(m.group(1).replace('"', '\\"')),
         fixed,
     )
-    fixed = sanitize_string_literals(fixed)
+    try:
+        fixed = sanitize_string_literals(fixed)
+    except Exception:
+        pass
 
     try:
         return _safe_json_loads(fixed)
     except GeminiSubtitlesError:
         pass
 
-    # 5) repair fallback (best-effort; never crash the whole service if repair fails)
+    # 6) repair fallback (best-effort; never crash the whole service if repair fails)
     if allow_repair:
         try:
             repaired_raw = _repair_json_with_gemini(payload_text)
             repaired_block = extract_json_block(repaired_raw)
-            repaired_sanitized = sanitize_string_literals(repaired_block)
+
+            try:
+                repaired_sanitized = sanitize_string_literals(repaired_block)
+            except Exception:
+                repaired_sanitized = repaired_block
+
             try:
                 return _safe_json_loads(repaired_block)
             except GeminiSubtitlesError:
