@@ -32,6 +32,7 @@ tv1_validation/
 workspace/
 tmp/
 temp/
+deliver/packs/
 
 # Media & generated artifacts
 *.mp4
