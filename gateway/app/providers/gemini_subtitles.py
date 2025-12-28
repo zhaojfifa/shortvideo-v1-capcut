@@ -171,6 +171,24 @@ def parse_gemini_json_payload(raw_text: str) -> dict:
     return payload
 
 
+def _ensure_scenes(data: dict) -> dict:
+    segments = data.get("segments")
+    if not isinstance(segments, list):
+        raise GeminiSubtitlesError("Gemini subtitles JSON must contain 'segments'")
+    if not segments:
+        raise GeminiSubtitlesError("Gemini subtitles returned empty segments")
+    scenes = data.get("scenes")
+    if isinstance(scenes, list):
+        return data
+    start = segments[0].get("start")
+    end = segments[-1].get("end")
+    data["scenes"] = [
+        {"scene_id": 1, "start": start, "end": end, "title": "", "mm_title": ""}
+    ]
+    logger.info("Gemini subtitles missing scenes; synthesized fallback scene")
+    return data
+
+
 def extract_json_block(raw: str) -> str:
     """
     Extract the most relevant JSON object from Gemini responses.
@@ -489,10 +507,7 @@ Here are the subtitles to process (SRT):
     if not isinstance(language, str):
         raise GeminiSubtitlesError("Gemini subtitles JSON must include a language code")
 
-    if "segments" not in data or "scenes" not in data:
-        raise GeminiSubtitlesError("Gemini subtitles JSON must contain 'segments' and 'scenes'")
-
-    return data
+    return _ensure_scenes(data)
 
 
 def transcribe_translate_and_segment_with_gemini(
@@ -581,10 +596,7 @@ Rules:
     if not isinstance(language, str):
         raise GeminiSubtitlesError("Gemini subtitles JSON must include a language code")
 
-    if "segments" not in data or "scenes" not in data:
-        raise GeminiSubtitlesError("Gemini subtitles JSON must contain 'segments' and 'scenes'")
-
-    return data
+    return _ensure_scenes(data)
 
 
 if __name__ == "__main__":
