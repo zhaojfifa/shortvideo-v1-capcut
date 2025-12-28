@@ -1,8 +1,7 @@
 import boto3
 import mimetypes
-import os
+from gateway.adapters.r2_s3_client import get_s3_client
 from gateway.app.ports.storage import IStorageService
-from gateway.app.utils.keys import KeyBuilder
 
 class R2StorageService(IStorageService):
     def __init__(
@@ -30,8 +29,9 @@ class R2StorageService(IStorageService):
             "s3",
             endpoint_url=endpoint_url,
             aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key
+            aws_secret_access_key=aws_secret_access_key,
         )
+        self._presign_client = get_s3_client()
 
     def upload_file(
         self,
@@ -49,6 +49,8 @@ class R2StorageService(IStorageService):
                 elif lower_path.endswith(".zip"):
                     content_type = "application/zip"
                 elif lower_path.endswith(".srt"):
+                    content_type = "text/plain; charset=utf-8"
+                elif lower_path.endswith(".txt"):
                     content_type = "text/plain; charset=utf-8"
                 else:
                     content_type = "application/octet-stream"
@@ -73,15 +75,31 @@ class R2StorageService(IStorageService):
             else:
                 raise
 
-    def generate_presigned_url(self, key: str, expiration: int = 3600) -> str:
+    def generate_presigned_url(
+        self,
+        key: str,
+        expiration: int = 3600,
+        content_type: str | None = None,
+        filename: str | None = None,
+        disposition: str | None = None,
+    ) -> str:
         params = {"Bucket": self.bucket_name, "Key": key}
-        key_lower = key.lower()
-        if key_lower.endswith(".zip"):
-            params["ResponseContentType"] = "application/zip"
-            params["ResponseContentDisposition"] = 'attachment; filename="capcut_pack.zip"'
-        elif key_lower.endswith(".mp3"):
-            params["ResponseContentType"] = "audio/mpeg"
-        return self.s3_client.generate_presigned_url(
+        if content_type:
+            params["ResponseContentType"] = content_type
+        else:
+            key_lower = key.lower()
+            if key_lower.endswith(".zip"):
+                params["ResponseContentType"] = "application/zip"
+            elif key_lower.endswith(".mp3"):
+                params["ResponseContentType"] = "audio/mpeg"
+            elif key_lower.endswith(".srt") or key_lower.endswith(".txt"):
+                params["ResponseContentType"] = "text/plain; charset=utf-8"
+        if filename:
+            disp = disposition or "attachment"
+            params["ResponseContentDisposition"] = f'{disp}; filename="{filename}"'
+        elif disposition:
+            params["ResponseContentDisposition"] = disposition
+        return self._presign_client.generate_presigned_url(
             'get_object',
             Params=params,
             ExpiresIn=expiration

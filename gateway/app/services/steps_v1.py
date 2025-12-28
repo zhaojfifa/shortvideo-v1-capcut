@@ -365,7 +365,16 @@ async def run_pack_step(req: PackRequest):
 
     # 返回值对 UI/调试友好：保留 zip_path/files
     zip_path_value = relative_to_workspace(zip_path) if zip_path.exists() else None
-    download_url = storage.generate_presigned_url(zip_key, expiration=3600)
+    try:
+        download_url = storage.generate_presigned_url(
+            zip_key,
+            expiration=3600,
+            content_type="application/zip",
+            filename=f"{task_id}_capcut_pack.zip",
+            disposition="attachment",
+        )
+    except TypeError:
+        download_url = storage.generate_presigned_url(zip_key, expiration=3600)
     return {
         "task_id": task_id,
         "zip_key": zip_key,

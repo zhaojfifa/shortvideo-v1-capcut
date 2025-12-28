@@ -1,19 +1,14 @@
 """V1 routes exposing parse/subtitles/dub/pack and related assets."""
 
-from pathlib import Path
-
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
-from gateway.app.services.artifact_storage import get_download_url, object_exists
-from gateway.app.utils.keys import KeyBuilder
-from gateway.app.config import get_settings
+from gateway.app.config import get_settings, get_storage_service
 from gateway.app.db import SessionLocal
 from gateway.app import models
 from gateway.app.web.templates import get_templates
 from gateway.app.core.workspace import (
     Workspace,
     origin_srt_path,
-    pack_zip_path,
     raw_path,
     translated_srt_path,
 )
@@ -99,43 +94,29 @@ async def get_audio(task_id: str):
 
 @router.post("/pack")
 async def pack(request: PackRequest):
-    result = await run_pack_step(request)
-    db = SessionLocal()
-    try:
-        task = db.query(models.Task).filter(models.Task.id == request.task_id).first()
-        if not task:
-            return result
-        pack_file = pack_zip_path(request.task_id)
-        if pack_file.exists():
-            task.pack_path = relative_to_workspace(pack_file)
-
-        task.status = "ready"
-        task.last_step = "pack"
-        task.error_message = None
-        task.error_reason = None
-
-        db.commit()
-        db.refresh(task)
-    finally:
-        db.close()
-    return result
+    return await run_pack_step(request)
 
 
 @router.get("/tasks/{task_id}/pack")
 async def download_pack(task_id: str):
+    storage = get_storage_service()
     db = SessionLocal()
     try:
         task = db.query(models.Task).filter(models.Task.id == task_id).first()
-        if task:
-            if task.pack_path:
-                key = str(task.pack_path)
-            else:
-                tenant = getattr(task, "tenant_id", "default")
-                project = getattr(task, "project_id", "default")
-                key = KeyBuilder.build(tenant, project, task_id, "artifacts/capcut_pack.zip")
-
-            if object_exists(key):
-                return RedirectResponse(url=get_download_url(key), status_code=302)
+        if task and task.pack_path:
+            key = str(task.pack_path)
+            if storage.exists(key):
+                try:
+                    presigned_url = storage.generate_presigned_url(
+                        key,
+                        expiration=3600,
+                        content_type="application/zip",
+                        filename=f"{task_id}_capcut_pack.zip",
+                        disposition="attachment",
+                    )
+                except TypeError:
+                    presigned_url = storage.generate_presigned_url(key, expiration=3600)
+                return RedirectResponse(url=presigned_url, status_code=302)
     finally:
         db.close()
 
