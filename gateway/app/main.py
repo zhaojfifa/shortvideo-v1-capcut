@@ -16,6 +16,16 @@ from gateway.app.routes.v17_pack import router as v17_pack_router
 from gateway.routes import admin_tools
 from gateway.routes import v1 as v1_router
 
+# --- v1.8 runtime directories (MUST exist before any IO) ---
+RUNTIME_DIRS = [
+    Path("scenes"),
+    Path("scene_packs"),
+    Path("deliver/packs"),
+]
+
+for d in RUNTIME_DIRS:
+    d.mkdir(parents=True, exist_ok=True)
+# --- end v1.8 runtime dirs ---
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 UI_HTML_PATH = STATIC_DIR / "ui.html"

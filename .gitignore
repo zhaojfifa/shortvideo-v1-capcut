@@ -33,6 +33,10 @@ workspace/
 tmp/
 temp/
 deliver/packs/
+!deliver/packs/pack_from_scene_001/
+!deliver/packs/pack_from_scene_001/**
+!deliver/packs/pack_from_multi_scenes/
+!deliver/packs/pack_from_multi_scenes/**
 
 # Media & generated artifacts
 *.mp4
@@ -41,6 +45,14 @@ deliver/packs/
 *.mp3
 *.srt
 *.zip
+
+# v1.8 Day2 mock fixtures (explicitly track)
+!sandbox/mock_tasks/**/raw/raw.mp4
+!sandbox/mock_tasks/**/edits/audio/audio.wav
+!sandbox/mock_tasks/**/edits/subs/subs.srt
+!scenes/scene_001/video.mp4
+!scenes/scene_001/audio.wav
+!scenes/scene_001/subs.srt
 
 # Smoke / local test helpers
 tmp_*.json

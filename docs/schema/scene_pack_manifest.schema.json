@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schema/scene_pack_manifest.schema.json",
+  "title": "Scene Pack Manifest Schema",
+  "type": "object",
+  "required": ["scene_pack_id", "version", "scenes", "source_tasks", "constraints"],
+  "additionalProperties": false,
+  "properties": {
+    "scene_pack_id": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "minLength": 1 },
+    "scenes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "source_tasks": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "constraints": {
+      "type": "object",
+      "required": ["language", "aspect_ratio"],
+      "additionalProperties": false,
+      "properties": {
+        "language": { "type": "string", "minLength": 2 },
+        "aspect_ratio": { "type": "string", "minLength": 3 }
+      }
+    }
+  }
+}

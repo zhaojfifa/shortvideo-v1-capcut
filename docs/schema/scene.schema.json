@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schema/scene.schema.json",
+  "title": "Scene Manifest Schema",
+  "type": "object",
+  "required": ["scene_id", "source", "semantics", "assets"],
+  "additionalProperties": false,
+  "properties": {
+    "scene_id": { "type": "string", "minLength": 1 },
+    "source": {
+      "type": "object",
+      "required": ["task_id", "origin_video", "time_range"],
+      "additionalProperties": false,
+      "properties": {
+        "task_id": { "type": "string", "minLength": 1 },
+        "origin_video": { "type": "string", "minLength": 1 },
+        "time_range": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "semantics": {
+      "type": "object",
+      "required": ["role", "language", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": ["hook", "demo", "explanation", "ending", "unknown"]
+        },
+        "language": { "type": "string", "minLength": 2 },
+        "summary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "assets": {
+      "type": "object",
+      "required": ["video", "audio", "subs"],
+      "additionalProperties": false,
+      "properties": {
+        "video": { "type": "string", "pattern": ".*\\.mp4$" },
+        "audio": { "type": "string", "pattern": ".*\\.wav$" },
+        "subs":  { "type": "string", "pattern": ".*\\.srt$" }
+      }
+    }
+  }
+}
