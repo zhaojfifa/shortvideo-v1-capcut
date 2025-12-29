@@ -1,0 +1,10 @@
+{
+  "scene_pack_id": "scene_pack_001",
+  "version": "1.0",
+  "scenes": ["scene_001"],
+  "source_tasks": ["task_demo_001"],
+  "constraints": {
+    "language": "zh",
+    "aspect_ratio": "9:16"
+  }
+}
