@@ -35,6 +35,8 @@ temp/
 deliver/packs/
 !deliver/packs/pack_from_scene_001/
 !deliver/packs/pack_from_scene_001/**
+!deliver/packs/pack_from_multi_scenes/
+!deliver/packs/pack_from_multi_scenes/**
 
 # Media & generated artifacts
 *.mp4
