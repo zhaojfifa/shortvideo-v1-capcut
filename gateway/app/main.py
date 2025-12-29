@@ -1,3 +1,18 @@
+# gateway/app/main.py
+
+from pathlib import Path
+
+# --- v1.8 runtime directories (MUST run at import time) ---
+RUNTIME_DIRS = [
+    Path("scenes"),
+    Path("scene_packs"),
+    Path("deliver/packs"),
+]
+
+for d in RUNTIME_DIRS:
+    d.mkdir(parents=True, exist_ok=True)
+# --- end runtime dirs ---
+
 import importlib.util
 import logging
 import os
