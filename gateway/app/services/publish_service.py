@@ -9,7 +9,12 @@ from typing import Optional, Tuple
 from sqlalchemy.orm import Session
 
 from gateway.app import models
-from gateway.app.core.workspace import pack_zip_path, relative_to_workspace, workspace_root
+from gateway.app.core.workspace import (
+    deliver_pack_zip_path,
+    pack_zip_path,
+    relative_to_workspace,
+    workspace_root,
+)
 
 PUBLISH_PROVIDER_DEFAULT = os.getenv("PUBLISH_PROVIDER", "local")
 
@@ -81,6 +86,8 @@ def publish_task_pack(
         raise RuntimeError(f"Task not found: {task_id}")
 
     zip_path = pack_zip_path(task_id)
+    if not zip_path.exists():
+        zip_path = deliver_pack_zip_path(task_id)
     if not zip_path.exists():
         raise RuntimeError(f"Pack zip not found for task {task_id}: {zip_path}")
 

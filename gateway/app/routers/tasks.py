@@ -122,7 +122,7 @@ from gateway.app.services.task_cleanup import delete_task_record, purge_task_art
 from ..core.workspace import (
     Workspace,
     origin_srt_path,
-    pack_zip_path,
+    deliver_pack_zip_path,
     raw_path,
     relative_to_workspace,
     task_base_dir,
@@ -203,13 +203,17 @@ def _is_storage_key(value: Optional[str]) -> bool:
 
 
 def _pack_path_for_list(task: dict) -> Optional[str]:
-    task_id = str(task.get("task_id") or task.get("id") or "")
-    pack_path = task.get("pack_path")
+    task_id = str(_task_value(task, "task_id") or _task_value(task, "id") or "")
+    pack_type = _task_value(task, "pack_type")
+    pack_key = _task_value(task, "pack_key")
+    pack_path = _task_value(task, "pack_path")
+    if pack_type == "capcut_v18" and pack_key:
+        return str(pack_key)
     if pack_path:
         pack_path = str(pack_path)
         if pack_path.startswith(("pack/", "published/")) and not _is_storage_key(pack_path):
             return pack_path
-    pack_file = pack_zip_path(task_id)
+    pack_file = deliver_pack_zip_path(task_id)
     if pack_file.exists():
         return relative_to_workspace(pack_file)
     return None
@@ -382,8 +386,17 @@ def download_pack(task_id: str, repo=Depends(get_task_repository)):
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Pack not found")
-    key = _require_storage_key(task, "pack_path", "Pack not found")
-    return RedirectResponse(url=get_download_url(key), status_code=302)
+    pack_type = _task_value(task, "pack_type")
+    if pack_type == "capcut_v18":
+        pack_key = _task_value(task, "pack_key")
+        if not pack_key or not object_exists(str(pack_key)):
+            raise HTTPException(status_code=404, detail="Pack not found")
+        return RedirectResponse(url=get_download_url(str(pack_key)), status_code=302)
+
+    key = _task_value(task, "pack_path") or _task_value(task, "pack_key")
+    if not key or not object_exists(str(key)):
+        raise HTTPException(status_code=404, detail="Pack not found")
+    return RedirectResponse(url=get_download_url(str(key)), status_code=302)
 
 
 def _task_endpoint(task_id: str, kind: str) -> Optional[str]:
@@ -403,8 +416,14 @@ def _task_endpoint(task_id: str, kind: str) -> Optional[str]:
     return None
 
 
+def _task_value(task: dict, field: str) -> Optional[str]:
+    if isinstance(task, dict):
+        return task.get(field)
+    return getattr(task, field, None)
+
+
 def _task_key(task: dict, field: str) -> Optional[str]:
-    value = task.get(field)
+    value = _task_value(task, field)
     return str(value) if value else None
 
 
@@ -443,11 +462,13 @@ def _resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
         else None
     )
     mm_txt_url = _task_endpoint(task_id, "mm_txt") if mm_url else None
-    pack_url = (
-        _task_endpoint(task_id, "pack")
-        if task.get("pack_path")
-        else None
-    )
+    pack_key = task.get("pack_key")
+    pack_type = task.get("pack_type")
+    pack_url = None
+    if pack_type == "capcut_v18" and pack_key:
+        pack_url = _task_endpoint(task_id, "pack")
+    elif task.get("pack_path"):
+        pack_url = _task_endpoint(task_id, "pack")
 
     return {
         "raw_path": raw_url,
@@ -650,18 +671,19 @@ def _run_pipeline_background(task_id: str, repo) -> None:
         current_step = "pack"
         _repo_upsert(repo, task_id, {**status_update, "last_step": current_step})
         pack_req = PackRequest(task_id=task_id)
-        asyncio.run(run_pack_step_v1(pack_req))
-        pack_file = pack_zip_path(task_id)
+        pack_res = asyncio.run(run_pack_step_v1(pack_req))
         pack_key = None
-        if pack_file.exists():
-            pack_key = upload_task_artifact(task, pack_file, "capcut_pack.zip", task_id=task_id)
+        if isinstance(pack_res, dict):
+            pack_key = pack_res.get("pack_key") or pack_res.get("zip_key")
         _repo_upsert(
             repo,
             task_id,
             {
                 "status": "done",
                 "last_step": current_step,
-                "pack_path": pack_key,
+                "pack_key": pack_key,
+                "pack_type": "capcut_v18" if pack_key else None,
+                "pack_status": "ready" if pack_key else None,
                 "error_message": None,
                 "error_reason": None,
             },

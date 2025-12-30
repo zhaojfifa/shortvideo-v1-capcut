@@ -281,6 +281,12 @@ def pack_zip_path(task_id: str) -> Path:
     return path
 
 
+def deliver_pack_zip_path(task_id: str) -> Path:
+    path = workspace_root() / "deliver" / "packs" / task_id / "capcut_pack.zip"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def relative_to_workspace(path: Path) -> str:
     try:
         return str(path.resolve().relative_to(workspace_root()))
