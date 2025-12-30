@@ -93,6 +93,12 @@ def ensure_task_extra_columns(engine) -> None:
         alter_statements.append("ALTER TABLE tasks ADD COLUMN assignee VARCHAR(64)")
     if "ops_notes" not in columns:
         alter_statements.append("ALTER TABLE tasks ADD COLUMN ops_notes TEXT")
+    if "pack_key" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN pack_key TEXT")
+    if "pack_type" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN pack_type VARCHAR(32)")
+    if "pack_status" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN pack_status VARCHAR(32)")
 
     if not alter_statements:
         return

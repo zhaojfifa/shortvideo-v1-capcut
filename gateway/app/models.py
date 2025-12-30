@@ -45,6 +45,9 @@ class Task(Base):
     mm_srt_path = Column(Text, nullable=True)          # [新增]
     mm_audio_path = Column(Text, nullable=True)
     pack_path = Column(Text, nullable=True)
+    pack_key = Column(Text, nullable=True)
+    pack_type = Column(String(32), nullable=True)
+    pack_status = Column(String(32), nullable=True)
     
     # v1.65 中间产物 (为下一步做准备)
     brief_path = Column(Text, nullable=True)           # [新增] brief.json

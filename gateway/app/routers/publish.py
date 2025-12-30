@@ -36,7 +36,14 @@ def download_pack(task_id: str, db: Session = Depends(get_db)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Pack not found")
-    if not task.pack_path or not object_exists(str(task.pack_path)):
+    if task.pack_type == "capcut_v18":
+        if not task.pack_key or not object_exists(str(task.pack_key)):
+            raise HTTPException(status_code=404, detail="Pack not found")
+        url = get_download_url(task.pack_key)
+        return RedirectResponse(url=url, status_code=302)
+
+    key = task.pack_path or task.pack_key
+    if not key or not object_exists(str(key)):
         raise HTTPException(status_code=404, detail="Pack not found")
-    url = get_download_url(task.pack_path)
+    url = get_download_url(key)
     return RedirectResponse(url=url, status_code=302)

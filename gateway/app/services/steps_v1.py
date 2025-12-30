@@ -14,7 +14,7 @@ from fastapi import HTTPException
 from gateway.app.config import get_storage_service
 from gateway.app.core.workspace import (
     Workspace,
-    pack_zip_path,
+    deliver_pack_zip_path,
     raw_path,
     relative_to_workspace,
     translated_srt_path,
@@ -26,7 +26,6 @@ from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.parse import detect_platform, parse_douyin_video
 from gateway.app.services.subtitles import generate_subtitles
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
-from gateway.app.utils.keys import KeyBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +37,6 @@ RAW_ARTIFACT = "raw/raw.mp4"
 ORIGIN_SRT_ARTIFACT = "subs/origin.srt"
 MM_SRT_ARTIFACT = "subs/mm.srt"
 MM_TXT_ARTIFACT = "subs/mm.txt"
-CAPCUT_PACK_ARTIFACT = "artifacts/capcut_pack.zip"
 
 README_TEMPLATE = """CapCut pack usage
 
@@ -274,7 +272,7 @@ async def run_pack_step(req: PackRequest):
     workspace = Workspace(task_id)
 
     raw_file = raw_path(task_id)
-    zip_path = pack_zip_path(task_id)
+    zip_path = deliver_pack_zip_path(task_id)
     zip_path.parent.mkdir(parents=True, exist_ok=True)
 
     # audio：优先 workspace.mm_audio_path（你的 dub 可能输出 mp3），不存在则 fallback 到 wav 命名
@@ -333,15 +331,7 @@ async def run_pack_step(req: PackRequest):
     if not zip_path.exists():
         raise RuntimeError(f"Pack zip not found after packing: {zip_path}")
 
-    db = SessionLocal()
-    try:
-        task = db.query(models.Task).filter(models.Task.id == task_id).first()
-        tenant_id = getattr(task, "tenant_id", None) or getattr(task, "tenant", None) or "default"
-        project_id = getattr(task, "project_id", None) or getattr(task, "project", None) or "default"
-    finally:
-        db.close()
-
-    zip_key = KeyBuilder.build(str(tenant_id), str(project_id), task_id, CAPCUT_PACK_ARTIFACT)
+    zip_key = f"packs/{task_id}/capcut_pack.zip"
     storage = get_storage_service()
     storage.upload_file(str(zip_path), zip_key, content_type="application/zip")
 
@@ -356,7 +346,10 @@ async def run_pack_step(req: PackRequest):
     # 更新任务：pack_path 必须存 key（供 /v1/tasks/{id}/pack 302 → /files/<key>）
     _update_task(
         task_id,
-        pack_path=zip_key,
+        pack_key=zip_key,
+        pack_type="capcut_v18",
+        pack_status="ready",
+        pack_path=None,
         status="ready",
         last_step="pack",
         error_message=None,
@@ -378,6 +371,7 @@ async def run_pack_step(req: PackRequest):
     return {
         "task_id": task_id,
         "zip_key": zip_key,
+        "pack_key": zip_key,
         "zip_path": zip_path_value,
         "download_url": download_url,
         "files": files,
