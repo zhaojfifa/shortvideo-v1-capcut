@@ -1,0 +1,9 @@
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Myanmar",
+    "Myanmar Text", "Padauk", "Noto Sans", Arial, sans-serif;
+}
+
+.t-secondary {
+  font-size: 0.88em;
+  color: #6b7280;
+}
