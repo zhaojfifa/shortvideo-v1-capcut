@@ -1,15 +1,15 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Task Board ? ShortVideo</title>
+  <title>Task Board - ShortVideo</title>
+  <link rel="stylesheet" href="/static/i18n.css" />
   <style>
     :root { color-scheme: light; }
     body {
       margin: 0;
       padding: 16px;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: #f3f4f6;
       color: #111827;
     }
@@ -88,10 +88,10 @@
 </head>
 <body>
   <header>
-    <h1>Task Board <span class="muted">/ ????</span></h1>
+    <h1>Task Board <span class="muted t-secondary">/ ????</span></h1>
     <div class="actions">
-      <a class="btn" href="/tasks/new">New task <span class="muted">/ ????</span></a>
-      <button id="refresh-btn" type="button">Refresh <span class="muted">/ ??</span></button>
+      <a class="btn" href="/tasks/new">New task <span class="muted t-secondary">/ ????</span></a>
+      <button id="refresh-btn" type="button">Refresh <span class="muted t-secondary">/ ??</span></button>
     </div>
   </header>
 
@@ -102,16 +102,16 @@
       <thead>
         <tr>
           <th>ID</th>
-          <th>Title <span class="muted">/ ??</span></th>
-          <th>Category <span class="muted">/ ??</span></th>
-          <th>Lang <span class="muted">/ ??</span></th>
-          <th>Platform <span class="muted">/ ??</span></th>
-          <th>Account <span class="muted">/ ??</span></th>
-          <th>Status <span class="muted">/ ??</span></th>
-          <th>Last Step <span class="muted">/ ??</span></th>
-          <th>Pack <span class="muted">/ ???</span></th>
-          <th>Created <span class="muted">/ ??</span></th>
-          <th>JSON <span class="muted">(Engineering)</span></th>
+          <th>Title <span class="muted t-secondary">/ ??</span></th>
+          <th>Category <span class="muted t-secondary">/ ??</span></th>
+          <th>Lang <span class="muted t-secondary">/ ??</span></th>
+          <th>Platform <span class="muted t-secondary">/ ??</span></th>
+          <th>Account <span class="muted t-secondary">/ ??</span></th>
+          <th>Status <span class="muted t-secondary">/ ??</span></th>
+          <th>Last Step <span class="muted t-secondary">/ ??</span></th>
+          <th>Pack <span class="muted t-secondary">/ ???</span></th>
+          <th>Created <span class="muted t-secondary">/ ??</span></th>
+          <th>JSON <span class="muted t-secondary">(Engineering)</span></th>
         </tr>
       </thead>
       <tbody id="task-rows"></tbody>
@@ -167,8 +167,8 @@
         const status = task.status || "pending";
         const tr = document.createElement("tr");
         const packCell = task.pack_path
-          ? `<a href="${task.pack_path}" class="btn" target="_blank">Download <span class="muted">/ ??</span></a>`
-          : `<span class="muted">Not ready</span>`;
+          ? `<a href="${task.pack_path}" class="btn" target="_blank">Download <span class="muted t-secondary">/ ??</span></a>`
+          : `<span class="muted t-secondary">Not ready</span>`;
         tr.innerHTML = `
           <td title="${task.task_id || ""}">${shortText(task.task_id, 16)}</td>
           <td title="${task.title || ""}">${shortText(task.title, 20)}</td>
@@ -180,7 +180,7 @@
           <td>${task.last_step || ""}</td>
           <td>${packCell}</td>
           <td><span class="small">${task.created_at || ""}</span></td>
-          <td><button class="json-btn secondary" data-task-id="${task.task_id}">View JSON <span class="muted">(Engineering)</span></button></td>
+          <td><button class="json-btn secondary" data-task-id="${task.task_id}">View JSON <span class="muted t-secondary">(Engineering)</span></button></td>
         `;
         rowsEl.appendChild(tr);
       }
@@ -233,3 +233,4 @@
   </script>
 </body>
 </html>
+

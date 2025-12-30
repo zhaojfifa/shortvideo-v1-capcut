@@ -1,15 +1,15 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>New Suitcase Task ? ShortVideo</title>
+  <title>New Suitcase Task - ShortVideo</title>
+  <link rel="stylesheet" href="/static/i18n.css" />
   <style>
     :root { color-scheme: light; }
     body {
       margin: 0;
       padding: 16px;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: #f3f4f6;
       color: #111827;
     }
@@ -70,21 +70,21 @@
     <header>
       <h1>{{ t_primary("new_suitcase_task") }}</h1>
       {% if ui_show_secondary %}
-        <div class="muted">{{ t_secondary("new_suitcase_task") }}</div>
+        <div class="muted t-secondary">{{ t_secondary("new_suitcase_task") }}</div>
       {% endif %}
-      <a href="/tasks">Back to Task Board <span class="muted">/ ??????</span></a>
+      <a href="/tasks">Back to Task Board <span class="muted t-secondary">/ ??????</span></a>
     </header>
 
     <main class="card">
       <form id="task-form">
         <div class="field">
-          <label for="source_url">Source URL <span class="muted">/ ????</span> *</label>
+          <label for="source_url">Source URL <span class="muted t-secondary">/ ????</span> *</label>
           <input id="source_url" name="source_url" type="text" autocomplete="off" required placeholder="??????????????/XHS/TK/FB?????" />
         </div>
 
         <div class="row">
           <div class="field">
-            <label for="platform">Platform <span class="muted">/ ??</span></label>
+            <label for="platform">Platform <span class="muted t-secondary">/ ??</span></label>
             <select id="platform" name="platform">
               <option value="douyin" selected>Douyin</option>
               <option value="xhs">XHS</option>
@@ -93,7 +93,7 @@
             </select>
           </div>
           <div class="field">
-            <label for="account_id">Account <span class="muted">/ ??</span></label>
+            <label for="account_id">Account <span class="muted t-secondary">/ ??</span></label>
             <select id="account_id" name="account_id">
               <option value="suitcase_mm_1">Suitcase MM #1</option>
             </select>
@@ -102,8 +102,8 @@
         </div>
 
         <div class="field">
-          <label>Video type <span class="muted">/ ????</span></label>
-          <div class="muted">Choose the business intent. <span class="muted">/ ??????</span></div>
+          <label>Video type <span class="muted t-secondary">/ ????</span></label>
+          <div class="muted t-secondary">Choose the business intent. <span class="muted t-secondary">/ ??????</span></div>
           <div class="radio-group" style="margin-top:6px;">
             <label class="radio"><input type="radio" name="video_type" value="review" checked /> Comparison Review</label>
             <label class="radio"><input type="radio" name="video_type" value="scenario" /> Scenario Usage</label>
@@ -111,8 +111,8 @@
         </div>
 
         <div class="field">
-          <label>Style preset <span class="muted">/ ????</span></label>
-          <div class="muted">Defines pacing and editing intent. <span class="muted">/ ?????????</span></div>
+          <label>Style preset <span class="muted t-secondary">/ ????</span></label>
+          <div class="muted t-secondary">Defines pacing and editing intent. <span class="muted t-secondary">/ ?????????</span></div>
           <div class="radio-group" style="margin-top:6px;">
             <label class="radio"><input type="radio" name="style_preset" value="review_brief" checked /> Short review, fast pace</label>
             <label class="radio"><input type="radio" name="style_preset" value="scenario_story" /> Scenario story, normal pace</label>
@@ -120,27 +120,27 @@
         </div>
 
         <div class="field">
-          <label for="title">Title (optional) <span class="muted">/ ??</span></label>
+          <label for="title">Title (optional) <span class="muted t-secondary">/ ??</span></label>
           <input id="title" name="title" type="text" placeholder="Optional title" />
         </div>
 
         <div class="field">
-          <label for="note">Note / Operator hint <span class="muted">/ ????</span></label>
+          <label for="note">Note / Operator hint <span class="muted t-secondary">/ ????</span></label>
           <textarea id="note" name="note" placeholder="Optional note for operators"></textarea>
         </div>
 
         <div class="summary" id="summary-block">
           <div class="summary-grid">
-            <div class="summary-item"><strong>Platform <span class="muted">/ ??</span></strong><span id="summary-platform">-</span></div>
-            <div class="summary-item"><strong>Account <span class="muted">/ ??</span></strong><span id="summary-account">-</span></div>
-            <div class="summary-item"><strong>Video type <span class="muted">/ ??</span></strong><span id="summary-video">-</span></div>
-            <div class="summary-item"><strong>Style <span class="muted">/ ??</span></strong><span id="summary-style">-</span></div>
-            <div class="summary-item"><strong>Language <span class="muted">/ ??</span></strong><span id="summary-lang">Burmese (MM)</span></div>
+            <div class="summary-item"><strong>Platform <span class="muted t-secondary">/ ??</span></strong><span id="summary-platform">-</span></div>
+            <div class="summary-item"><strong>Account <span class="muted t-secondary">/ ??</span></strong><span id="summary-account">-</span></div>
+            <div class="summary-item"><strong>Video type <span class="muted t-secondary">/ ??</span></strong><span id="summary-video">-</span></div>
+            <div class="summary-item"><strong>Style <span class="muted t-secondary">/ ??</span></strong><span id="summary-style">-</span></div>
+            <div class="summary-item"><strong>Language <span class="muted t-secondary">/ ??</span></strong><span id="summary-lang">Burmese (MM)</span></div>
           </div>
         </div>
 
-        <button class="btn-primary" type="submit">Create &amp; run pipeline <span class="muted">/ ?????</span></button>
-        <div class="muted" style="margin-top: 6px;">Auto-category: Suitcase ? Language: Burmese ? UI: Chinese <span class="muted">/ ???????? ? ????? ? ?????</span></div>
+        <button class="btn-primary" type="submit">Create &amp; run pipeline <span class="muted t-secondary">/ ?????</span></button>
+        <div class="muted t-secondary" style="margin-top: 6px;">Auto-category: Suitcase ? Language: Burmese ? UI: Chinese <span class="muted t-secondary">/ ???????? ? ????? ? ?????</span></div>
       </form>
 
       <div style="margin-top: 12px;">
@@ -231,3 +231,4 @@
   </script>
 </body>
 </html>
+
