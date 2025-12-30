@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>New Suitcase Task - ShortVideo</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
   <link rel="stylesheet" href="/static/i18n.css" />
   <style>
     :root { color-scheme: light; }
@@ -72,14 +73,14 @@
       {% if ui_show_secondary %}
         <div class="muted t-secondary">{{ t_secondary("new_suitcase_task") }}</div>
       {% endif %}
-      <a href="/tasks">Back to Task Board <span class="muted t-secondary">/ ??????</span></a>
+      <a href="/tasks">Back to Task Board <span class="muted t-secondary">/ Back to Task Board</span></a>
     </header>
 
     <main class="card">
       <form id="task-form">
         <div class="field">
-          <label for="source_url">Source URL <span class="muted t-secondary">/ ????</span> *</label>
-          <input id="source_url" name="source_url" type="text" autocomplete="off" required placeholder="??????????????/XHS/TK/FB?????" />
+          <label for="source_url">Source URL <span class="muted t-secondary">/ Source URL</span> *</label>
+          <input id="source_url" name="source_url" type="text" autocomplete="off" required placeholder="Paste source URL (Douyin/XHS/TK/FB)" />
         </div>
 
         <div class="row">
@@ -102,8 +103,8 @@
         </div>
 
         <div class="field">
-          <label>Video type <span class="muted t-secondary">/ ????</span></label>
-          <div class="muted t-secondary">Choose the business intent. <span class="muted t-secondary">/ ??????</span></div>
+          <label>Video type <span class="muted t-secondary">/ Video type</span></label>
+          <div class="muted t-secondary">Choose the business intent. <span class="muted t-secondary">/ Pick intent</span></div>
           <div class="radio-group" style="margin-top:6px;">
             <label class="radio"><input type="radio" name="video_type" value="review" checked /> Comparison Review</label>
             <label class="radio"><input type="radio" name="video_type" value="scenario" /> Scenario Usage</label>
@@ -111,8 +112,8 @@
         </div>
 
         <div class="field">
-          <label>Style preset <span class="muted t-secondary">/ ????</span></label>
-          <div class="muted t-secondary">Defines pacing and editing intent. <span class="muted t-secondary">/ ?????????</span></div>
+          <label>Style preset <span class="muted t-secondary">/ Style preset</span></label>
+          <div class="muted t-secondary">Defines pacing and editing intent. <span class="muted t-secondary">/ Editing pace</span></div>
           <div class="radio-group" style="margin-top:6px;">
             <label class="radio"><input type="radio" name="style_preset" value="review_brief" checked /> Short review, fast pace</label>
             <label class="radio"><input type="radio" name="style_preset" value="scenario_story" /> Scenario story, normal pace</label>
@@ -125,7 +126,7 @@
         </div>
 
         <div class="field">
-          <label for="note">Note / Operator hint <span class="muted t-secondary">/ ????</span></label>
+          <label for="note">Note / Operator hint <span class="muted t-secondary">/ Notes</span></label>
           <textarea id="note" name="note" placeholder="Optional note for operators"></textarea>
         </div>
 
@@ -139,8 +140,8 @@
           </div>
         </div>
 
-        <button class="btn-primary" type="submit">Create &amp; run pipeline <span class="muted t-secondary">/ ?????</span></button>
-        <div class="muted t-secondary" style="margin-top: 6px;">Auto-category: Suitcase ? Language: Burmese ? UI: Chinese <span class="muted t-secondary">/ ???????? ? ????? ? ?????</span></div>
+        <button class="btn-primary" type="submit">Create &amp; run pipeline <span class="muted t-secondary">/ Create</span></button>
+        <div class="muted t-secondary" style="margin-top: 6px;">Auto-category: Suitcase · Language: Burmese · UI: Chinese <span class="muted t-secondary">/ Auto category · Language · UI</span></div>
       </form>
 
       <div style="margin-top: 12px;">
@@ -174,7 +175,7 @@
 
       const rawSource = document.getElementById("source_url").value.trim();
       if (!rawSource) {
-        alert("?????????????");
+        alert("Source URL is required.");
         resultEl.textContent = "";
         return;
       }
