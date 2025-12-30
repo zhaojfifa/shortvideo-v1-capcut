@@ -160,11 +160,12 @@
       </div>
       <div class="section-grid deliverables-grid">
         <div class="deliverable-card primary">
-          <div class="deliverable-title">CapCut Pack <span class="muted">/ 成品包</span></div>
+          <div class="deliverable-title">CapCut Pack <span class="muted">/ 剪辑包</span></div>
           <div class="deliverable-actions">
-            <a id="pack-link" class="download-link disabled" href="#" target="_blank" rel="noopener">Download</a>
+            <a id="pack-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/pack" target="_blank" rel="noopener">Download</a>
             <span id="pack-status" class="muted">Not ready</span>
           </div>
+          <div class="muted" style="margin-top:6px;">Download via redirect (302) / 下载将跳转到对象存储链接</div>
         </div>
         <div class="deliverable-card">
           <div class="deliverable-title">Video <span class="muted">/ 视频</span></div>
@@ -184,7 +185,7 @@
         <div class="deliverable-card">
           <div class="deliverable-title">Audio (MM) <span class="muted">/ 缅语配音</span></div>
           <div class="deliverable-actions">
-            <a id="audio-link" class="download-link disabled" href="#" target="_blank" rel="noopener">mm_audio</a>
+            <a id="audio-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/audio_mm" target="_blank" rel="noopener">mm_audio</a>
             <span id="audio-status" class="muted">Not ready</span>
           </div>
           <audio id="audio-preview" controls style="display:none; width: 100%; margin-top:6px;"></audio>
