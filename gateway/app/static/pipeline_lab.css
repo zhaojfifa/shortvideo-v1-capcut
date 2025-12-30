@@ -241,6 +241,40 @@ textarea {
   gap: 12px;
 }
 
+.back-button {
+  background: #1d4ed8;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.2);
+}
+
+.back-button:hover {
+  background: #1e40af;
+}
+
+.steps-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.step-wide {
+  grid-column: 1 / -1;
+}
+
+.step-card textarea,
+.step-card pre {
+  max-width: 100%;
+}
+
+.step-card textarea {
+  min-height: 220px;
+}
+
 @media (min-width: 768px) {
   .page {
     padding: 28px 24px 56px;
@@ -262,5 +296,11 @@ textarea {
 
   button {
     align-items: center;
+  }
+}
+
+@media (max-width: 900px) {
+  .steps-grid {
+    grid-template-columns: 1fr;
   }
 }
