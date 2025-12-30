@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Task Workbench - {{ task.task_id }}</title>
   <link rel="stylesheet" href="/static/pipeline_lab.css" />
+  <link rel="stylesheet" href="/static/i18n.css" />
   <style>
     :root { color-scheme: light; }
     .page.workbench {
@@ -131,23 +132,23 @@
         <div id="status-badge" class="status-pill">{{ task.status }}</div>
       </div>
       <div class="header-row">
-        <h1>Task Workbench <span class="muted">/ 任务工作台</span></h1>
-        <div class="muted">Task ID: {{ task.task_id }}</div>
+        <h1>Task Workbench <span class="muted t-secondary">/ 任务工作台</span></h1>
+        <div class="muted t-secondary">Task ID: {{ task.task_id }}</div>
       </div>
       <div class="meta-grid">
-        <div class="meta-item"><strong>Task ID <span class="muted">/ 任务ID</span></strong><span>{{ task.task_id }}</span></div>
-        <div class="meta-item"><strong>Platform <span class="muted">/ 平台</span></strong><span>{{ task.platform or '-' }}</span></div>
-        <div class="meta-item"><strong>Account <span class="muted">/ 账号</span></strong><span>{{ task.account_id or '-' }}</span></div>
-        <div class="meta-item"><strong>Category <span class="muted">/ 分类</span></strong><span>{{ task.category_key or '-' }}</span></div>
-        <div class="meta-item"><strong>Language <span class="muted">/ 语种</span></strong><span>{{ task.content_lang or '-' }}</span></div>
-        <div class="meta-item"><strong>Status <span class="muted">/ 状态</span></strong><span>{{ task.status }}</span></div>
-        <div class="meta-item"><strong>Created <span class="muted">/ 创建时间</span></strong><span>{{ task.created_at }}</span></div>
+        <div class="meta-item"><strong>Task ID <span class="muted t-secondary">/ 任务ID</span></strong><span>{{ task.task_id }}</span></div>
+        <div class="meta-item"><strong>Platform <span class="muted t-secondary">/ 平台</span></strong><span>{{ task.platform or '-' }}</span></div>
+        <div class="meta-item"><strong>Account <span class="muted t-secondary">/ 账号</span></strong><span>{{ task.account_id or '-' }}</span></div>
+        <div class="meta-item"><strong>Category <span class="muted t-secondary">/ 分类</span></strong><span>{{ task.category_key or '-' }}</span></div>
+        <div class="meta-item"><strong>Language <span class="muted t-secondary">/ 语种</span></strong><span>{{ task.content_lang or '-' }}</span></div>
+        <div class="meta-item"><strong>Status <span class="muted t-secondary">/ 状态</span></strong><span>{{ task.status }}</span></div>
+        <div class="meta-item"><strong>Created <span class="muted t-secondary">/ 创建时间</span></strong><span>{{ task.created_at }}</span></div>
         <div class="meta-item">
-          <strong>Source URL <span class="muted">/ 来源</span></strong>
+          <strong>Source URL <span class="muted t-secondary">/ 来源</span></strong>
           {% if task_view.source_url_open %}
             <div><a href="{{ task_view.source_url_open }}" target="_blank" rel="noopener">Open source link</a></div>
           {% else %}
-            <div class="muted">No clickable URL detected.</div>
+            <div class="muted t-secondary">No clickable URL detected.</div>
           {% endif %}
         </div>
       </div>
@@ -155,37 +156,37 @@
 
     <div class="panel">
       <div class="section-title">
-        <h2>Deliverables <span class="muted">/ 交付物</span></h2>
+        <h2>Deliverables <span class="muted t-secondary">/ 交付物</span></h2>
         <div class="secondary">Download-ready outputs for operators.</div>
       </div>
       <div class="section-grid deliverables-grid">
         <div class="deliverable-card primary">
-          <div class="deliverable-title">CapCut Pack <span class="muted">/ 成品包</span></div>
+          <div class="deliverable-title">CapCut Pack <span class="muted t-secondary">/ 成品包</span></div>
           <div class="deliverable-actions">
             <a id="pack-link" class="download-link disabled" href="#" target="_blank" rel="noopener">Download</a>
-            <span id="pack-status" class="muted">Not ready</span>
+            <span id="pack-status" class="muted t-secondary">Not ready</span>
           </div>
         </div>
         <div class="deliverable-card">
-          <div class="deliverable-title">Video <span class="muted">/ 视频</span></div>
+          <div class="deliverable-title">Video <span class="muted t-secondary">/ 视频</span></div>
           <div class="deliverable-actions">
             <a id="raw-link" class="download-link disabled" href="#" target="_blank" rel="noopener">raw.mp4</a>
-            <span id="video-status" class="muted">Not ready</span>
+            <span id="video-status" class="muted t-secondary">Not ready</span>
           </div>
         </div>
         <div class="deliverable-card">
-          <div class="deliverable-title">Subtitles (MM) <span class="muted">/ 缅文字幕</span></div>
+          <div class="deliverable-title">Subtitles (MM) <span class="muted t-secondary">/ 缅文字幕</span></div>
           <div class="deliverable-actions">
             <a id="mm-link" class="download-link disabled" href="#" target="_blank" rel="noopener">mm.srt</a>
             <a id="mm-txt-link" class="download-link disabled" href="#" target="_blank" rel="noopener">mm.txt</a>
-            <span id="subs-status" class="muted">Not ready</span>
+            <span id="subs-status" class="muted t-secondary">Not ready</span>
           </div>
         </div>
         <div class="deliverable-card">
-          <div class="deliverable-title">Audio (MM) <span class="muted">/ 缅语配音</span></div>
+          <div class="deliverable-title">Audio (MM) <span class="muted t-secondary">/ 缅语配音</span></div>
           <div class="deliverable-actions">
             <a id="audio-link" class="download-link disabled" href="#" target="_blank" rel="noopener">mm_audio</a>
-            <span id="audio-status" class="muted">Not ready</span>
+            <span id="audio-status" class="muted t-secondary">Not ready</span>
           </div>
           <audio id="audio-preview" controls style="display:none; width: 100%; margin-top:6px;"></audio>
         </div>
@@ -194,7 +195,7 @@
 
     <div class="panel">
       <div class="section-title">
-        <h2>Publish Info <span class="muted">/ 发布信息</span></h2>
+        <h2>Publish Info <span class="muted t-secondary">/ 发布信息</span></h2>
         <div class="secondary">Share-ready details for operators.</div>
       </div>
       <div class="info-row">
@@ -204,14 +205,14 @@
       </div>
       <div class="section-grid" style="margin-top:12px;">
         <div class="field">
-          <label>Publish Key <span class="muted">/ 发布Key</span></label>
+          <label>Publish Key <span class="muted t-secondary">/ 发布Key</span></label>
           <div class="copy-row">
             <code id="publish-key">-</code>
             <button type="button" class="copy-btn" data-copy-target="publish-key">Copy</button>
           </div>
         </div>
         <div class="field">
-          <label>Publish URL <span class="muted">/ 发布链接</span></label>
+          <label>Publish URL <span class="muted t-secondary">/ 发布链接</span></label>
           <div class="copy-row">
             <a id="publish-url" href="#" target="_blank" rel="noopener">-</a>
             <button type="button" class="copy-btn" data-copy-target="publish-url">Copy</button>
@@ -219,30 +220,30 @@
         </div>
       </div>
       <div class="field" style="margin-top:12px;">
-        <label>Publishing Text (မြန်မာ) <span class="muted">/ 发布文案</span></label>
+        <label>Publishing Text (မြန်မာ) <span class="muted t-secondary">/ 发布文案</span></label>
         <div class="copy-row">
           <button type="button" class="copy-btn" id="copy-publish-text">Copy</button>
-          <span class="muted">From MM text</span>
+          <span class="muted t-secondary">From MM text</span>
         </div>
         <textarea id="publish-text" class="publish-textarea" readonly></textarea>
       </div>
       <div class="action-row" style="margin-top:12px;">
-        <button id="publish-btn">Publish now <span class="muted">/ 立即发布</span></button>
+        <button id="publish-btn">Publish now <span class="muted t-secondary">/ 立即发布</span></button>
       </div>
     </div>
 
     <div class="panel">
       <div class="section-title">
-        <h2>Steps <span class="muted">/ 流程</span></h2>
+        <h2>Steps <span class="muted t-secondary">/ 流程</span></h2>
         <div class="secondary">Operator view of the processing pipeline.</div>
       </div>
       <div class="section-grid steps-grid">
         <div class="step-card">
-          <h3>Step 1 - Parse &amp; Download <span class="muted">/ 解析</span></h3>
-          <p class="muted">Call /v1/parse for this task.</p>
+          <h3>Step 1 - Parse &amp; Download <span class="muted t-secondary">/ 解析</span></h3>
+          <p class="muted t-secondary">Call /v1/parse for this task.</p>
           <div class="action-row">
-            <button id="btn-parse">Run parse <span class="muted">/ 运行</span></button>
-            <span id="parse-status" class="muted">Not parsed</span>
+            <button id="btn-parse">Run parse <span class="muted t-secondary">/ 运行</span></button>
+            <span id="parse-status" class="muted t-secondary">Not parsed</span>
           </div>
         </div>
         <div class="step-card">
@@ -281,22 +282,22 @@
           <h3>Step 2 - Subtitles <span class="muted">/ 字幕</span></h3>
           <p class="muted">Generate subtitles via /v1/subtitles.</p>
           <div class="action-row">
-            <button id="btn-subtitles">Generate subtitles <span class="muted">/ 生成</span></button>
-            <span id="subs-step-status" class="muted">Not ready</span>
+            <button id="btn-subtitles">Generate subtitles <span class="muted t-secondary">/ 生成</span></button>
+            <span id="subs-step-status" class="muted t-secondary">Not ready</span>
           </div>
           <details id="subs-compare" style="margin-top:10px;">
-            <summary>Compare subtitles <span class="muted">/ 对比字幕</span></summary>
+            <summary>Compare subtitles <span class="muted t-secondary">/ 对比字幕</span></summary>
             <div style="margin-top:12px; display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
               <div>
                 <div class="copy-row" style="justify-content:space-between;">
-                  <label style="margin:0;">Origin (SRT) <span class="muted">/ 原始</span></label>
+                  <label style="margin:0;">Origin (SRT) <span class="muted t-secondary">/ 原始</span></label>
                   <button type="button" id="btn-copy-origin" class="copy-btn">Copy</button>
                 </div>
                 <pre id="origin-text" class="output"></pre>
               </div>
               <div>
                 <div class="copy-row" style="justify-content:space-between;">
-                  <label style="margin:0;">MM (Myanmar) <span class="muted">/ 缅文</span></label>
+                  <label style="margin:0;">MM (Myanmar) <span class="muted t-secondary">/ 缅文</span></label>
                   <button type="button" id="btn-copy-mm" class="copy-btn">Copy</button>
                 </div>
                 <pre id="mm-text" class="output"></pre>
@@ -305,14 +306,14 @@
 
             <div style="margin-top:12px;">
               <div class="copy-row" style="justify-content:space-between;">
-                <label for="mm-edit" style="margin:0;">MM Edited (mm_edited.txt) <span class="muted">/ 缅文编辑</span></label>
+                <label for="mm-edit" style="margin:0;">MM Edited (mm_edited.txt) <span class="muted t-secondary">/ 缅文编辑</span></label>
                 <div class="copy-row">
                   <button type="button" id="btn-load-edited" class="copy-btn">Reload</button>
                   <button type="button" id="btn-save-edited" class="copy-btn">Save</button>
                 </div>
               </div>
               <textarea id="mm-edit" rows="6" style="width:100%; margin-top:8px;"></textarea>
-              <div class="muted" id="mm-edit-status" style="margin-top:6px;">-</div>
+              <div class="muted t-secondary" id="mm-edit-status" style="margin-top:6px;">-</div>
             </div>
           </details>
         </div>
@@ -320,13 +321,13 @@
     </div>
 
     <details class="panel" id="debug-panel">
-      <summary>Logs &amp; Debug <span class="muted">/ 日志与调试</span></summary>
+      <summary>Logs &amp; Debug <span class="muted t-secondary">/ 日志与调试</span></summary>
       <div style="margin-top:12px;">
-        <h3 style="margin:0 0 8px;">Logs <span class="muted">/ 日志</span></h3>
+        <h3 style="margin:0 0 8px;">Logs <span class="muted t-secondary">/ 日志</span></h3>
         <pre id="log-output" class="output-log">Ready.</pre>
       </div>
       <div style="margin-top:12px;">
-        <h3 style="margin:0 0 8px;">Engineering details <span class="muted">/ 工程信息</span></h3>
+        <h3 style="margin:0 0 8px;">Engineering details <span class="muted t-secondary">/ 工程信息</span></h3>
         <div class="env-grid">
           <div class="env-card"><div class="env-label"><span>Workspace</span></div><div class="env-value">{{ env_summary.workspace_root }}</div></div>
           <div class="env-card"><div class="env-label"><span>Douyin API</span></div><div class="env-value">{{ env_summary.douyin_api_base }}</div></div>
@@ -341,12 +342,12 @@
         </div>
         <div style="margin-top:10px;" class="section-grid">
           <div class="field">
-            <label>Origin Subtitles <span class="muted">/ 工程用</span></label>
+            <label>Origin Subtitles <span class="muted t-secondary">/ 工程用</span></label>
             <a id="origin-link" class="download-link disabled" href="#" target="_blank" rel="noopener">origin.srt</a>
           </div>
           <div class="field">
-            <label>Source URL (raw) <span class="muted">/ 原始文本</span></label>
-            <div class="muted" style="white-space:pre-wrap; word-break:break-word;">{{ task.source_url or '-' }}</div>
+            <label>Source URL (raw) <span class="muted t-secondary">/ 原始文本</span></label>
+            <div class="muted t-secondary" style="white-space:pre-wrap; word-break:break-word;">{{ task.source_url or '-' }}</div>
           </div>
         </div>
       </div>
@@ -787,3 +788,4 @@
   </script>
 </body>
 </html>
+
