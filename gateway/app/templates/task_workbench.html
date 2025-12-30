@@ -59,6 +59,7 @@
     .env code { background: #f3f4f6; padding: 4px 6px; border-radius: 6px; }
     .mobile-only { display: none; }
     .desktop-only { display: block; }
+    .muted { color: #6b7280; font-size: 0.9rem; }
     @media (max-width: 768px) {
       .mobile-only { display: block; }
       .desktop-only { display: none; }
@@ -128,7 +129,7 @@
 
     <div class="card desktop-only">
       <div class="downloads" id="downloads">
-        <span class="label">Downloads:</span>
+        <span class="label">Downloads <span class="muted">/ -</span>:</span>
         <a id="raw-link" class="disabled" href="#" target="_blank" rel="noopener">raw.mp4</a>
         <a id="origin-link" class="disabled" href="#" target="_blank" rel="noopener">origin.srt</a>
         <a id="mm-link" class="disabled" href="#" target="_blank" rel="noopener">mm.srt</a>
@@ -178,30 +179,30 @@
     </div>
 
     <section>
-      <h2>Step 1 · Parse & Download</h2>
+      <h2>Step 1 - Parse &amp; Download <span class="muted">/ ?????</span></h2>
       <p>Call /v1/parse for this task.</p>
-      <button id="btn-parse">Execute parse</button>
+      <button id="btn-parse">Execute parse <span class="muted">/ ????</span></button>
     </section>
 
     <section>
-      <h2>{{ t_primary("step2") }} · Transcribe & Translate</h2>
-      <p>Generate subtitles via /v1/subtitles.</p>
-      <button id="btn-subtitles">Generate subtitles</button>
+      <h2>{{ t_primary("step2") }} - Transcribe &amp; Translate <span class="muted">/ ?????</span></h2>
+      <p>Generate subtitles via /v1/subtitles. <span class="muted">/ ????</span></p>
+      <button id="btn-subtitles">Generate subtitles <span class="muted">/ ????</span></button>
 
       <details id="subs-compare" style="margin-top:12px;">
-        <summary style="cursor:pointer; font-weight:700;">Subtitles (origin vs mm) · compare / copy / edit</summary>
+        <summary style="cursor:pointer; font-weight:700;">Subtitles (origin vs mm) - compare / copy / edit <span class="muted">/ ????</span></summary>
         <div style="margin-top:12px; display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
           <div>
             <div class="row" style="justify-content:space-between;">
-              <label style="margin:0;">Origin (SRT)</label>
-              <button type="button" id="btn-copy-origin" class="btn" style="padding:6px 10px;">Copy</button>
+              <label style="margin:0;">Origin (SRT) <span class="muted">/ ????</span></label>
+              <button type="button" id="btn-copy-origin" class="btn" style="padding:6px 10px;">Copy <span class="muted">/ ??</span></button>
             </div>
             <pre id="origin-text" style="max-height:220px;"></pre>
           </div>
           <div>
             <div class="row" style="justify-content:space-between;">
-              <label style="margin:0;">MM (TXT)</label>
-              <button type="button" id="btn-copy-mm" class="btn" style="padding:6px 10px;">Copy</button>
+              <label style="margin:0;">?????? (MM) <span class="muted">/ ????</span></label>
+              <button type="button" id="btn-copy-mm" class="btn" style="padding:6px 10px;">Copy <span class="muted">/ ??</span></button>
             </div>
             <pre id="mm-text" style="max-height:220px;"></pre>
           </div>
@@ -209,10 +210,10 @@
 
         <div style="margin-top:12px;">
           <div class="row" style="justify-content:space-between;">
-            <label for="mm-edit" style="margin:0;">MM Edited (mm_edited.txt)</label>
+            <label for="mm-edit" style="margin:0;">MM Edited (mm_edited.txt) <span class="muted">/ --</span></label>
             <div class="row" style="gap:8px;">
-              <button type="button" id="btn-load-edited" class="btn" style="padding:6px 10px;">Reload</button>
-              <button type="button" id="btn-save-edited" class="btn" style="padding:6px 10px;">Save</button>
+              <button type="button" id="btn-load-edited" class="btn" style="padding:6px 10px;">Reload <span class="muted">/ -</span></button>
+              <button type="button" id="btn-save-edited" class="btn" style="padding:6px 10px;">Save <span class="muted">/ -</span></button>
             </div>
           </div>
           <textarea id="mm-edit" rows="6" style="width:100%; margin-top:8px; border-radius:10px; border:1px solid #e5e7eb; padding:10px;"></textarea>
@@ -225,7 +226,7 @@
       <h2>{{ t_primary("step3") }} · Burmese Voiceover</h2>
       <div class="row">
         <div class="field">
-          <label for="voice-id">Voice ID</label>
+          <label for="voice-id">Voice ID <span class="muted">/ -</span></label>
           <select id="voice-id">
             <option value="mm_female_1">mm_female_1</option>
             <option value="mm_male_1">mm_male_1</option>
@@ -233,7 +234,7 @@
           </select>
         </div>
         <div class="field">
-          <label for="dub-provider">Dub provider</label>
+          <label for="dub-provider">Dub provider <span class="muted">/ --</span></label>
           <select id="dub-provider">
             <option value="edge-tts">edge-tts</option>
             <option value="lovo">lovo</option>
@@ -241,7 +242,7 @@
         </div>
         <div class="field" style="justify-content:flex-end;">
           <label>&nbsp;</label>
-          <button id="btn-dub">Generate dub</button>
+          <button id="btn-dub">Generate dub <span class="muted">/ --</span></button>
         </div>
       </div>
     </section>
@@ -249,11 +250,11 @@
     <section>
       <h2>{{ t_primary("step4") }} · Pack for CapCut</h2>
       <p>Bundle the CapCut project for this task.</p>
-      <button id="btn-pack">Build pack</button>
+      <button id="btn-pack">Build pack <span class="muted">/ -?</span></button>
     </section>
 
     <section>
-      <h2>{{ t_primary("log") }}</h2>
+      <h2>{{ t_primary("log") }} <span class="muted">/ -</span></h2>
       <pre id="log-output" class="log">Ready.</pre>
     </section>
   </div>
@@ -620,7 +621,7 @@
       });
     }
 
-    const copyBtnOrigin = document.getElementById("btn-copy-origin");
+              <button type="button" id="btn-copy-origin" class="btn" style="padding:6px 10px;">Copy <span class="muted">/ ??</span></button>
     if (copyBtnOrigin) {
       copyBtnOrigin.addEventListener("click", async () => {
         const t = (document.getElementById("origin-text") || {}).textContent || "";
@@ -628,7 +629,7 @@
         appendLog("Copied origin subtitles.");
       });
     }
-    const copyBtnMm = document.getElementById("btn-copy-mm");
+              <button type="button" id="btn-copy-mm" class="btn" style="padding:6px 10px;">Copy <span class="muted">/ ??</span></button>
     if (copyBtnMm) {
       copyBtnMm.addEventListener("click", async () => {
         const t = (document.getElementById("mm-text") || {}).textContent || "";

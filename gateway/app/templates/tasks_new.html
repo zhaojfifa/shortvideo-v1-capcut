@@ -63,19 +63,19 @@
       {% if ui_show_secondary %}
         <div class="muted">{{ t_secondary("new_suitcase_task") }}</div>
       {% endif %}
-      <a href="/tasks">Back to Task Board</a>
+      <a href="/tasks">Back to Task Board <span class="muted">/ ??????</span></a>
     </header>
 
     <main class="card">
       <form id="task-form">
         <div class="field">
-          <label for="source_url">Source URL *</label>
+          <label for="source_url">Source URL <span class="muted">/ ????</span> *</label>
           <input id="source_url" name="source_url" type="text" autocomplete="off" required placeholder="可粘贴整段分享文案，例如抖音/XHS/TK/FB的分享文本" />
         </div>
 
         <div class="row">
           <div class="field">
-            <label for="platform">Platform</label>
+            <label for="platform">Platform <span class="muted">/ ??</span></label>
             <select id="platform" name="platform">
               <option value="douyin" selected>Douyin</option>
               <option value="xhs">XHS</option>
@@ -84,7 +84,7 @@
             </select>
           </div>
           <div class="field">
-            <label for="account_id">Account</label>
+            <label for="account_id">Account <span class="muted">/ ??</span></label>
             <select id="account_id" name="account_id">
               <option value="suitcase_mm_1">Suitcase MM #1</option>
             </select>
@@ -93,7 +93,7 @@
         </div>
 
         <div class="field">
-          <label>Video type</label>
+          <label>Video type <span class="muted">/ ????</span></label>
           <div class="radio-group">
             <label class="radio"><input type="radio" name="video_type" value="review" checked /> Comparison Review</label>
             <label class="radio"><input type="radio" name="video_type" value="scenario" /> Scenario Usage</label>
@@ -101,7 +101,7 @@
         </div>
 
         <div class="field">
-          <label>Style preset</label>
+          <label>Style preset <span class="muted">/ ????</span></label>
           <div class="radio-group">
             <label class="radio"><input type="radio" name="style_preset" value="review_brief" checked /> Short review, fast pace</label>
             <label class="radio"><input type="radio" name="style_preset" value="scenario_story" /> Scenario story, normal pace</label>
@@ -109,16 +109,16 @@
         </div>
 
         <div class="field">
-          <label for="title">Title (optional)</label>
+          <label for="title">Title (optional) <span class="muted">/ ??</span></label>
           <input id="title" name="title" type="text" placeholder="Optional title" />
         </div>
 
         <div class="field">
-          <label for="note">Note / Operator hint</label>
+          <label for="note">Note / Operator hint <span class="muted">/ ????</span></label>
           <textarea id="note" name="note" placeholder="Optional note for operators"></textarea>
         </div>
 
-        <button class="btn-primary" type="submit">Create &amp; run pipeline</button>
+        <button class="btn-primary" type="submit">Create &amp; run pipeline <span class="muted">/ ?????</span></button>
         <div class="muted" style="margin-top: 6px;">Auto-category: Suitcase · Language: Burmese · UI: Chinese</div>
       </form>
 

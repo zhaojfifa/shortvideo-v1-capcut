@@ -55,6 +55,7 @@
     }
     th { background: #f9fafb; font-weight: 700; }
     .small { color: #6b7280; font-size: 0.8rem; }
+    .muted { color: #6b7280; font-size: 0.82rem; }
     .status {
       padding: 2px 8px;
       border-radius: 999px;
@@ -78,10 +79,10 @@
 </head>
 <body>
   <header>
-    <h1>Shortvideo Tasks</h1>
+    <h1>Task Board <span class="muted">/ 任务看板</span></h1>
     <div class="actions">
-      <a class="btn" href="/tasks/new">New suitcase task</a>
-      <button id="refresh-btn" type="button">刷新</button>
+      <a class="btn" href="/tasks/new">New task <span class="muted">/ 新建任务</span></a>
+      <button id="refresh-btn" type="button">Refresh <span class="muted">/ 刷新</span></button>
     </div>
   </header>
 
@@ -92,16 +93,16 @@
       <thead>
         <tr>
           <th>ID</th>
-          <th>Title</th>
-          <th>Category</th>
-          <th>Lang</th>
-          <th>Platform</th>
-          <th>Account</th>
-          <th>Status</th>
-          <th>Last Step</th>
-          <th>Pack</th>
-          <th>Created</th>
-          <th>JSON</th>
+          <th>Title <span class="muted">/ 标题</span></th>
+          <th>Category <span class="muted">/ 类别</span></th>
+          <th>Lang <span class="muted">/ 语言</span></th>
+          <th>Platform <span class="muted">/ 平台</span></th>
+          <th>Account <span class="muted">/ 账号</span></th>
+          <th>Status <span class="muted">/ 状态</span></th>
+          <th>Last Step <span class="muted">/ 进度</span></th>
+          <th>Pack <span class="muted">/ 成品包</span></th>
+          <th>Created <span class="muted">/ 创建</span></th>
+          <th>JSON <span class="muted">(Engineering)</span></th>
         </tr>
       </thead>
       <tbody id="task-rows"></tbody>
@@ -148,7 +149,7 @@
 
     function shortText(text, limit = 28) {
       if (!text) return "";
-      return text.length > limit ? text.slice(0, limit - 1) + "…" : text;
+      return text.length > limit ? text.slice(0, limit - 1) + "..." : text;
     }
 
     function renderTasks(tasks) {
@@ -157,10 +158,10 @@
         const status = task.status || "pending";
         const tr = document.createElement("tr");
         const packCell = (task.ui_lang || "en").toLowerCase() === "zh"
-          ? "-"
+          ? `<span class="muted">Not ready</span>`
           : (task.pack_path
               ? `<a href="${task.pack_path}" class="text-sm font-medium" target="_blank">Download</a>`
-              : "-");
+              : `<span class="muted">Not ready</span>`);
         tr.innerHTML = `
           <td title="${task.task_id || ""}">${shortText(task.task_id, 16)}</td>
           <td title="${task.title || ""}">${shortText(task.title, 20)}</td>
