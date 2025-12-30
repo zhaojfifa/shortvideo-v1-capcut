@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>New Suitcase Task · ShortVideo</title>
+  <title>New Suitcase Task ? ShortVideo</title>
   <style>
     :root { color-scheme: light; }
     body {
@@ -52,6 +52,15 @@
     }
     .btn-primary:hover { background: #1d4ed8; }
     .muted { color: #6b7280; font-size: 0.9rem; }
+    .summary {
+      border: 1px dashed #d1d5db;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #f9fafb;
+      margin: 12px 0;
+    }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+    .summary-item strong { display: block; font-size: 0.85rem; color: #111827; }
     pre { background: #f9fafb; padding: 10px; border-radius: 8px; border: 1px solid #e5e7eb; }
     .error { color: #b91c1c; }
   </style>
@@ -70,7 +79,7 @@
       <form id="task-form">
         <div class="field">
           <label for="source_url">Source URL <span class="muted">/ ????</span> *</label>
-          <input id="source_url" name="source_url" type="text" autocomplete="off" required placeholder="可粘贴整段分享文案，例如抖音/XHS/TK/FB的分享文本" />
+          <input id="source_url" name="source_url" type="text" autocomplete="off" required placeholder="??????????????/XHS/TK/FB?????" />
         </div>
 
         <div class="row">
@@ -94,7 +103,8 @@
 
         <div class="field">
           <label>Video type <span class="muted">/ ????</span></label>
-          <div class="radio-group">
+          <div class="muted">Choose the business intent. <span class="muted">/ ??????</span></div>
+          <div class="radio-group" style="margin-top:6px;">
             <label class="radio"><input type="radio" name="video_type" value="review" checked /> Comparison Review</label>
             <label class="radio"><input type="radio" name="video_type" value="scenario" /> Scenario Usage</label>
           </div>
@@ -102,7 +112,8 @@
 
         <div class="field">
           <label>Style preset <span class="muted">/ ????</span></label>
-          <div class="radio-group">
+          <div class="muted">Defines pacing and editing intent. <span class="muted">/ ?????????</span></div>
+          <div class="radio-group" style="margin-top:6px;">
             <label class="radio"><input type="radio" name="style_preset" value="review_brief" checked /> Short review, fast pace</label>
             <label class="radio"><input type="radio" name="style_preset" value="scenario_story" /> Scenario story, normal pace</label>
           </div>
@@ -118,8 +129,18 @@
           <textarea id="note" name="note" placeholder="Optional note for operators"></textarea>
         </div>
 
+        <div class="summary" id="summary-block">
+          <div class="summary-grid">
+            <div class="summary-item"><strong>Platform <span class="muted">/ ??</span></strong><span id="summary-platform">-</span></div>
+            <div class="summary-item"><strong>Account <span class="muted">/ ??</span></strong><span id="summary-account">-</span></div>
+            <div class="summary-item"><strong>Video type <span class="muted">/ ??</span></strong><span id="summary-video">-</span></div>
+            <div class="summary-item"><strong>Style <span class="muted">/ ??</span></strong><span id="summary-style">-</span></div>
+            <div class="summary-item"><strong>Language <span class="muted">/ ??</span></strong><span id="summary-lang">Burmese (MM)</span></div>
+          </div>
+        </div>
+
         <button class="btn-primary" type="submit">Create &amp; run pipeline <span class="muted">/ ?????</span></button>
-        <div class="muted" style="margin-top: 6px;">Auto-category: Suitcase · Language: Burmese · UI: Chinese</div>
+        <div class="muted" style="margin-top: 6px;">Auto-category: Suitcase ? Language: Burmese ? UI: Chinese <span class="muted">/ ???????? ? ????? ? ?????</span></div>
       </form>
 
       <div style="margin-top: 12px;">
@@ -133,13 +154,27 @@
     const form = document.getElementById("task-form");
     const resultEl = document.getElementById("create-result");
 
+    function updateSummary() {
+      const platform = document.getElementById("platform").value;
+      const account = document.getElementById("account_id").value;
+      const videoType = form.querySelector("input[name='video_type']:checked")?.value || "review";
+      const stylePreset = form.querySelector("input[name='style_preset']:checked")?.value || "review_brief";
+      document.getElementById("summary-platform").textContent = platform || "-";
+      document.getElementById("summary-account").textContent = account || "-";
+      document.getElementById("summary-video").textContent = videoType || "-";
+      document.getElementById("summary-style").textContent = stylePreset || "-";
+    }
+
+    form.addEventListener("change", updateSummary);
+    document.addEventListener("DOMContentLoaded", updateSummary);
+
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       resultEl.textContent = "Submitting...";
 
       const rawSource = document.getElementById("source_url").value.trim();
       if (!rawSource) {
-        alert("请输入短视频分享文案或链接。");
+        alert("?????????????");
         resultEl.textContent = "";
         return;
       }
