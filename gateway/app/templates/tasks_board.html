@@ -168,7 +168,7 @@
         const status = task.status || "pending";
         const tr = document.createElement("tr");
         const packCell = task.pack_path
-          ? `<a href="${task.pack_path}" class="btn" target="_blank">Download <span class="muted t-secondary">/ ??</span></a>`
+          ? `<a href="${task.pack_path}" class="btn" target="_blank">Download <span class="muted t-secondary">/ Download</span></a>`
           : `<span class="muted t-secondary">Not ready</span>`;
         tr.innerHTML = `
           <td title="${task.task_id || ""}">${shortText(task.task_id, 16)}</td>
