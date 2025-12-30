@@ -129,7 +129,7 @@
   <div class="page workbench">
     <div class="card header-card">
       <div class="header-row">
-        <a class="back-link back-button" href="/tasks">Back to Task Board <span class="muted">/ 返回任务看板</span></a>
+        <a class="back-link back-button btn-secondary" href="/tasks">Back to Task Board <span class="muted">/ 返回任务看板</span></a>
         <div id="status-badge" class="status-pill">{{ task.status }}</div>
       </div>
       <div class="header-row">
@@ -172,15 +172,16 @@
         <div class="deliverable-card">
           <div class="deliverable-title">Video <span class="muted t-secondary">/ 视频</span></div>
           <div class="deliverable-actions">
-            <a id="raw-link" class="download-link disabled" href="#" target="_blank" rel="noopener">raw.mp4</a>
+            <a id="raw-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/raw" target="_blank" rel="noopener">raw.mp4</a>
             <span id="video-status" class="muted t-secondary">Not ready</span>
           </div>
         </div>
         <div class="deliverable-card">
           <div class="deliverable-title">Subtitles (MM) <span class="muted t-secondary">/ 缅文字幕</span></div>
           <div class="deliverable-actions">
-            <a id="mm-link" class="download-link disabled" href="#" target="_blank" rel="noopener">mm.srt</a>
-            <a id="mm-txt-link" class="download-link disabled" href="#" target="_blank" rel="noopener">mm.txt</a>
+            <a id="mm-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/subs_mm" target="_blank" rel="noopener">mm.srt</a>
+            <a id="mm-txt-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/mm_txt" target="_blank" rel="noopener">mm.txt</a>
+            <a id="origin-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/subs_origin" target="_blank" rel="noopener">origin.srt</a>
             <span id="subs-status" class="muted t-secondary">Not ready</span>
           </div>
         </div>
@@ -230,7 +231,7 @@
         <textarea id="publish-text" class="publish-textarea" readonly></textarea>
       </div>
       <div class="action-row" style="margin-top:12px;">
-        <button id="publish-btn" class="btn-primary">Publish now <span class="muted t-secondary">/ 立即发布</span></button>
+        <button id="publish-btn" class="btn-success">Publish now <span class="muted t-secondary">/ 立即发布</span></button>
       </div>
     </div>
 
@@ -345,7 +346,7 @@
         <div style="margin-top:10px;" class="section-grid">
           <div class="field">
             <label>Origin Subtitles <span class="muted t-secondary">/ 工程用</span></label>
-            <a id="origin-link" class="download-link disabled" href="#" target="_blank" rel="noopener">origin.srt</a>
+            <div class="muted t-secondary">See deliverables above.</div>
           </div>
           <div class="field">
             <label>Source URL (raw) <span class="muted t-secondary">/ 原始文本</span></label>
