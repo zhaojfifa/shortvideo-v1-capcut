@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Task Board · ShortVideo</title>
+  <title>Task Board ? ShortVideo</title>
   <style>
     :root { color-scheme: light; }
     body {
@@ -55,6 +55,16 @@
     }
     th { background: #f9fafb; font-weight: 700; }
     .small { color: #6b7280; font-size: 0.8rem; }
+    .muted { color: #6b7280; font-size: 0.82rem; }
+    .secondary {
+      color: #6b7280;
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
     .status {
       padding: 2px 8px;
       border-radius: 999px;
@@ -78,30 +88,30 @@
 </head>
 <body>
   <header>
-    <h1>Shortvideo Tasks</h1>
+    <h1>Task Board <span class="muted">/ ????</span></h1>
     <div class="actions">
-      <a class="btn" href="/tasks/new">New suitcase task</a>
-      <button id="refresh-btn" type="button">刷新</button>
+      <a class="btn" href="/tasks/new">New task <span class="muted">/ ????</span></a>
+      <button id="refresh-btn" type="button">Refresh <span class="muted">/ ??</span></button>
     </div>
   </header>
 
-  <div id="message" class="small">Loading tasks…</div>
+  <div id="message" class="small">Loading tasks...</div>
 
   <div class="card">
     <table>
       <thead>
         <tr>
           <th>ID</th>
-          <th>Title</th>
-          <th>Category</th>
-          <th>Lang</th>
-          <th>Platform</th>
-          <th>Account</th>
-          <th>Status</th>
-          <th>Last Step</th>
-          <th>Pack</th>
-          <th>Created</th>
-          <th>JSON</th>
+          <th>Title <span class="muted">/ ??</span></th>
+          <th>Category <span class="muted">/ ??</span></th>
+          <th>Lang <span class="muted">/ ??</span></th>
+          <th>Platform <span class="muted">/ ??</span></th>
+          <th>Account <span class="muted">/ ??</span></th>
+          <th>Status <span class="muted">/ ??</span></th>
+          <th>Last Step <span class="muted">/ ??</span></th>
+          <th>Pack <span class="muted">/ ???</span></th>
+          <th>Created <span class="muted">/ ??</span></th>
+          <th>JSON <span class="muted">(Engineering)</span></th>
         </tr>
       </thead>
       <tbody id="task-rows"></tbody>
@@ -148,7 +158,7 @@
 
     function shortText(text, limit = 28) {
       if (!text) return "";
-      return text.length > limit ? text.slice(0, limit - 1) + "…" : text;
+      return text.length > limit ? text.slice(0, limit - 1) + "..." : text;
     }
 
     function renderTasks(tasks) {
@@ -156,11 +166,9 @@
       for (const task of tasks) {
         const status = task.status || "pending";
         const tr = document.createElement("tr");
-        const packCell = (task.ui_lang || "en").toLowerCase() === "zh"
-          ? "-"
-          : (task.pack_path
-              ? `<a href="${task.pack_path}" class="text-sm font-medium" target="_blank">Download</a>`
-              : "-");
+        const packCell = task.pack_path
+          ? `<a href="${task.pack_path}" class="btn" target="_blank">Download <span class="muted">/ ??</span></a>`
+          : `<span class="muted">Not ready</span>`;
         tr.innerHTML = `
           <td title="${task.task_id || ""}">${shortText(task.task_id, 16)}</td>
           <td title="${task.title || ""}">${shortText(task.title, 20)}</td>
@@ -172,14 +180,14 @@
           <td>${task.last_step || ""}</td>
           <td>${packCell}</td>
           <td><span class="small">${task.created_at || ""}</span></td>
-          <td><button class="json-btn" data-task-id="${task.task_id}">查看 JSON</button></td>
+          <td><button class="json-btn secondary" data-task-id="${task.task_id}">View JSON <span class="muted">(Engineering)</span></button></td>
         `;
         rowsEl.appendChild(tr);
       }
     }
 
     async function loadTasks() {
-      messageEl.textContent = "Loading tasks…";
+      messageEl.textContent = "Loading tasks...";
       try {
         const res = await fetch("/api/tasks?limit=50");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -205,7 +213,7 @@
         jsonPanel.scrollIntoView({ behavior: "smooth" });
       } catch (err) {
         console.error(err);
-        alert("加载任务详情失败: " + err.message);
+        alert("Failed to load task detail: " + err.message);
       }
     }
 

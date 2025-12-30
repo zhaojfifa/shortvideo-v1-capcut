@@ -201,6 +201,30 @@ textarea {
   text-decoration: underline;
 }
 
+.muted {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.download-link.disabled {
+  color: #94a3b8;
+  pointer-events: none;
+  text-decoration: none;
+}
+
+.copy-btn {
+  background: #e2e8f0;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.copy-btn:hover {
+  background: #cbd5f5;
+}
+
 .output {
   background: #f9fafb;
   border-radius: 12px;
