@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Task Board · ShortVideo</title>
+  <title>Task Board ? ShortVideo</title>
   <style>
     :root { color-scheme: light; }
     body {
@@ -56,6 +56,15 @@
     th { background: #f9fafb; font-weight: 700; }
     .small { color: #6b7280; font-size: 0.8rem; }
     .muted { color: #6b7280; font-size: 0.82rem; }
+    .secondary {
+      color: #6b7280;
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
     .status {
       padding: 2px 8px;
       border-radius: 999px;
@@ -79,29 +88,29 @@
 </head>
 <body>
   <header>
-    <h1>Task Board <span class="muted">/ 任务看板</span></h1>
+    <h1>Task Board <span class="muted">/ ????</span></h1>
     <div class="actions">
-      <a class="btn" href="/tasks/new">New task <span class="muted">/ 新建任务</span></a>
-      <button id="refresh-btn" type="button">Refresh <span class="muted">/ 刷新</span></button>
+      <a class="btn" href="/tasks/new">New task <span class="muted">/ ????</span></a>
+      <button id="refresh-btn" type="button">Refresh <span class="muted">/ ??</span></button>
     </div>
   </header>
 
-  <div id="message" class="small">Loading tasks…</div>
+  <div id="message" class="small">Loading tasks...</div>
 
   <div class="card">
     <table>
       <thead>
         <tr>
           <th>ID</th>
-          <th>Title <span class="muted">/ 标题</span></th>
-          <th>Category <span class="muted">/ 类别</span></th>
-          <th>Lang <span class="muted">/ 语言</span></th>
-          <th>Platform <span class="muted">/ 平台</span></th>
-          <th>Account <span class="muted">/ 账号</span></th>
-          <th>Status <span class="muted">/ 状态</span></th>
-          <th>Last Step <span class="muted">/ 进度</span></th>
-          <th>Pack <span class="muted">/ 成品包</span></th>
-          <th>Created <span class="muted">/ 创建</span></th>
+          <th>Title <span class="muted">/ ??</span></th>
+          <th>Category <span class="muted">/ ??</span></th>
+          <th>Lang <span class="muted">/ ??</span></th>
+          <th>Platform <span class="muted">/ ??</span></th>
+          <th>Account <span class="muted">/ ??</span></th>
+          <th>Status <span class="muted">/ ??</span></th>
+          <th>Last Step <span class="muted">/ ??</span></th>
+          <th>Pack <span class="muted">/ ???</span></th>
+          <th>Created <span class="muted">/ ??</span></th>
           <th>JSON <span class="muted">(Engineering)</span></th>
         </tr>
       </thead>
@@ -157,11 +166,9 @@
       for (const task of tasks) {
         const status = task.status || "pending";
         const tr = document.createElement("tr");
-        const packCell = (task.ui_lang || "en").toLowerCase() === "zh"
-          ? `<span class="muted">Not ready</span>`
-          : (task.pack_path
-              ? `<a href="${task.pack_path}" class="text-sm font-medium" target="_blank">Download</a>`
-              : `<span class="muted">Not ready</span>`);
+        const packCell = task.pack_path
+          ? `<a href="${task.pack_path}" class="btn" target="_blank">Download <span class="muted">/ ??</span></a>`
+          : `<span class="muted">Not ready</span>`;
         tr.innerHTML = `
           <td title="${task.task_id || ""}">${shortText(task.task_id, 16)}</td>
           <td title="${task.title || ""}">${shortText(task.title, 20)}</td>
@@ -173,14 +180,14 @@
           <td>${task.last_step || ""}</td>
           <td>${packCell}</td>
           <td><span class="small">${task.created_at || ""}</span></td>
-          <td><button class="json-btn" data-task-id="${task.task_id}">查看 JSON</button></td>
+          <td><button class="json-btn secondary" data-task-id="${task.task_id}">View JSON <span class="muted">(Engineering)</span></button></td>
         `;
         rowsEl.appendChild(tr);
       }
     }
 
     async function loadTasks() {
-      messageEl.textContent = "Loading tasks…";
+      messageEl.textContent = "Loading tasks...";
       try {
         const res = await fetch("/api/tasks?limit=50");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -206,7 +213,7 @@
         jsonPanel.scrollIntoView({ behavior: "smooth" });
       } catch (err) {
         console.error(err);
-        alert("加载任务详情失败: " + err.message);
+        alert("Failed to load task detail: " + err.message);
       }
     }
 
