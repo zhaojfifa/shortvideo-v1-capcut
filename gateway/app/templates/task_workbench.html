@@ -128,7 +128,7 @@
   <div class="page workbench">
     <div class="card header-card">
       <div class="header-row">
-        <a class="back-link" href="/tasks">Back to Task Board <span class="muted t-secondary">/ 返回任务看板</span></a>
+        <a class="back-link back-button" href="/tasks">Back to Task Board <span class="muted">/ 返回任务看板</span></a>
         <div id="status-badge" class="status-pill">{{ task.status }}</div>
       </div>
       <div class="header-row">
@@ -247,8 +247,40 @@
           </div>
         </div>
         <div class="step-card">
-          <h3>Step 2 - Subtitles <span class="muted t-secondary">/ 字幕</span></h3>
-          <p class="muted t-secondary">Generate subtitles via /v1/subtitles.</p>
+          <h3>Step 3 - Voiceover (MM) <span class="muted">/ 缅语配音</span></h3>
+          <div class="form-grid">
+            <div class="field">
+              <label for="voice-id">Voice ID <span class="muted">/ 音色</span></label>
+              <select id="voice-id">
+                <option value="mm_female_1">mm_female_1</option>
+                <option value="mm_male_1">mm_male_1</option>
+                <option value="mm_female_2">mm_female_2</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="dub-provider">Provider <span class="muted">/ 引擎</span></label>
+              <select id="dub-provider">
+                <option value="edge-tts">edge-tts</option>
+                <option value="lovo">lovo</option>
+              </select>
+            </div>
+          </div>
+          <div class="action-row" style="margin-top:8px;">
+            <button id="btn-dub">Generate dub <span class="muted">/ 生成</span></button>
+            <span id="dub-status" class="muted">Not ready</span>
+          </div>
+        </div>
+        <div class="step-card">
+          <h3>Step 4 - Pack <span class="muted">/ 打包</span></h3>
+          <p class="muted">Bundle the CapCut project for this task.</p>
+          <div class="action-row">
+            <button id="btn-pack">Build pack <span class="muted">/ 生成</span></button>
+            <span id="pack-step-status" class="muted">Not ready</span>
+          </div>
+        </div>
+        <div class="step-card step-wide">
+          <h3>Step 2 - Subtitles <span class="muted">/ 字幕</span></h3>
+          <p class="muted">Generate subtitles via /v1/subtitles.</p>
           <div class="action-row">
             <button id="btn-subtitles">Generate subtitles <span class="muted t-secondary">/ 生成</span></button>
             <span id="subs-step-status" class="muted t-secondary">Not ready</span>
@@ -284,38 +316,6 @@
               <div class="muted t-secondary" id="mm-edit-status" style="margin-top:6px;">-</div>
             </div>
           </details>
-        </div>
-        <div class="step-card">
-          <h3>Step 3 - Voiceover (MM) <span class="muted t-secondary">/ 缅语配音</span></h3>
-          <div class="form-grid">
-            <div class="field">
-              <label for="voice-id">Voice ID <span class="muted t-secondary">/ 音色</span></label>
-              <select id="voice-id">
-                <option value="mm_female_1">mm_female_1</option>
-                <option value="mm_male_1">mm_male_1</option>
-                <option value="mm_female_2">mm_female_2</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="dub-provider">Provider <span class="muted t-secondary">/ 引擎</span></label>
-              <select id="dub-provider">
-                <option value="edge-tts">edge-tts</option>
-                <option value="lovo">lovo</option>
-              </select>
-            </div>
-          </div>
-          <div class="action-row" style="margin-top:8px;">
-            <button id="btn-dub">Generate dub <span class="muted t-secondary">/ 生成</span></button>
-            <span id="dub-status" class="muted t-secondary">Not ready</span>
-          </div>
-        </div>
-        <div class="step-card">
-          <h3>Step 4 - Pack <span class="muted t-secondary">/ 打包</span></h3>
-          <p class="muted t-secondary">Bundle the CapCut project for this task.</p>
-          <div class="action-row">
-            <button id="btn-pack">Build pack <span class="muted t-secondary">/ 生成</span></button>
-            <span id="pack-step-status" class="muted t-secondary">Not ready</span>
-          </div>
         </div>
       </div>
     </div>
