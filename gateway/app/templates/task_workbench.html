@@ -1,262 +1,356 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Task Workbench · {{ task.task_id }}</title>
+  <title>Task Workbench - {{ task.task_id }}</title>
+  <link rel="stylesheet" href="/static/pipeline_lab.css" />
   <style>
     :root { color-scheme: light; }
-    body {
-      margin: 0;
-      padding: 16px;
-      background: #f3f4f6;
-      color: #0f172a;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    .page.workbench {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
-    .page { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
-    .card {
-      background: #ffffff;
-      border-radius: 12px;
-      border: 1px solid #e5e7eb;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-      padding: 16px;
+    .header-card {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
-    .header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .back-link {
+      color: #1d4ed8;
+      text-decoration: none;
+      font-weight: 700;
+    }
     h1 { margin: 0; font-size: 1.6rem; font-weight: 800; }
-    .back-link { color: #2563eb; text-decoration: none; font-weight: 700; }
-    .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 16px; margin-top: 12px; }
-    .meta-item { font-size: 0.95rem; color: #374151; }
-    .meta-item strong { display: block; color: #0f172a; font-size: 0.9rem; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
-    .badge { padding: 6px 10px; border-radius: 999px; font-size: 0.85rem; font-weight: 700; display: inline-block; }
+    .status-pill {
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      background: #e5e7eb;
+      color: #374151;
+    }
     .badge-ready { background: #dcfce7; color: #15803d; }
     .badge-processing { background: #fef3c7; color: #b45309; }
     .badge-error { background: #fee2e2; color: #b91c1c; }
-    .badge-unknown { background: #e5e7eb; color: #374151; }
-    .downloads { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 0.95rem; }
-    .downloads a { color: #2563eb; text-decoration: none; font-weight: 600; }
-    .downloads a.disabled { color: #9ca3af; pointer-events: none; text-decoration: none; }
-    .downloads span.label { font-weight: 700; color: #111827; margin-right: 4px; }
-    section { border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
-    section h2 { margin-top: 0; font-size: 1.2rem; }
-    button {
-      background: #2563eb;
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      padding: 10px 14px;
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px 16px;
+    }
+    .meta-item { font-size: 0.95rem; color: #374151; }
+    .meta-item strong {
+      display: block;
+      color: #0f172a;
+      font-size: 0.8rem;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .muted { color: #64748b; font-size: 0.85rem; }
+    .deliverables-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .deliverable-card {
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #f8fafc;
+    }
+    .deliverable-card.primary { border-color: rgba(37, 99, 235, 0.35); background: #eef2ff; }
+    .deliverable-title { font-weight: 700; font-size: 1rem; color: #0f172a; }
+    .deliverable-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .download-link {
+      color: #1d4ed8;
+      text-decoration: none;
       font-weight: 700;
+    }
+    .download-link.disabled { color: #9ca3af; pointer-events: none; }
+    .copy-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .copy-btn {
+      background: #e2e8f0;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-weight: 600;
       cursor: pointer;
     }
-    button:hover { background: #1d4ed8; }
-    button:disabled { background: #cbd5e1; cursor: not-allowed; }
-    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-    .field { display: flex; flex-direction: column; gap: 4px; }
-    label { font-weight: 700; color: #111827; font-size: 0.9rem; }
-    select, input { padding: 8px 10px; border-radius: 8px; border: 1px solid #e5e7eb; font-size: 0.95rem; min-width: 180px; }
-    pre { background: #0b1727; color: #e5e7eb; border-radius: 12px; padding: 12px; overflow: auto; max-height: 240px; white-space: pre-wrap; border: 1px solid #0f172a; }
-    .log { max-height: 200px; }
-    .env { display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.9rem; color: #4b5563; }
-    .env code { background: #f3f4f6; padding: 4px 6px; border-radius: 6px; }
-    .mobile-only { display: none; }
-    .desktop-only { display: block; }
-    .muted { color: #6b7280; font-size: 0.9rem; }
+    .copy-btn:hover { background: #cbd5f5; }
+    .info-row { display: flex; flex-wrap: wrap; gap: 12px; }
+    .info-pill {
+      background: #f1f5f9;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+    }
+    .publish-textarea { width: 100%; min-height: 120px; }
+    .steps-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .step-card {
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 14px;
+      padding: 12px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .step-card h3 { margin: 0; font-size: 1rem; }
+    pre.output-log {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 12px;
+      padding: 12px;
+      max-height: 240px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+    details.panel summary { cursor: pointer; font-weight: 700; }
     @media (max-width: 768px) {
-      .mobile-only { display: block; }
-      .desktop-only { display: none; }
-      button { width: 100%; }
+      .header-row { flex-direction: column; align-items: flex-start; }
     }
   </style>
 </head>
-<body class="{{ 'mobile' if is_mobile else 'desktop' }}">
-  <div class="page">
-    <div class="header">
-      <a class="back-link" href="/tasks">← Back to Task Board</a>
-      <h1>{{ t_primary("task_workbench") }}</h1>
-      <div id="status-badge" class="badge badge-unknown">{{ task.status }}</div>
-    </div>
-
-    <div class="card">
+<body>
+  <div class="page workbench">
+    <div class="card header-card">
+      <div class="header-row">
+        <a class="back-link" href="/tasks">Back to Task Board <span class="muted">/ 返回任务看板</span></a>
+        <div id="status-badge" class="status-pill">{{ task.status }}</div>
+      </div>
+      <div class="header-row">
+        <h1>Task Workbench <span class="muted">/ 任务工作台</span></h1>
+        <div class="muted">Task ID: {{ task.task_id }}</div>
+      </div>
       <div class="meta-grid">
-        <div class="meta-item"><strong>Task ID</strong><span>{{ task.task_id }}</span></div>
-        <div class="meta-item"><strong>Platform</strong><span>{{ task.platform or '-' }}</span></div>
-        <div class="meta-item"><strong>Category</strong><span>{{ task.category_key or '-' }}</span></div>
-        <div class="meta-item"><strong>Lang</strong><span>{{ task.content_lang or '-' }}</span></div>
-        <div class="meta-item"><strong>Status</strong><span>{{ task.status }}</span></div>
-        <div class="meta-item"><strong>Created</strong><span>{{ task.created_at }}</span></div>
+        <div class="meta-item"><strong>Task ID <span class="muted">/ 任务ID</span></strong><span>{{ task.task_id }}</span></div>
+        <div class="meta-item"><strong>Platform <span class="muted">/ 平台</span></strong><span>{{ task.platform or '-' }}</span></div>
+        <div class="meta-item"><strong>Account <span class="muted">/ 账号</span></strong><span>{{ task.account_id or '-' }}</span></div>
+        <div class="meta-item"><strong>Category <span class="muted">/ 分类</span></strong><span>{{ task.category_key or '-' }}</span></div>
+        <div class="meta-item"><strong>Language <span class="muted">/ 语种</span></strong><span>{{ task.content_lang or '-' }}</span></div>
+        <div class="meta-item"><strong>Status <span class="muted">/ 状态</span></strong><span>{{ task.status }}</span></div>
+        <div class="meta-item"><strong>Created <span class="muted">/ 创建时间</span></strong><span>{{ task.created_at }}</span></div>
         <div class="meta-item">
-          <strong>Source URL</strong>
+          <strong>Source URL <span class="muted">/ 来源</span></strong>
           {% if task_view.source_url_open %}
             <div><a href="{{ task_view.source_url_open }}" target="_blank" rel="noopener">Open source link</a></div>
           {% else %}
-            <div class="muted">No clickable URL found in source text.</div>
-          {% endif %}
-          {% if task.source_url %}
-            <div style="margin-top:6px; white-space:pre-wrap; word-break:break-word; color:#111827;">
-              {{ task.source_url }}
-            </div>
+            <div class="muted">No clickable URL detected.</div>
           {% endif %}
         </div>
       </div>
-      <div class="env" style="margin-top:12px;">
-        <div>Workspace: <code>{{ env_summary.workspace_root }}</code></div>
-        <div>Douyin API: <code>{{ env_summary.douyin_api_base }}</code></div>
-        <div>ASR: <code>{{ env_summary.asr_backend }}</code></div>
-        <div>Subtitles: <code>{{ env_summary.subtitles_backend }}</code></div>
-        <div>Whisper: <code>{{ env_summary.whisper_model }}</code></div>
-        <div>Gemini: <code>{{ env_summary.gemini_model }}</code></div>
-        <div>GPT: <code>{{ env_summary.gpt_model }}</code></div>
-        {% if env_summary.defaults %}
-          <div>Defaults: <code>{{ env_summary.defaults }}</code></div>
-        {% endif %}
-      </div>
     </div>
 
-    <div class="card mobile-only">
-      <h2>{{ t_primary("downloads") }}</h2>
-      {% if ui_show_secondary %}
-        <div class="muted">{{ t_secondary("downloads") }}</div>
-      {% endif %}
-      <div class="downloads" style="margin-top:8px;">
-        <a id="mobile-raw-link" class="disabled" href="#" target="_blank" rel="noopener">raw.mp4</a>
-        <a id="mobile-audio-link" class="disabled" href="#" target="_blank" rel="noopener">mm_audio</a>
-        <a id="mobile-mm-link" class="disabled" href="#" target="_blank" rel="noopener">mm.srt</a>
-        <a id="mobile-mm-txt-link" class="disabled" href="#" target="_blank" rel="noopener">mm.txt</a>
-        {% if features.allow_pack_download %}
-          <a id="mobile-pack-link" class="disabled" href="#" target="_blank" rel="noopener">capcut_pack.zip</a>
-        {% endif %}
+    <div class="panel">
+      <div class="section-title">
+        <h2>Deliverables <span class="muted">/ 交付物</span></h2>
+        <div class="secondary">Download-ready outputs for operators.</div>
       </div>
-    </div>
-
-    <div class="card desktop-only">
-      <div class="downloads" id="downloads">
-        <span class="label">Downloads <span class="muted">/ -</span>:</span>
-        <a id="raw-link" class="disabled" href="#" target="_blank" rel="noopener">raw.mp4</a>
-        <a id="origin-link" class="disabled" href="#" target="_blank" rel="noopener">origin.srt</a>
-        <a id="mm-link" class="disabled" href="#" target="_blank" rel="noopener">mm.srt</a>
-        <a id="mm-txt-link" class="disabled" href="#" target="_blank" rel="noopener">mm.txt</a>
-        <a id="audio-link" class="disabled" href="#" target="_blank" rel="noopener">mm_audio</a>
-        {% if features.allow_pack_download %}
-          <a id="pack-link" class="disabled" href="#" target="_blank" rel="noopener">capcut_pack.zip</a>
-        {% endif %}
-      </div>
-      <div style="margin-top:8px;">
-        <audio id="audio-preview" controls style="display:none; width: 100%; max-width: 360px;"></audio>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">
-        {{ t_primary("publish") }}
-        {% if ui_show_secondary %}
-          <span class="muted">{{ t_secondary("publish") }}</span>
-        {% endif %}
-      </div>
-
-      <div class="row">
-        <div class="muted">
-          {{ t_primary("publish_provider") }}: <span id="publish-provider">-</span>
-          &nbsp;|&nbsp;
-          {{ t_primary("published") }}: <span id="published-at">-</span>
-        </div>
-      </div>
-
-      <div class="row">
-        <button id="publish-btn" class="btn">
-          {{ t_primary("publish_now") }}
-          {% if ui_show_secondary %}
-            <span class="muted">{{ t_secondary("publish_now") }}</span>
-          {% endif %}
-        </button>
-        <span id="publish-status" class="muted" style="margin-left:10px;">-</span>
-      </div>
-
-      <div class="row">
-        <div class="muted">{{ t_primary("publish_key") }}: <code id="publish-key">-</code></div>
-      </div>
-      <div class="row">
-        <div class="muted">{{ t_primary("publish_url") }}: <a id="publish-url" href="#" target="_blank">-</a></div>
-      </div>
-    </div>
-
-    <section>
-      <h2>Step 1 - Parse &amp; Download <span class="muted">/ ?????</span></h2>
-      <p>Call /v1/parse for this task.</p>
-      <button id="btn-parse">Execute parse <span class="muted">/ ????</span></button>
-    </section>
-
-    <section>
-      <h2>{{ t_primary("step2") }} - Transcribe &amp; Translate <span class="muted">/ ?????</span></h2>
-      <p>Generate subtitles via /v1/subtitles. <span class="muted">/ ????</span></p>
-      <button id="btn-subtitles">Generate subtitles <span class="muted">/ ????</span></button>
-
-      <details id="subs-compare" style="margin-top:12px;">
-        <summary style="cursor:pointer; font-weight:700;">Subtitles (origin vs mm) - compare / copy / edit <span class="muted">/ ????</span></summary>
-        <div style="margin-top:12px; display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-          <div>
-            <div class="row" style="justify-content:space-between;">
-              <label style="margin:0;">Origin (SRT) <span class="muted">/ ????</span></label>
-              <button type="button" id="btn-copy-origin" class="btn" style="padding:6px 10px;">Copy <span class="muted">/ ??</span></button>
-            </div>
-            <pre id="origin-text" style="max-height:220px;"></pre>
-          </div>
-          <div>
-            <div class="row" style="justify-content:space-between;">
-              <label style="margin:0;">?????? (MM) <span class="muted">/ ????</span></label>
-              <button type="button" id="btn-copy-mm" class="btn" style="padding:6px 10px;">Copy <span class="muted">/ ??</span></button>
-            </div>
-            <pre id="mm-text" style="max-height:220px;"></pre>
+      <div class="section-grid deliverables-grid">
+        <div class="deliverable-card primary">
+          <div class="deliverable-title">CapCut Pack <span class="muted">/ 成品包</span></div>
+          <div class="deliverable-actions">
+            <a id="pack-link" class="download-link disabled" href="#" target="_blank" rel="noopener">Download</a>
+            <span id="pack-status" class="muted">Not ready</span>
           </div>
         </div>
-
-        <div style="margin-top:12px;">
-          <div class="row" style="justify-content:space-between;">
-            <label for="mm-edit" style="margin:0;">MM Edited (mm_edited.txt) <span class="muted">/ --</span></label>
-            <div class="row" style="gap:8px;">
-              <button type="button" id="btn-load-edited" class="btn" style="padding:6px 10px;">Reload <span class="muted">/ -</span></button>
-              <button type="button" id="btn-save-edited" class="btn" style="padding:6px 10px;">Save <span class="muted">/ -</span></button>
-            </div>
+        <div class="deliverable-card">
+          <div class="deliverable-title">Video <span class="muted">/ 视频</span></div>
+          <div class="deliverable-actions">
+            <a id="raw-link" class="download-link disabled" href="#" target="_blank" rel="noopener">raw.mp4</a>
+            <span id="video-status" class="muted">Not ready</span>
           </div>
-          <textarea id="mm-edit" rows="6" style="width:100%; margin-top:8px; border-radius:10px; border:1px solid #e5e7eb; padding:10px;"></textarea>
-          <div class="muted" id="mm-edit-status" style="margin-top:6px;">-</div>
         </div>
-      </details>
-    </section>
+        <div class="deliverable-card">
+          <div class="deliverable-title">Subtitles (MM) <span class="muted">/ 缅文字幕</span></div>
+          <div class="deliverable-actions">
+            <a id="mm-link" class="download-link disabled" href="#" target="_blank" rel="noopener">mm.srt</a>
+            <a id="mm-txt-link" class="download-link disabled" href="#" target="_blank" rel="noopener">mm.txt</a>
+            <span id="subs-status" class="muted">Not ready</span>
+          </div>
+        </div>
+        <div class="deliverable-card">
+          <div class="deliverable-title">Audio (MM) <span class="muted">/ 缅语配音</span></div>
+          <div class="deliverable-actions">
+            <a id="audio-link" class="download-link disabled" href="#" target="_blank" rel="noopener">mm_audio</a>
+            <span id="audio-status" class="muted">Not ready</span>
+          </div>
+          <audio id="audio-preview" controls style="display:none; width: 100%; margin-top:6px;"></audio>
+        </div>
+      </div>
+    </div>
 
-    <section>
-      <h2>{{ t_primary("step3") }} · Burmese Voiceover</h2>
-      <div class="row">
+    <div class="panel">
+      <div class="section-title">
+        <h2>Publish Info <span class="muted">/ 发布信息</span></h2>
+        <div class="secondary">Share-ready details for operators.</div>
+      </div>
+      <div class="info-row">
+        <div class="info-pill">Provider: <span id="publish-provider">-</span></div>
+        <div class="info-pill">Status: <span id="publish-status">-</span></div>
+        <div class="info-pill">Published: <span id="published-at">-</span></div>
+      </div>
+      <div class="section-grid" style="margin-top:12px;">
         <div class="field">
-          <label for="voice-id">Voice ID <span class="muted">/ -</span></label>
-          <select id="voice-id">
-            <option value="mm_female_1">mm_female_1</option>
-            <option value="mm_male_1">mm_male_1</option>
-            <option value="mm_female_2">mm_female_2</option>
-          </select>
+          <label>Publish Key <span class="muted">/ 发布Key</span></label>
+          <div class="copy-row">
+            <code id="publish-key">-</code>
+            <button type="button" class="copy-btn" data-copy-target="publish-key">Copy</button>
+          </div>
         </div>
         <div class="field">
-          <label for="dub-provider">Dub provider <span class="muted">/ --</span></label>
-          <select id="dub-provider">
-            <option value="edge-tts">edge-tts</option>
-            <option value="lovo">lovo</option>
-          </select>
-        </div>
-        <div class="field" style="justify-content:flex-end;">
-          <label>&nbsp;</label>
-          <button id="btn-dub">Generate dub <span class="muted">/ --</span></button>
+          <label>Publish URL <span class="muted">/ 发布链接</span></label>
+          <div class="copy-row">
+            <a id="publish-url" href="#" target="_blank" rel="noopener">-</a>
+            <button type="button" class="copy-btn" data-copy-target="publish-url">Copy</button>
+          </div>
         </div>
       </div>
-    </section>
+      <div class="field" style="margin-top:12px;">
+        <label>Publishing Text (မြန်မာ) <span class="muted">/ 发布文案</span></label>
+        <div class="copy-row">
+          <button type="button" class="copy-btn" id="copy-publish-text">Copy</button>
+          <span class="muted">From MM text</span>
+        </div>
+        <textarea id="publish-text" class="publish-textarea" readonly></textarea>
+      </div>
+      <div class="action-row" style="margin-top:12px;">
+        <button id="publish-btn">Publish now <span class="muted">/ 立即发布</span></button>
+      </div>
+    </div>
 
-    <section>
-      <h2>{{ t_primary("step4") }} · Pack for CapCut</h2>
-      <p>Bundle the CapCut project for this task.</p>
-      <button id="btn-pack">Build pack <span class="muted">/ -?</span></button>
-    </section>
+    <div class="panel">
+      <div class="section-title">
+        <h2>Steps <span class="muted">/ 流程</span></h2>
+        <div class="secondary">Operator view of the processing pipeline.</div>
+      </div>
+      <div class="section-grid steps-grid">
+        <div class="step-card">
+          <h3>Step 1 - Parse &amp; Download <span class="muted">/ 解析</span></h3>
+          <p class="muted">Call /v1/parse for this task.</p>
+          <div class="action-row">
+            <button id="btn-parse">Run parse <span class="muted">/ 运行</span></button>
+            <span id="parse-status" class="muted">Not parsed</span>
+          </div>
+        </div>
+        <div class="step-card">
+          <h3>Step 2 - Subtitles <span class="muted">/ 字幕</span></h3>
+          <p class="muted">Generate subtitles via /v1/subtitles.</p>
+          <div class="action-row">
+            <button id="btn-subtitles">Generate subtitles <span class="muted">/ 生成</span></button>
+            <span id="subs-step-status" class="muted">Not ready</span>
+          </div>
+          <details id="subs-compare" style="margin-top:10px;">
+            <summary>Compare subtitles <span class="muted">/ 对比字幕</span></summary>
+            <div style="margin-top:12px; display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+              <div>
+                <div class="copy-row" style="justify-content:space-between;">
+                  <label style="margin:0;">Origin (SRT) <span class="muted">/ 原始</span></label>
+                  <button type="button" id="btn-copy-origin" class="copy-btn">Copy</button>
+                </div>
+                <pre id="origin-text" class="output"></pre>
+              </div>
+              <div>
+                <div class="copy-row" style="justify-content:space-between;">
+                  <label style="margin:0;">MM (Myanmar) <span class="muted">/ 缅文</span></label>
+                  <button type="button" id="btn-copy-mm" class="copy-btn">Copy</button>
+                </div>
+                <pre id="mm-text" class="output"></pre>
+              </div>
+            </div>
 
-    <section>
-      <h2>{{ t_primary("log") }} <span class="muted">/ -</span></h2>
-      <pre id="log-output" class="log">Ready.</pre>
-    </section>
+            <div style="margin-top:12px;">
+              <div class="copy-row" style="justify-content:space-between;">
+                <label for="mm-edit" style="margin:0;">MM Edited (mm_edited.txt) <span class="muted">/ 缅文编辑</span></label>
+                <div class="copy-row">
+                  <button type="button" id="btn-load-edited" class="copy-btn">Reload</button>
+                  <button type="button" id="btn-save-edited" class="copy-btn">Save</button>
+                </div>
+              </div>
+              <textarea id="mm-edit" rows="6" style="width:100%; margin-top:8px;"></textarea>
+              <div class="muted" id="mm-edit-status" style="margin-top:6px;">-</div>
+            </div>
+          </details>
+        </div>
+        <div class="step-card">
+          <h3>Step 3 - Voiceover (MM) <span class="muted">/ 缅语配音</span></h3>
+          <div class="form-grid">
+            <div class="field">
+              <label for="voice-id">Voice ID <span class="muted">/ 音色</span></label>
+              <select id="voice-id">
+                <option value="mm_female_1">mm_female_1</option>
+                <option value="mm_male_1">mm_male_1</option>
+                <option value="mm_female_2">mm_female_2</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="dub-provider">Provider <span class="muted">/ 引擎</span></label>
+              <select id="dub-provider">
+                <option value="edge-tts">edge-tts</option>
+                <option value="lovo">lovo</option>
+              </select>
+            </div>
+          </div>
+          <div class="action-row" style="margin-top:8px;">
+            <button id="btn-dub">Generate dub <span class="muted">/ 生成</span></button>
+            <span id="dub-status" class="muted">Not ready</span>
+          </div>
+        </div>
+        <div class="step-card">
+          <h3>Step 4 - Pack <span class="muted">/ 打包</span></h3>
+          <p class="muted">Bundle the CapCut project for this task.</p>
+          <div class="action-row">
+            <button id="btn-pack">Build pack <span class="muted">/ 生成</span></button>
+            <span id="pack-step-status" class="muted">Not ready</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <details class="panel" id="debug-panel">
+      <summary>Logs &amp; Debug <span class="muted">/ 日志与调试</span></summary>
+      <div style="margin-top:12px;">
+        <h3 style="margin:0 0 8px;">Logs <span class="muted">/ 日志</span></h3>
+        <pre id="log-output" class="output-log">Ready.</pre>
+      </div>
+      <div style="margin-top:12px;">
+        <h3 style="margin:0 0 8px;">Engineering details <span class="muted">/ 工程信息</span></h3>
+        <div class="env-grid">
+          <div class="env-card"><div class="env-label"><span>Workspace</span></div><div class="env-value">{{ env_summary.workspace_root }}</div></div>
+          <div class="env-card"><div class="env-label"><span>Douyin API</span></div><div class="env-value">{{ env_summary.douyin_api_base }}</div></div>
+          <div class="env-card"><div class="env-label"><span>ASR</span></div><div class="env-value">{{ env_summary.asr_backend }}</div></div>
+          <div class="env-card"><div class="env-label"><span>Subtitles</span></div><div class="env-value">{{ env_summary.subtitles_backend }}</div></div>
+          <div class="env-card"><div class="env-label"><span>Whisper</span></div><div class="env-value">{{ env_summary.whisper_model }}</div></div>
+          <div class="env-card"><div class="env-label"><span>Gemini</span></div><div class="env-value">{{ env_summary.gemini_model }}</div></div>
+          <div class="env-card"><div class="env-label"><span>GPT</span></div><div class="env-value">{{ env_summary.gpt_model }}</div></div>
+          {% if env_summary.defaults %}
+          <div class="env-card"><div class="env-label"><span>Defaults</span></div><div class="env-value">{{ env_summary.defaults }}</div></div>
+          {% endif %}
+        </div>
+        <div style="margin-top:10px;" class="section-grid">
+          <div class="field">
+            <label>Origin Subtitles <span class="muted">/ 工程用</span></label>
+            <a id="origin-link" class="download-link disabled" href="#" target="_blank" rel="noopener">origin.srt</a>
+          </div>
+          <div class="field">
+            <label>Source URL (raw) <span class="muted">/ 原始文本</span></label>
+            <div class="muted" style="white-space:pre-wrap; word-break:break-word;">{{ task.source_url or '-' }}</div>
+          </div>
+        </div>
+      </div>
+    </details>
   </div>
 
   <script>
@@ -276,13 +370,13 @@
       if (!badge) return;
       const status = data.status || "unknown";
       badge.textContent = status;
-      badge.className = "badge " + (status === "ready"
+      badge.className = `status-pill ${status === "ready"
         ? "badge-ready"
         : status === "processing"
         ? "badge-processing"
         : status === "error"
         ? "badge-error"
-        : "badge-unknown");
+        : "badge-unknown"}`;
     }
 
     function setDownloadLink(id, href) {
@@ -297,6 +391,12 @@
         el.classList.add("disabled");
         el.setAttribute("aria-disabled", "true");
       }
+    }
+
+    function setStatusText(id, isReady, readyText, missingText) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = isReady ? readyText : missingText;
     }
 
     function taskEndpoint(taskId, kind) {
@@ -318,11 +418,6 @@
       return /X-Amz-|Signature=|cloudflarestorage|AWS4-HMAC-SHA256/i.test(u);
     }
 
-    function mmTxtLink(data) {
-      const hasMmTxt = !!(data.mm_txt_path || data.mm_srt_path);
-      return hasMmTxt ? taskEndpoint(data.task_id, "mm_txt") : null;
-    }
-
     function updateDownloadsFromTask(data) {
       const taskId = data.task_id;
       const hasRaw = !!data.raw_path;
@@ -338,14 +433,13 @@
       setDownloadLink("mm-txt-link", hasMmTxt ? taskEndpoint(taskId, "mm_txt") : null);
       setDownloadLink("audio-link", hasAudio ? taskEndpoint(taskId, "audio_mm") : null);
       setDownloadLink("pack-link", hasPack ? taskEndpoint(taskId, "pack") : null);
-      setDownloadLink("mobile-raw-link", hasRaw ? taskEndpoint(taskId, "raw") : null);
-      setDownloadLink("mobile-audio-link", hasAudio ? taskEndpoint(taskId, "audio_mm") : null);
-      setDownloadLink("mobile-mm-link", hasMmSrt ? taskEndpoint(taskId, "mm_srt") : null);
-      setDownloadLink("mobile-mm-txt-link", hasMmTxt ? taskEndpoint(taskId, "mm_txt") : null);
-      setDownloadLink("mobile-pack-link", hasPack ? taskEndpoint(taskId, "pack") : null);
+
+      setStatusText("video-status", hasRaw, "Ready", "Not ready");
+      setStatusText("subs-status", hasMmSrt || hasMmTxt, "Ready", "Not ready");
+      setStatusText("audio-status", hasAudio, "Ready", "Not ready");
+      setStatusText("pack-status", hasPack, "Ready", "Not ready");
 
       const audioEl = document.getElementById("audio-preview");
-      const audioLink = document.getElementById("audio-link");
       if (audioEl) {
         if (hasAudio) {
           audioEl.src = taskEndpoint(taskId, "audio_mm");
@@ -355,31 +449,18 @@
           audioEl.style.display = "none";
         }
       }
-      if (audioLink) {
-        audioLink.textContent = "mm_audio";
-      }
     }
 
+    function updateStepStatuses(data) {
+      const hasRaw = !!data.raw_path;
+      const hasSubs = !!(data.mm_srt_path || data.origin_srt_path);
+      const hasAudio = !!data.mm_audio_path;
+      const hasPack = !!data.pack_path;
 
-    function updateStepButtons(data) {
-      const parseBtn = document.getElementById("btn-parse");
-      const subsBtn = document.getElementById("btn-subtitles");
-      const dubBtn = document.getElementById("btn-dub");
-      const packBtn = document.getElementById("btn-pack");
-
-      if (parseBtn) {
-        parseBtn.textContent = data.raw_path ? "Re-run parse" : "Execute parse";
-      }
-      if (subsBtn) {
-        const hasSubs = data.mm_srt_path || data.origin_srt_path;
-        subsBtn.textContent = hasSubs ? "Re-run subtitles" : "Generate subtitles";
-      }
-      if (dubBtn) {
-        dubBtn.textContent = data.mm_audio_path ? "Re-run dub" : "Generate dub";
-      }
-      if (packBtn) {
-        packBtn.textContent = data.pack_path ? "Re-run pack" : "Build pack";
-      }
+      setStatusText("parse-status", hasRaw, "Parsed", "Not parsed");
+      setStatusText("subs-step-status", hasSubs, "Ready", "Not ready");
+      setStatusText("dub-status", hasAudio, "Ready", "Not ready");
+      setStatusText("pack-step-status", hasPack, "Ready", "Not ready");
     }
 
     function refreshPublishInfo(data) {
@@ -408,10 +489,36 @@
       }
     }
 
-    // Initialize with server-rendered values in case files already exist.
+    function copyTextFromElement(el) {
+      if (!el) return;
+      const text = el.tagName === "A" ? el.getAttribute("href") : el.textContent || "";
+      if (!text || text === "#") return;
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+
+    document.querySelectorAll("[data-copy-target]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetId = btn.getAttribute("data-copy-target");
+        const target = document.getElementById(targetId);
+        copyTextFromElement(target);
+        appendLog(`Copied ${targetId}.`);
+      });
+    });
+
+    const copyPublishTextBtn = document.getElementById("copy-publish-text");
+    if (copyPublishTextBtn) {
+      copyPublishTextBtn.addEventListener("click", async () => {
+        const text = (document.getElementById("publish-text") || {}).value || "";
+        if (text) {
+          await navigator.clipboard.writeText(text);
+          appendLog("Copied publish text.");
+        }
+      });
+    }
+
     updateDownloadsFromTask(window.currentTask);
     updateStatusBadge(window.currentTask);
-    updateStepButtons(window.currentTask);
+    updateStepStatuses(window.currentTask);
     refreshPublishInfo(window.currentTask);
 
     async function refreshTaskState() {
@@ -425,7 +532,7 @@
       window.currentTask = data;
       updateDownloadsFromTask(data);
       updateStatusBadge(data);
-      updateStepButtons(data);
+      updateStepStatuses(data);
       refreshPublishInfo(data);
       if (data.error_message) {
         appendLog(`Last error: ${data.error_message}`);
@@ -567,29 +674,31 @@
       const mmPre = document.getElementById("mm-text");
       const mmEdit = document.getElementById("mm-edit");
       const statusEl = document.getElementById("mm-edit-status");
+      const publishText = document.getElementById("publish-text");
       if (!originPre || !mmPre || !mmEdit) return;
 
       if (!forceReload && originPre.getAttribute("data-loaded") === "1") {
         return;
       }
 
-      originPre.textContent = "Loading…";
-      mmPre.textContent = "Loading…";
-      if (statusEl) statusEl.textContent = "Loading…";
+      originPre.textContent = "Loading...";
+      mmPre.textContent = "Loading...";
+      if (statusEl) statusEl.textContent = "Loading...";
 
       const originUrl = `/api/tasks/${encodeURIComponent(taskId)}/text?kind=origin_srt`;
       const mmTxtUrl = `/api/tasks/${encodeURIComponent(taskId)}/text?kind=mm_txt`;
 
       const originText = await fetchTextOrFallback(
         originUrl,
-        "Unable to load origin subtitles in-browser (possible CORS redirect). Use Downloads → origin.srt."
+        "Unable to load origin subtitles in-browser (possible CORS redirect). Use Downloads -> origin.srt."
       );
       const mmText = await fetchTextOrFallback(
         mmTxtUrl,
-        "Unable to load mm text in-browser (possible CORS redirect). Use Downloads → mm.txt."
+        "Unable to load mm text in-browser (possible CORS redirect). Use Downloads -> mm.txt."
       );
       originPre.textContent = originText || "";
       mmPre.textContent = mmText || "";
+      if (publishText && !publishText.value) publishText.value = mmText || "";
       originPre.setAttribute("data-loaded", "1");
 
       try {
@@ -621,7 +730,7 @@
       });
     }
 
-              <button type="button" id="btn-copy-origin" class="btn" style="padding:6px 10px;">Copy <span class="muted">/ ??</span></button>
+    const copyBtnOrigin = document.getElementById("btn-copy-origin");
     if (copyBtnOrigin) {
       copyBtnOrigin.addEventListener("click", async () => {
         const t = (document.getElementById("origin-text") || {}).textContent || "";
@@ -629,7 +738,8 @@
         appendLog("Copied origin subtitles.");
       });
     }
-              <button type="button" id="btn-copy-mm" class="btn" style="padding:6px 10px;">Copy <span class="muted">/ ??</span></button>
+
+    const copyBtnMm = document.getElementById("btn-copy-mm");
     if (copyBtnMm) {
       copyBtnMm.addEventListener("click", async () => {
         const t = (document.getElementById("mm-text") || {}).textContent || "";
@@ -653,7 +763,7 @@
         const mmEdit = document.getElementById("mm-edit");
         const statusEl = document.getElementById("mm-edit-status");
         const text = mmEdit ? mmEdit.value : "";
-        if (statusEl) statusEl.textContent = "Saving…";
+        if (statusEl) statusEl.textContent = "Saving...";
         try {
           const resp = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/mm_edited`, {
             method: "POST",
