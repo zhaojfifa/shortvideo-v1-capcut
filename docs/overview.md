@@ -24,4 +24,3 @@
 1) Document the active entrypoint and route ownership.
 2) Define the v1.8 pack spec and ZIP layout (source of truth).
 3) Capture operational baseline for v1.8 pack generation and download.
-4) Move legacy notes into a dedicated `docs/legacy/` index.
