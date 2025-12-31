@@ -20,5 +20,12 @@ class IStorageService(ABC):
         pass
 
     @abstractmethod
-    def generate_presigned_url(self, key: str, expiration: int = 3600) -> str:
+    def generate_presigned_url(
+        self,
+        key: str,
+        expiration: int = 3600,
+        content_type: str | None = None,
+        filename: str | None = None,
+        disposition: str | None = None,
+    ) -> str:
         pass

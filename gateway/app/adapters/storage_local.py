@@ -52,6 +52,13 @@ class LocalStorageService(IStorageService):
         path = os.path.join(self.root_dir, remote_key)
         return os.path.exists(path)
 
-    def generate_presigned_url(self, remote_key: str, expiration=3600) -> str:
+    def generate_presigned_url(
+        self,
+        remote_key: str,
+        expiration=3600,
+        content_type: str | None = None,
+        filename: str | None = None,
+        disposition: str | None = None,
+    ) -> str:
         # 本地模拟返回 web 路径
         return f"/files/{remote_key}"

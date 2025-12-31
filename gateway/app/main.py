@@ -2,17 +2,6 @@
 
 from pathlib import Path
 
-# --- v1.8 runtime directories (MUST run at import time) ---
-RUNTIME_DIRS = [
-    Path("scenes"),
-    Path("scene_packs"),
-    Path("deliver/packs"),
-]
-
-for d in RUNTIME_DIRS:
-    d.mkdir(parents=True, exist_ok=True)
-# --- end runtime dirs ---
-
 import importlib.util
 import logging
 import os
@@ -23,8 +12,7 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from gateway.app.core.workspace import workspace_root
-from gateway.app.config import create_storage_service
+from gateway.app.config import create_storage_service, get_settings
 from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
 from gateway.app import models
 from gateway.app.ports.storage_provider import set_storage_service
@@ -34,8 +22,7 @@ from gateway.app.routes.v17_pack import router as v17_pack_router
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 UI_HTML_PATH = STATIC_DIR / "ui.html"
-AUDIO_DIR = workspace_root() / "audio"
-AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+AUDIO_DIR = Path(get_settings().workspace_root).expanduser().resolve() / "audio"
 WORKSPACE_ROOT = Path(
     os.environ.get("VIDEO_WORKSPACE", "/opt/render/project/src/video_workspace")
 ).resolve()
@@ -43,7 +30,7 @@ ALLOWED_TOP_DIRS = {"raw", "tasks", "audio", "pack", "published"}
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-app.mount("/audio", StaticFiles(directory=str(AUDIO_DIR)), name="audio")
+app.mount("/audio", StaticFiles(directory=str(AUDIO_DIR), check_dir=False), name="audio")
 logger = logging.getLogger(__name__)
 tasks_html_path = Path(__file__).resolve().parent / "static" / "tasks.html"
 
@@ -55,6 +42,8 @@ def on_startup() -> None:
     ensure_task_extra_columns(engine)
     ensure_provider_config_table(engine)
     set_storage_service(create_storage_service())
+    for d in (Path("scenes"), Path("scene_packs"), Path("deliver/packs"), AUDIO_DIR):
+        d.mkdir(parents=True, exist_ok=True)
 
 @app.on_event("startup")
 def log_routes_on_startup() -> None:

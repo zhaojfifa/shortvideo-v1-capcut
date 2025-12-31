@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from gateway.app.config import get_settings
-from gateway.app.ports.storage_provider import get_storage_service
+from gateway.app.services.artifact_storage import get_download_url, object_exists
 from gateway.app.db import SessionLocal
 from gateway.app import models
 from gateway.app.web.templates import get_templates
@@ -100,23 +100,19 @@ async def pack(request: PackRequest):
 
 @router.get("/tasks/{task_id}/pack")
 async def download_pack(task_id: str):
-    storage = get_storage_service()
     db = SessionLocal()
     try:
         task = db.query(models.Task).filter(models.Task.id == task_id).first()
-        if task and task.pack_path:
-            key = str(task.pack_path)
-            if storage.exists(key):
-                try:
-                    presigned_url = storage.generate_presigned_url(
-                        key,
-                        expiration=3600,
-                        content_type="application/zip",
-                        filename=f"{task_id}_capcut_pack.zip",
-                        disposition="attachment",
-                    )
-                except TypeError:
-                    presigned_url = storage.generate_presigned_url(key, expiration=3600)
+        if task:
+            key = str(task.pack_key or task.pack_path or "")
+            if key and object_exists(key):
+                presigned_url = get_download_url(
+                    key,
+                    expiration=3600,
+                    content_type="application/zip",
+                    filename=f"{task_id}_capcut_pack.zip",
+                    disposition="attachment",
+                )
                 return RedirectResponse(url=presigned_url, status_code=302)
     finally:
         db.close()
