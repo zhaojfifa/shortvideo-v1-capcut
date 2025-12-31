@@ -2,7 +2,8 @@
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
-from gateway.app.config import get_settings, get_storage_service
+from gateway.app.config import get_settings
+from gateway.app.ports.storage_provider import get_storage_service
 from gateway.app.db import SessionLocal
 from gateway.app import models
 from gateway.app.web.templates import get_templates

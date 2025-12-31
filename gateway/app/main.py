@@ -24,8 +24,10 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from gateway.app.core.workspace import workspace_root
+from gateway.app.config import create_storage_service
 from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
 from gateway.app import models
+from gateway.app.ports.storage_provider import set_storage_service
 from gateway.app.routers import admin_publish, publish as publish_router, tasks as tasks_router
 from gateway.app.routes.v17_pack import router as v17_pack_router
 
@@ -52,6 +54,7 @@ def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
     ensure_task_extra_columns(engine)
     ensure_provider_config_table(engine)
+    set_storage_service(create_storage_service())
 
 @app.on_event("startup")
 def log_routes_on_startup() -> None:

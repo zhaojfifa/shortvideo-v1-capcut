@@ -38,9 +38,10 @@ def test_create_capcut_pack_zip_structure(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("WORKSPACE_ROOT", str(tmp_path))
 
     from gateway.app import config as app_config
+    from gateway.app.ports.storage_provider import set_storage_service
 
     app_config.get_settings.cache_clear()
-    app_config._storage_service_instance = None
+    set_storage_service(app_config.create_storage_service())
 
     from gateway.app.core.workspace import pack_zip_path
     from gateway.app.services.pack_service import create_capcut_pack

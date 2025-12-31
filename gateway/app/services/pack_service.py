@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from gateway.app.config import get_storage_service
+from gateway.app.ports.storage_provider import get_storage_service
 from gateway.app.core.workspace import pack_zip_path, relative_to_workspace
 from gateway.app.utils.keys import KeyBuilder
 

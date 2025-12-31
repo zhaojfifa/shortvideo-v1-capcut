@@ -1,7 +1,8 @@
 import os
 import logging
 import tempfile
-from gateway.app.config import get_settings, get_storage_service
+from gateway.app.config import get_settings
+from gateway.app.ports.storage_provider import get_storage_service
 from gateway.app.utils.keys import KeyBuilder
 from pathlib import Path
 from urllib.parse import unquote
