@@ -1,0 +1,6 @@
+{
+  "scene_id": "scene001",
+  "source": "video.mp4",
+  "semantics": "scene description",
+  "assets": ["audio.wav", "subs.srt"]
+}

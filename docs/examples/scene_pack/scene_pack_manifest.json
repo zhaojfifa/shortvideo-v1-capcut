@@ -1,0 +1,6 @@
+{
+  "scene_pack_id": "pack001",
+  "scenes": ["scene001", "scene002"],
+  "source_tasks": ["task001", "task002"],
+  "readme": "This pack includes multiple scenes from different tasks"
+}
