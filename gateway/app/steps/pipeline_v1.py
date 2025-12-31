@@ -15,7 +15,6 @@ from gateway.app.db import SessionLocal, engine
 from gateway.app.core.workspace import (
     Workspace,
     get_task_workspace,
-    pack_zip_path,
     raw_path,
     relative_to_task_workspace,
     relative_to_workspace,
@@ -218,6 +217,8 @@ async def run_pipeline_for_task(task_id: str, db: Session):
         if _disabled_step("pack"):
             return
         pack_provider = defaults.get("pack")
+        if pack_provider == "youcut":
+            pack_provider = "capcut"
         pack_handler = get_provider("pack", pack_provider)
         pack_req = schemas.PackRequest(task_id=task.id)
         ok, pack_res = await _run_step("pack", pack_handler(pack_req))
@@ -230,13 +231,17 @@ async def run_pipeline_for_task(task_id: str, db: Session):
             db.commit()
             return
 
-        pack_file = pack_zip_path(task.id)
-        if pack_file.exists():
-            task.pack_path = relative_to_workspace(pack_file)
-        elif isinstance(pack_res, dict):
-            maybe_pack = pack_res.get("pack_path") or pack_res.get("zip_path")
-            if maybe_pack:
-                task.pack_path = str(maybe_pack)
+        pack_key = None
+        if isinstance(pack_res, dict):
+            pack_key = (
+                pack_res.get("pack_key")
+                or pack_res.get("zip_key")
+                or pack_res.get("pack_path")
+            )
+        if pack_key:
+            task.pack_key = str(pack_key)
+            task.pack_type = "capcut_v18"
+            task.pack_status = "ready"
 
         task.status = "ready"
         task.last_step = "pack"
