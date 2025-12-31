@@ -28,8 +28,6 @@ from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_ta
 from gateway.app import models
 from gateway.app.routers import admin_publish, publish as publish_router, tasks as tasks_router
 from gateway.app.routes.v17_pack import router as v17_pack_router
-from gateway.routes import admin_tools
-from gateway.routes import v1 as v1_router
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -56,16 +54,18 @@ def on_startup() -> None:
     ensure_provider_config_table(engine)
 
 @app.on_event("startup")
-def on_startup() -> None:
-    """Ensure database schema exists before serving traffic."""
+def log_routes_on_startup() -> None:
+    """Log route table to help spot duplicates in CI/logs (dev-only signal)."""
+    for route in app.routes:
+        methods = ",".join(sorted(getattr(route, "methods", []) or []))
+        path = getattr(route, "path", "")
+        name = getattr(route, "name", "")
+        logger.info("route=%s methods=%s name=%s", path, methods, name)
 
 app.include_router(tasks_router.pages_router)
 app.include_router(tasks_router.api_router)
 app.include_router(publish_router.router)
 app.include_router(admin_publish.router, tags=["admin"])
-app.include_router(admin_tools.router, tags=["admin"])
-app.include_router(admin_tools.pages_router)
-app.include_router(v1_router.router, prefix="/v1")
 app.include_router(v17_pack_router)
 
 
