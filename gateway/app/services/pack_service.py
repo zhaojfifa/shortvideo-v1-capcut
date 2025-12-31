@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import shutil
@@ -13,11 +14,10 @@ from gateway.app.utils.keys import KeyBuilder
 README_TEMPLATE = """CapCut pack usage
 
 1. Create a new CapCut project and import the extracted zip files.
-2. Place raw.mp4 on the video track.
-3. Import subs_mm.srt (or subs_origin.srt) and adjust styling.
-4. Place {audio_filename} on the audio track and align with subtitles.
-5. For plain text subtitles, use subs_mm.txt (no timecodes).
-6. Add transitions or stickers as needed.
+2. Place raw/raw.mp4 on the video track.
+3. Import subs/my.srt and adjust styling.
+4. Place audio/{audio_filename} on the audio track and align with subtitles.
+5. Add transitions or stickers as needed.
 """
 
 
@@ -117,27 +117,49 @@ def create_capcut_pack(
         tmp_path = Path(tmp_dir) / f"pack_{task_id}"
         tmp_path.mkdir(parents=True, exist_ok=True)
 
-        audio_filename = audio_path.name
+        raw_dir = tmp_path / "raw"
+        audio_dir = tmp_path / "audio"
+        subs_dir = tmp_path / "subs"
+        scenes_dir = tmp_path / "scenes"
+        for d in (raw_dir, audio_dir, subs_dir, scenes_dir):
+            d.mkdir(parents=True, exist_ok=True)
 
-        shutil.copy(raw_path, tmp_path / "raw.mp4")
-        shutil.copy(audio_path, tmp_path / audio_filename)
-        shutil.copy(subs_path, tmp_path / "subs_mm.srt")
+        audio_ext = audio_path.suffix if audio_path.suffix else ".wav"
+        audio_filename = f"voice_my{audio_ext}"
 
-        txt_dst = tmp_path / "subs_mm.txt"
-        resolved_txt = txt_path if txt_path and txt_path.exists() else subs_path.with_suffix(".txt")
-        if resolved_txt.exists():
-            shutil.copy(resolved_txt, txt_dst)
-        else:
-            _ensure_txt_from_srt(txt_dst, subs_path)
+        shutil.copy(raw_path, raw_dir / "raw.mp4")
+        shutil.copy(audio_path, audio_dir / audio_filename)
+        shutil.copy(subs_path, subs_dir / "my.srt")
 
-        (tmp_path / "README.txt").write_text(
+        (scenes_dir / ".keep").write_text("", encoding="utf-8")
+
+        manifest = {
+            "version": "1.8",
+            "pack_type": "capcut_v18",
+            "task_id": task_id,
+            "language": "my",
+            "assets": {
+                "raw_video": "raw/raw.mp4",
+                "voice": f"audio/{audio_filename}",
+                "subtitle": "subs/my.srt",
+                "scenes_dir": "scenes/",
+            },
+        }
+        (tmp_path / "manifest.json").write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        (tmp_path / "README.md").write_text(
             README_TEMPLATE.format(audio_filename=audio_filename),
             encoding="utf-8",
         )
 
+        pack_prefix = Path("deliver") / "packs" / task_id
         with ZipFile(resolved_pack_path, "w", compression=ZIP_DEFLATED) as zf:
-            for item in tmp_path.iterdir():
-                zf.write(item, arcname=item.name)
+            for item in tmp_path.rglob("*"):
+                if item.is_file():
+                    arcname = (pack_prefix / item.relative_to(tmp_path)).as_posix()
+                    zf.write(item, arcname=arcname)
 
     if not resolved_pack_path.exists():
         raise PackError(f"pack zip not found: {resolved_pack_path}")
@@ -147,11 +169,12 @@ def create_capcut_pack(
     storage.upload_file(str(resolved_pack_path), zip_key, content_type="application/zip")
 
     files = [
-        "raw.mp4",
-        audio_filename,
-        "subs_mm.srt",
-        "subs_mm.txt",
-        "README.txt",
+        f"deliver/packs/{task_id}/raw/raw.mp4",
+        f"deliver/packs/{task_id}/audio/{audio_filename}",
+        f"deliver/packs/{task_id}/subs/my.srt",
+        f"deliver/packs/{task_id}/scenes/.keep",
+        f"deliver/packs/{task_id}/manifest.json",
+        f"deliver/packs/{task_id}/README.md",
     ]
 
     return {

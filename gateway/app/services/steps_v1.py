@@ -1,5 +1,6 @@
 """Reusable pipeline step functions shared by /v1 routes and background tasks."""
 
+import json
 import logging
 import os
 import re
@@ -41,11 +42,10 @@ MM_TXT_ARTIFACT = "subs/mm.txt"
 README_TEMPLATE = """CapCut pack usage
 
 1. Create a new CapCut project and import the extracted zip files.
-2. Place raw.mp4 on the video track.
-3. Import subs_mm.srt (or subs_origin.srt) and adjust styling.
-4. Place {audio_filename} on the audio track and align with subtitles.
-5. For plain text subtitles, use subs_mm.txt (no timecodes).
-6. Add transitions or stickers as needed.
+2. Place raw/raw.mp4 on the video track.
+3. Import subs/my.srt and adjust styling.
+4. Place audio/{audio_filename} on the audio track and align with subtitles.
+5. Add transitions or stickers as needed.
 """
 
 
@@ -286,8 +286,6 @@ async def run_pack_step(req: PackRequest):
     subs_mm_srt = translated_srt_path(task_id, "my")
     if not subs_mm_srt.exists():
         subs_mm_srt = translated_srt_path(task_id, "mm")
-    subs_mm_txt = subs_mm_srt.with_suffix(".txt")
-
     try:
         _maybe_fill_missing_for_pack(
             raw_path=raw_file,
@@ -307,25 +305,49 @@ async def run_pack_step(req: PackRequest):
             tmp_path = Path(tmp_dir) / f"pack_{task_id}"
             tmp_path.mkdir(parents=True, exist_ok=True)
 
-            shutil.copy(raw_file, tmp_path / "raw.mp4")
-            shutil.copy(audio_file, tmp_path / audio_filename)
-            shutil.copy(subs_mm_srt, tmp_path / "subs_mm.srt")
+            raw_dir = tmp_path / "raw"
+            audio_dir = tmp_path / "audio"
+            subs_dir = tmp_path / "subs"
+            scenes_dir = tmp_path / "scenes"
+            for d in (raw_dir, audio_dir, subs_dir, scenes_dir):
+                d.mkdir(parents=True, exist_ok=True)
 
-            txt_dst = tmp_path / "subs_mm.txt"
-            resolved_txt = subs_mm_txt if subs_mm_txt.exists() else subs_mm_srt.with_suffix(".txt")
-            if resolved_txt.exists():
-                shutil.copy(resolved_txt, txt_dst)
-            else:
-                _ensure_txt_from_srt(txt_dst, subs_mm_srt)
+            audio_ext = audio_file.suffix if audio_file.suffix else ".wav"
+            audio_filename = f"voice_my{audio_ext}"
 
-            (tmp_path / "README.txt").write_text(
+            shutil.copy(raw_file, raw_dir / "raw.mp4")
+            shutil.copy(audio_file, audio_dir / audio_filename)
+            shutil.copy(subs_mm_srt, subs_dir / "my.srt")
+
+            (scenes_dir / ".keep").write_text("", encoding="utf-8")
+
+            manifest = {
+                "version": "1.8",
+                "pack_type": "capcut_v18",
+                "task_id": task_id,
+                "language": "my",
+                "assets": {
+                    "raw_video": "raw/raw.mp4",
+                    "voice": f"audio/{audio_filename}",
+                    "subtitle": "subs/my.srt",
+                    "scenes_dir": "scenes/",
+                },
+            }
+            (tmp_path / "manifest.json").write_text(
+                json.dumps(manifest, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            (tmp_path / "README.md").write_text(
                 README_TEMPLATE.format(audio_filename=audio_filename),
                 encoding="utf-8",
             )
 
+            pack_prefix = Path("deliver") / "packs" / task_id
             with ZipFile(zip_path, "w", compression=ZIP_DEFLATED) as zf:
-                for item in tmp_path.iterdir():
-                    zf.write(item, arcname=item.name)
+                for item in tmp_path.rglob("*"):
+                    if item.is_file():
+                        arcname = (pack_prefix / item.relative_to(tmp_path)).as_posix()
+                        zf.write(item, arcname=arcname)
     except PackError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not zip_path.exists():
@@ -336,11 +358,12 @@ async def run_pack_step(req: PackRequest):
     storage.upload_file(str(zip_path), zip_key, content_type="application/zip")
 
     files = [
-        "raw.mp4",
-        audio_filename,
-        "subs_mm.srt",
-        "subs_mm.txt",
-        "README.txt",
+        f"deliver/packs/{task_id}/raw/raw.mp4",
+        f"deliver/packs/{task_id}/audio/{audio_filename}",
+        f"deliver/packs/{task_id}/subs/my.srt",
+        f"deliver/packs/{task_id}/scenes/.keep",
+        f"deliver/packs/{task_id}/manifest.json",
+        f"deliver/packs/{task_id}/README.md",
     ]
 
     # 更新任务：pack_path 必须存 key（供 /v1/tasks/{id}/pack 302 → /files/<key>）

@@ -388,12 +388,12 @@ def download_pack(task_id: str, repo=Depends(get_task_repository)):
         raise HTTPException(status_code=404, detail="Pack not found")
     pack_type = _task_value(task, "pack_type")
     if pack_type == "capcut_v18":
-        pack_key = _task_value(task, "pack_key")
+        pack_key = _task_value(task, "pack_key") or _task_value(task, "pack_path")
         if not pack_key or not object_exists(str(pack_key)):
             raise HTTPException(status_code=404, detail="Pack not found")
         return RedirectResponse(url=get_download_url(str(pack_key)), status_code=302)
 
-    key = _task_value(task, "pack_path") or _task_value(task, "pack_key")
+    key = _task_value(task, "pack_key") or _task_value(task, "pack_path")
     if not key or not object_exists(str(key)):
         raise HTTPException(status_code=404, detail="Pack not found")
     return RedirectResponse(url=get_download_url(str(key)), status_code=302)
