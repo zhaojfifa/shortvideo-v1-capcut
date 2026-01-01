@@ -2,17 +2,6 @@
 
 from pathlib import Path
 
-# --- v1.8 runtime directories (MUST run at import time) ---
-RUNTIME_DIRS = [
-    Path("scenes"),
-    Path("scene_packs"),
-    Path("deliver/packs"),
-]
-
-for d in RUNTIME_DIRS:
-    d.mkdir(parents=True, exist_ok=True)
-# --- end runtime dirs ---
-
 import importlib.util
 import logging
 import os
@@ -23,19 +12,17 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from gateway.app.core.workspace import workspace_root
+from gateway.app.config import create_storage_service, get_settings
 from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
 from gateway.app import models
+from gateway.app.ports.storage_provider import set_storage_service
 from gateway.app.routers import admin_publish, publish as publish_router, tasks as tasks_router
 from gateway.app.routes.v17_pack import router as v17_pack_router
-from gateway.routes import admin_tools
-from gateway.routes import v1 as v1_router
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 UI_HTML_PATH = STATIC_DIR / "ui.html"
-AUDIO_DIR = workspace_root() / "audio"
-AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+AUDIO_DIR = Path(get_settings().workspace_root).expanduser().resolve() / "audio"
 WORKSPACE_ROOT = Path(
     os.environ.get("VIDEO_WORKSPACE", "/opt/render/project/src/video_workspace")
 ).resolve()
@@ -43,7 +30,7 @@ ALLOWED_TOP_DIRS = {"raw", "tasks", "audio", "pack", "published"}
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-app.mount("/audio", StaticFiles(directory=str(AUDIO_DIR)), name="audio")
+app.mount("/audio", StaticFiles(directory=str(AUDIO_DIR), check_dir=False), name="audio")
 logger = logging.getLogger(__name__)
 tasks_html_path = Path(__file__).resolve().parent / "static" / "tasks.html"
 
@@ -54,18 +41,23 @@ def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
     ensure_task_extra_columns(engine)
     ensure_provider_config_table(engine)
+    set_storage_service(create_storage_service())
+    for d in (Path("scenes"), Path("scene_packs"), Path("deliver/packs"), AUDIO_DIR):
+        d.mkdir(parents=True, exist_ok=True)
 
 @app.on_event("startup")
-def on_startup() -> None:
-    """Ensure database schema exists before serving traffic."""
+def log_routes_on_startup() -> None:
+    """Log route table to help spot duplicates in CI/logs (dev-only signal)."""
+    for route in app.routes:
+        methods = ",".join(sorted(getattr(route, "methods", []) or []))
+        path = getattr(route, "path", "")
+        name = getattr(route, "name", "")
+        logger.info("route=%s methods=%s name=%s", path, methods, name)
 
 app.include_router(tasks_router.pages_router)
 app.include_router(tasks_router.api_router)
 app.include_router(publish_router.router)
 app.include_router(admin_publish.router, tags=["admin"])
-app.include_router(admin_tools.router, tags=["admin"])
-app.include_router(admin_tools.pages_router)
-app.include_router(v1_router.router, prefix="/v1")
 app.include_router(v17_pack_router)
 
 

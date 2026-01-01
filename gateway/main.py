@@ -2,8 +2,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from gateway.routes import admin_tools, files, tasks, v1
-from gateway.app.config import get_settings
+from gateway.app.config import create_storage_service, get_settings
 from gateway.app.db import Base, engine, ensure_provider_config_table, ensure_task_extra_columns
+from gateway.app.ports.storage_provider import set_storage_service
 from gateway.app.web.templates import get_templates
 
 settings = None
@@ -44,6 +45,7 @@ def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
     ensure_task_extra_columns(engine)
     ensure_provider_config_table(engine)
+    set_storage_service(create_storage_service())
 
 
 app.include_router(v1.router, prefix="/v1", tags=["v1"])

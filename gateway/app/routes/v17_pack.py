@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field
 
 from gateway.app.core.pack_v17_youcut import generate_youcut_pack, zip_youcut_pack
 from gateway.app.core.tts_edge import EdgeTTSError, generate_edge_tts_wav_from_srt
-from gateway.app.config import get_storage_service
 from gateway.app.config import get_settings
+from gateway.app.ports.storage_provider import get_storage_service
 from gateway.app.utils.keys import KeyBuilder
 
 router = APIRouter(prefix="/v1.7/pack", tags=["v1.7-pack"])

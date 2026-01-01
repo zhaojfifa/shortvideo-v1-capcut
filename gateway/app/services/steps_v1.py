@@ -12,7 +12,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import HTTPException
 
-from gateway.app.config import get_storage_service
+from gateway.app.ports.storage_provider import get_storage_service
 from gateway.app.core.workspace import (
     Workspace,
     deliver_pack_zip_path,

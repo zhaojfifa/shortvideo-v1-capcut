@@ -1,7 +1,8 @@
 import os
 import logging
 import tempfile
-from gateway.app.config import get_settings, get_storage_service
+from gateway.app.config import get_settings
+from gateway.app.ports.storage_provider import get_storage_service
 from gateway.app.utils.keys import KeyBuilder
 from pathlib import Path
 from urllib.parse import unquote
@@ -98,8 +99,17 @@ def upload_task_artifact(task, local_path, artifact_name, task_id=None, **kwargs
     )
 
 
-def get_download_url(task_or_key: str, artifact_name: str | None = None,
-                     tenant_id: str = "default", project_id: str = "default") -> str:
+def get_download_url(
+    task_or_key: str,
+    artifact_name: str | None = None,
+    tenant_id: str = "default",
+    project_id: str = "default",
+    *,
+    expiration: int = 3600,
+    content_type: str | None = None,
+    filename: str | None = None,
+    disposition: str | None = None,
+) -> str:
     """
     Backward compatible:
     - get_download_url(key)
@@ -111,7 +121,16 @@ def get_download_url(task_or_key: str, artifact_name: str | None = None,
         key = task_or_key
     else:
         key = KeyBuilder.build(tenant_id, project_id, task_or_key, artifact_name)
-    return storage.generate_presigned_url(key, expiration=3600)
+    try:
+        return storage.generate_presigned_url(
+            key,
+            expiration=expiration,
+            content_type=content_type,
+            filename=filename,
+            disposition=disposition,
+        )
+    except TypeError:
+        return storage.generate_presigned_url(key, expiration=expiration)
 
 
 def object_exists(task_or_key: str, artifact_name: str | None = None,

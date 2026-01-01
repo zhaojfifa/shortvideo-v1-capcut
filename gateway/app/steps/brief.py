@@ -1,7 +1,8 @@
 import os
 import json
 import logging
-from gateway.app.config import get_storage_service, get_settings
+from gateway.app.config import get_settings
+from gateway.app.ports.storage_provider import get_storage_service
 from gateway.app.utils.keys import KeyBuilder
 from gateway.app.services.gemini_brief import generate_brief
 
