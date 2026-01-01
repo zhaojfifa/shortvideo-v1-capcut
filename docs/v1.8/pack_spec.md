@@ -2,6 +2,16 @@
 
 ## Purpose
 Define the canonical ZIP contents and internal paths for v1.8 CapCut packs.
+## Download contract (v1.8)
+
+Primary operator endpoint:
+- `GET /v1/tasks/{task_id}/pack`
+- Behavior: returns `302` redirect to a presigned URL for the CapCut v1.8 ZIP.
+
+Notes:
+- For v1.8, `pack_key` is the authoritative storage key; `pack_path` is legacy and may be empty/stale.
+- This spec is v1.8-only and must not alter v1.7 pack layout or endpoints.
+
 
 ## ZIP root
 All entries are stored under:
