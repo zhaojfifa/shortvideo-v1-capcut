@@ -2,14 +2,17 @@
 
 ## 1.8.0
 
-- Converged routing under `gateway/app/routers` and added route-table logging to spot duplicates.
-- Wired storage via a port/provider to keep services off adapters and centralized composition in entrypoints.
-- Removed legacy pack shims and duplicate pack download route; kept v1.7 YouCut behavior intact.
-- Added tests for route uniqueness and import stability on Windows.
+Ops baseline / traceability
+- Baseline tag: `v1.8-p0-pack-baseline` (stable pack download redirect + canonical ZIP layout).
+- Canonical download endpoint: `GET /v1/tasks/{task_id}/pack` (302 redirect to presigned URL).
+- Canonical pack layout: see `docs/v1.8/pack_spec.md`.
 
-## 1.6.2
+Architecture / cleanup
+- Converged routing under `gateway/app/routers/*` only; removed duplicate `/v1/tasks/{task_id}/pack` handler risk.
+- Wired storage via port/provider (`gateway/app/ports/storage_provider.py`), keeping services off adapters and centralizing composition in entrypoints.
+- Removed legacy pack shims and import-time side effects (e.g., mkdir at import).
 
-- Added Admin Tools UI and `provider_config` persistence for provider defaults.
-- Workbench now injects task JSON safely and uses V1 endpoints for downloads.
-- Task pipeline step outputs persist into DB and pack marks tasks as `ready`.
-- Added `/files/{rel_path}` gateway for workspace artifact downloads.
+Tests / regression gates
+- Route uniqueness gate: `tests/test_routes_unique.py` (asserts exactly one GET `/v1/tasks/{task_id}/pack` route).
+- Windows import stability: `gateway/__init__.py` + `tests/conftest.py`.
+- v1.7 compatibility: `/v1.7/pack/youcut` behavior remains intact.
