@@ -550,6 +550,9 @@ def _task_to_detail(task: dict) -> TaskDetail:
         "scenes_status": task.get("scenes_status"),
         "scenes_key": task.get("scenes_key"),
         "scenes_error": task.get("scenes_error"),
+        "subtitles_status": task.get("subtitles_status"),
+        "subtitles_key": task.get("subtitles_key"),
+        "subtitles_error": task.get("subtitles_error"),
 
         "created_at": _coerce_datetime(task.get("created_at") or task.get("created") or task.get("createdAt")),
         "updated_at": _coerce_datetime(task.get("updated_at") or task.get("updatedAt")),
@@ -786,6 +789,9 @@ async def task_workbench_page(
         "scenes_status": detail.scenes_status,
         "scenes_key": detail.scenes_key,
         "scenes_error": detail.scenes_error,
+        "subtitles_status": detail.subtitles_status,
+        "subtitles_key": detail.subtitles_key,
+        "subtitles_error": detail.subtitles_error,
         "publish_status": detail.publish_status,
         "publish_provider": detail.publish_provider,
         "publish_key": detail.publish_key,
@@ -911,6 +917,9 @@ def list_tasks(
                 scenes_status=t.get("scenes_status"),
                 scenes_key=t.get("scenes_key"),
                 scenes_error=t.get("scenes_error"),
+                subtitles_status=t.get("subtitles_status"),
+                subtitles_key=t.get("subtitles_key"),
+                subtitles_error=t.get("subtitles_error"),
                 created_at=(coerce_datetime(t.get("created_at") or t.get("created") or t.get("createdAt")) or datetime(1970, 1, 1, tzinfo=timezone.utc)),
                 updated_at=coerce_datetime(t.get("updated_at") or t.get("updatedAt")),
                 error_message=t.get("error_message"),
@@ -1099,10 +1108,20 @@ def build_subtitles(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    if task.get("subtitles_status") == "ready" and task.get("subtitles_key"):
+        return {
+            "task_id": task_id,
+            "status": "already_ready",
+            "subtitles_key": task.get("subtitles_key"),
+            "message": "Subtitles already ready",
+            "error": None,
+        }
+
     target_lang = (payload.target_lang if payload else None) or task.get("content_lang") or "my"
     force = payload.force if payload else False
     translate = payload.translate if payload else True
 
+    repo.upsert(task_id, {"subtitles_status": "running", "subtitles_error": None})
     subs_req = SubtitlesRequest(
         task_id=task_id,
         target_lang=target_lang,
@@ -1110,7 +1129,11 @@ def build_subtitles(
         translate=translate,
         with_scenes=True,
     )
-    asyncio.run(run_subtitles_step_v1(subs_req))
+    try:
+        asyncio.run(run_subtitles_step_v1(subs_req))
+    except HTTPException as exc:
+        repo.upsert(task_id, {"subtitles_status": "error", "subtitles_error": str(exc.detail)})
+        raise
 
     workspace = Workspace(task_id)
     origin_key = (
@@ -1127,12 +1150,19 @@ def build_subtitles(
     if mm_txt_path.exists():
         upload_task_artifact(task, mm_txt_path, "mm.txt", task_id=task_id)
 
+    subtitles_dir = Path("deliver") / "subtitles" / task_id
+    subtitles_key = str(subtitles_dir / "subtitles.json")
+
     repo.upsert(
         task_id,
         {
             "origin_srt_path": origin_key,
             "mm_srt_path": mm_key,
             "last_step": "subtitles",
+            "subtitles_status": "ready",
+            "subtitles_key": subtitles_key,
+            "subtitle_structure_path": subtitles_key,
+            "subtitles_error": None,
         },
     )
 

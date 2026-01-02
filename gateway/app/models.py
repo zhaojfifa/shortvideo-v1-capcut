@@ -56,6 +56,9 @@ class Task(Base):
     # v1.65 中间产物 (为下一步做准备)
     brief_path = Column(Text, nullable=True)           # [新增] brief.json
     subtitle_structure_path = Column(Text, nullable=True) # [新增] subtitles.json
+    subtitles_status = Column(String(32), nullable=True)
+    subtitles_key = Column(Text, nullable=True)
+    subtitles_error = Column(Text, nullable=True)
     pack_manifest_path = Column(Text, nullable=True)   # [新增] pack/manifest.json
 
     # === 4. 发布闭环 (PR-02) ===

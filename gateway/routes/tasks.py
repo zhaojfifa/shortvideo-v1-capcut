@@ -184,6 +184,9 @@ async def task_workbench_page(
         "scenes_status": getattr(task, "scenes_status", None),
         "scenes_key": getattr(task, "scenes_key", None),
         "scenes_error": getattr(task, "scenes_error", None),
+        "subtitles_status": getattr(task, "subtitles_status", None),
+        "subtitles_key": getattr(task, "subtitles_key", None),
+        "subtitles_error": getattr(task, "subtitles_error", None),
     }
     task_view = {"source_url_open": _extract_first_http_url(task.source_url)}
 
@@ -280,6 +283,9 @@ def create_task(
         scenes_status=db_task.scenes_status,
         scenes_key=db_task.scenes_key,
         scenes_error=db_task.scenes_error,
+        subtitles_status=db_task.subtitles_status,
+        subtitles_key=db_task.subtitles_key,
+        subtitles_error=db_task.subtitles_error,
         created_at=db_task.created_at,
         updated_at=db_task.updated_at,
         error_message=db_task.error_message,
@@ -339,6 +345,9 @@ def list_tasks(
                 scenes_status=t.scenes_status,
                 scenes_key=t.scenes_key,
                 scenes_error=t.scenes_error,
+                subtitles_status=t.subtitles_status,
+                subtitles_key=t.subtitles_key,
+                subtitles_error=t.subtitles_error,
                 created_at=t.created_at,
                 updated_at=t.updated_at,
                 error_message=t.error_message,
@@ -381,6 +390,9 @@ def get_task(task_id: str, db: Session = Depends(get_db)):
         scenes_status=t.scenes_status,
         scenes_key=t.scenes_key,
         scenes_error=t.scenes_error,
+        subtitles_status=t.subtitles_status,
+        subtitles_key=t.subtitles_key,
+        subtitles_error=t.subtitles_error,
         created_at=t.created_at,
         updated_at=t.updated_at,
         error_message=t.error_message,
@@ -427,6 +439,15 @@ def build_subtitles(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    if task.subtitles_status == "ready" and task.subtitles_key:
+        return {
+            "task_id": task_id,
+            "status": "already_ready",
+            "subtitles_key": task.subtitles_key,
+            "message": "Subtitles already ready",
+            "error": None,
+        }
+
     target_lang = (payload.target_lang if payload else None) or task.content_lang or "my"
     force = payload.force if payload else False
     translate = payload.translate if payload else True
@@ -438,7 +459,13 @@ def build_subtitles(
         translate=translate,
         with_scenes=True,
     )
-    asyncio.run(run_subtitles_step_v1(subs_req))
+    try:
+        asyncio.run(run_subtitles_step_v1(subs_req))
+    except HTTPException as exc:
+        task.subtitles_status = "error"
+        task.subtitles_error = str(exc.detail)
+        db.commit()
+        raise
 
     db.refresh(task)
     return TaskDetail(

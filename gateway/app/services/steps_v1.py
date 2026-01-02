@@ -15,6 +15,7 @@ from fastapi import HTTPException
 from gateway.app.ports.storage_provider import get_storage_service
 from gateway.app.core.workspace import (
     Workspace,
+    deliver_dir,
     deliver_pack_zip_path,
     raw_path,
     relative_to_workspace,
@@ -158,6 +159,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
     """Run the subtitles step for the given request."""
 
     try:
+        _update_task(req.task_id, subtitles_status="running", subtitles_error=None)
         result = await generate_subtitles(
             task_id=req.task_id,
             target_lang=req.target_lang,
@@ -182,18 +184,34 @@ async def run_subtitles_step(req: SubtitlesRequest):
             if mm_txt_path.exists():
                 _upload_artifact(req.task_id, mm_txt_path, MM_TXT_ARTIFACT)
 
+        subtitles_dir = deliver_dir() / "subtitles" / req.task_id
+        subtitles_dir.mkdir(parents=True, exist_ok=True)
+        if workspace.origin_srt_path.exists():
+            shutil.copy2(workspace.origin_srt_path, subtitles_dir / "origin.srt")
+        if workspace.mm_srt_path.exists():
+            shutil.copy2(workspace.mm_srt_path, subtitles_dir / "mm.srt")
+        if workspace.segments_json.exists():
+            shutil.copy2(workspace.segments_json, subtitles_dir / "subtitles.json")
+        subtitles_key = relative_to_workspace(subtitles_dir / "subtitles.json")
+
         _update_task(
             req.task_id,
             origin_srt_path=origin_key,
             mm_srt_path=mm_key,
             last_step="subtitles",
+            subtitles_status="ready",
+            subtitles_key=subtitles_key,
+            subtitle_structure_path=subtitles_key,
+            subtitles_error=None,
         )
         return result
 
     except HTTPException:
+        _update_task(req.task_id, subtitles_status="error", subtitles_error="http_error")
         raise
     except Exception as exc:  # pragma: no cover
         logger.exception("Unexpected error in subtitles step for task %s", req.task_id)
+        _update_task(req.task_id, subtitles_status="error", subtitles_error=str(exc))
         raise HTTPException(status_code=500, detail="internal error") from exc
 
 

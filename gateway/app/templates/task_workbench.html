@@ -504,7 +504,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
 
     function updateStepStatuses(data) {
       const hasRaw = !!data.raw_path;
-      const hasSubs = !!(data.mm_srt_path || data.origin_srt_path);
+      const hasSubs = data.subtitles_status === "ready" || !!(data.mm_srt_path || data.origin_srt_path);
       const hasAudio = !!data.mm_audio_path;
       const hasPack = !!data.pack_path;
 
@@ -681,6 +681,11 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
 
     document.getElementById("btn-dub").addEventListener("click", async () => {
       const taskId = window.currentTask.task_id;
+      const subsReady = window.currentTask.subtitles_status === "ready" || !!window.currentTask.mm_srt_path;
+      if (!subsReady) {
+        appendLog("Please generate subtitles first / 请先生成字幕 / အရင် စာတန်းထိုးကို ထုတ်ပါ");
+        return;
+      }
       const voiceId = document.getElementById("voice-id").value;
       const provider = document.getElementById("dub-provider").value || "edge-tts";
       appendLog(`Calling /api/tasks/${taskId}/dub (provider=${provider}, voice=${voiceId})...`);
@@ -718,6 +723,11 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
 
     document.getElementById("btn-scenes").addEventListener("click", async () => {
       const taskId = window.currentTask.task_id;
+      const subsReady = window.currentTask.subtitles_status === "ready" || !!window.currentTask.mm_srt_path;
+      if (!subsReady) {
+        appendLog("Please generate subtitles first / 请先生成字幕 / အရင် စာတန်းထိုးကို ထုတ်ပါ");
+        return;
+      }
       appendLog(`Calling /api/tasks/${taskId}/scenes...`);
       const resp = await fetch(`/api/tasks/${taskId}/scenes`, {
         method: "POST",
