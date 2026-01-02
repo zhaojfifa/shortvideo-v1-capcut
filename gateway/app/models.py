@@ -48,6 +48,9 @@ class Task(Base):
     pack_key = Column(Text, nullable=True)
     pack_type = Column(String(32), nullable=True)
     pack_status = Column(String(32), nullable=True)
+    scenes_key = Column(Text, nullable=True)
+    scenes_status = Column(String(32), nullable=True)
+    scenes_count = Column(Integer, nullable=True)
     
     # v1.65 中间产物 (为下一步做准备)
     brief_path = Column(Text, nullable=True)           # [新增] brief.json

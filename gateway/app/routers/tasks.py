@@ -399,6 +399,17 @@ def download_pack(task_id: str, repo=Depends(get_task_repository)):
     return RedirectResponse(url=get_download_url(str(key)), status_code=302)
 
 
+@pages_router.get("/v1/tasks/{task_id}/scenes")
+def download_scenes(task_id: str, repo=Depends(get_task_repository)):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Scenes not found")
+    scenes_key = _task_value(task, "scenes_key")
+    if not scenes_key or not object_exists(str(scenes_key)):
+        raise HTTPException(status_code=404, detail="Scenes not found")
+    return RedirectResponse(url=get_download_url(str(scenes_key)), status_code=302)
+
+
 def _task_endpoint(task_id: str, kind: str) -> Optional[str]:
     safe_id = str(task_id)
     if kind == "raw":

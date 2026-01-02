@@ -118,3 +118,25 @@ async def download_pack(task_id: str):
         db.close()
 
     raise HTTPException(status_code=404, detail="pack not found")
+
+
+@router.get("/tasks/{task_id}/scenes")
+async def download_scenes(task_id: str):
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if task and task.scenes_key:
+            key = str(task.scenes_key)
+            if object_exists(key):
+                presigned_url = get_download_url(
+                    key,
+                    expiration=3600,
+                    content_type="application/zip",
+                    filename=f"{task_id}_scenes.zip",
+                    disposition="attachment",
+                )
+                return RedirectResponse(url=presigned_url, status_code=302)
+    finally:
+        db.close()
+
+    raise HTTPException(status_code=404, detail="scenes not found")

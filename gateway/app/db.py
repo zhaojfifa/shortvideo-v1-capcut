@@ -99,6 +99,12 @@ def ensure_task_extra_columns(engine) -> None:
         alter_statements.append("ALTER TABLE tasks ADD COLUMN pack_type VARCHAR(32)")
     if "pack_status" not in columns:
         alter_statements.append("ALTER TABLE tasks ADD COLUMN pack_status VARCHAR(32)")
+    if "scenes_key" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN scenes_key TEXT")
+    if "scenes_status" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN scenes_status VARCHAR(32)")
+    if "scenes_count" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN scenes_count INTEGER")
 
     if not alter_statements:
         return
