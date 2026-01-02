@@ -24,11 +24,25 @@ from gateway.app.core.workspace import (
 )
 from gateway.app.db import get_db
 from gateway.app.web.templates import get_templates
-from gateway.app.schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary, SubtitlesRequest
+from gateway.app.schemas import (
+    PackRequest,
+    ParseRequest,
+    SubtitlesRequest,
+    TaskCreate,
+    TaskDetail,
+    TaskListResponse,
+    TaskSummary,
+)
 from gateway.app.services.artifact_storage import object_exists
 from gateway.app.services.scene_split import enqueue_scenes_build
 from gateway.app.steps.pipeline_v1 import run_pipeline_background
-from gateway.app.services.steps_v1 import run_subtitles_step as run_subtitles_step_v1
+from gateway.app.steps.dubbing import run_dub_step as run_dub_step_ssot
+from gateway.app.services.steps_v1 import (
+    run_pack_step as run_pack_step_v1,
+    run_parse_step as run_parse_step_v1,
+    run_subtitles_step as run_subtitles_step_v1,
+)
+from gateway.app.utils.keys import KeyBuilder
 
 router = APIRouter(prefix="/tasks")
 pages_router = APIRouter()
@@ -44,6 +58,16 @@ class SubtitlesTaskRequest(BaseModel):
     target_lang: str | None = None
     force: bool = False
     translate: bool = True
+
+
+class ParseTaskRequest(BaseModel):
+    link: str | None = None
+    platform: str | None = None
+
+
+class DubProviderRequest(BaseModel):
+    provider: str | None = None
+    voice_id: str | None = None
 
 
 def _infer_platform_from_url(url: str) -> Optional[str]:
@@ -400,6 +424,36 @@ def get_task(task_id: str, db: Session = Depends(get_db)):
     )
 
 
+@router.post("/{task_id}/parse")
+def build_parse(
+    task_id: str,
+    payload: ParseTaskRequest | None = None,
+    db: Session = Depends(get_db),
+):
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    link = (payload.link if payload else None) or task.source_url
+    if not link:
+        raise HTTPException(status_code=400, detail="source_url is empty; cannot parse")
+
+    platform = (payload.platform if payload else None) or task.platform
+    req = ParseRequest(task_id=task_id, link=link, platform=platform)
+
+    try:
+        asyncio.run(run_parse_step_v1(req))
+    except HTTPException as exc:
+        task.error_message = str(exc.detail)
+        task.error_reason = "parse_failed"
+        task.last_step = "parse"
+        db.commit()
+        raise
+
+    db.refresh(task)
+    return get_task(task_id, db)
+
+
 @router.post("/{task_id}/scenes")
 def build_scenes(
     task_id: str,
@@ -497,6 +551,91 @@ def build_subtitles(
         error_message=task.error_message,
         error_reason=task.error_reason,
     )
+
+
+@router.post("/{task_id}/dub", response_model=TaskDetail)
+async def rerun_dub(
+    task_id: str,
+    payload: DubProviderRequest,
+    db: Session = Depends(get_db),
+):
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    provider = (payload.provider or "edge-tts").lower()
+    if provider == "edge":
+        provider = "edge-tts"
+    if provider not in {"edge-tts", "lovo"}:
+        raise HTTPException(status_code=400, detail="Unsupported dub provider")
+
+    settings = get_settings()
+    if provider == "lovo" and not getattr(settings, "lovo_api_key", None):
+        raise HTTPException(status_code=400, detail="LOVO_API_KEY is not configured")
+
+    try:
+        class TaskAdapter:
+            def __init__(self, t: models.Task, voice_override: str | None, provider: str):
+                self.task_id = t.id
+                self.id = t.id
+                self.tenant_id = getattr(t, "tenant_id", None) or "default"
+                self.project_id = getattr(t, "project_id", None) or "default"
+                self.target_lang = getattr(t, "target_lang", None) or t.content_lang or "my"
+                self.voice_id = voice_override or getattr(t, "voice_id", None)
+                self.dub_provider = provider
+
+        task_adapter = TaskAdapter(task, voice_override=payload.voice_id, provider=provider)
+        await run_dub_step_ssot(task_adapter)
+
+        audio_key = KeyBuilder.build(
+            task_adapter.tenant_id,
+            task_adapter.project_id,
+            task_adapter.task_id,
+            "artifacts/voice/full.mp3",
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Dubbing step failed: {exc}")
+
+    task.mm_audio_path = audio_key
+    task.dub_provider = provider
+    task.last_step = "dubbing"
+    db.commit()
+    db.refresh(task)
+    return get_task(task_id, db)
+
+
+@router.post("/{task_id}/pack")
+def build_pack(
+    task_id: str,
+    db: Session = Depends(get_db),
+):
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    pack_key = getattr(task, "pack_key", None)
+    if pack_key and object_exists(str(pack_key)):
+        return {
+            "task_id": task_id,
+            "status": "already_ready",
+            "pack_key": pack_key,
+            "message": "Pack already ready",
+            "error": None,
+        }
+
+    try:
+        asyncio.run(run_pack_step_v1(PackRequest(task_id=task_id)))
+    except HTTPException as exc:
+        task.pack_status = "error"
+        task.error_message = str(exc.detail)
+        task.error_reason = "pack_failed"
+        db.commit()
+        raise
+
+    db.refresh(task)
+    return get_task(task_id, db)
 
 
 # Public exports for API and HTML routers

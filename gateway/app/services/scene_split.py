@@ -241,14 +241,6 @@ def _find_source_srt(task_id: str) -> tuple[Path, str]:
         if origin.exists():
             return origin, "origin"
 
-    base = workspace_root() / "deliver" / "packs" / task_id / "subs"
-    for lang in ("mm", "my"):
-        srt_path = base / f"{lang}.srt"
-        if srt_path.exists():
-            return srt_path, lang
-    origin = base / "origin.srt"
-    if origin.exists():
-        return origin, "origin"
     raise HTTPException(status_code=400, detail="subtitles not ready; run subtitles first")
 
 

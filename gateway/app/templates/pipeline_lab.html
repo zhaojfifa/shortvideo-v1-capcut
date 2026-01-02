@@ -425,11 +425,11 @@
 
     async function runSubtitles() {
       const body = { task_id: taskId(), target_lang: 'my', force: false, translate: true, with_scenes: true };
-      log(`Calling /api/tasks/${body.task_id}/subtitles · ${LABELS.subtitles}`);
-      const res = await fetch(`/api/tasks/${body.task_id}/subtitles`, {
+      log(`Calling /v1/subtitles for ${body.task_id} · ${LABELS.subtitles}`);
+      const res = await fetch('/v1/subtitles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify(body),
       });
       const json = await res.json();
       document.getElementById('subsOutput').textContent = JSON.stringify(json, null, 2);
