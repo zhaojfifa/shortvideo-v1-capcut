@@ -146,6 +146,12 @@ class ScenesRequest(BaseModel):
     force: bool = False
 
 
+class SubtitlesTaskRequest(BaseModel):
+    target_lang: str | None = None
+    force: bool = False
+    translate: bool = True
+
+
 pages_router = APIRouter()
 api_router = APIRouter(prefix="/api", tags=["tasks"])
 templates = get_templates()
@@ -1063,6 +1069,8 @@ async def rerun_dub(
             "artifacts/voice/full.mp3",
         )
 
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Dubbing step failed for task_id=%s", task_id)
         raise HTTPException(status_code=500, detail=f"Dubbing step failed: {exc}")
@@ -1074,6 +1082,57 @@ async def rerun_dub(
             "mm_audio_path": audio_key,
             "dub_provider": provider,
             "last_step": "dubbing",
+        },
+    )
+
+    stored = repo.get(task_id)
+    return _task_to_detail(stored)
+
+
+@api_router.post("/tasks/{task_id}/subtitles")
+def build_subtitles(
+    task_id: str,
+    payload: SubtitlesTaskRequest | None = None,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    target_lang = (payload.target_lang if payload else None) or task.get("content_lang") or "my"
+    force = payload.force if payload else False
+    translate = payload.translate if payload else True
+
+    subs_req = SubtitlesRequest(
+        task_id=task_id,
+        target_lang=target_lang,
+        force=force,
+        translate=translate,
+        with_scenes=True,
+    )
+    asyncio.run(run_subtitles_step_v1(subs_req))
+
+    workspace = Workspace(task_id)
+    origin_key = (
+        upload_task_artifact(task, workspace.origin_srt_path, "origin.srt", task_id=task_id)
+        if workspace.origin_srt_path.exists()
+        else None
+    )
+    mm_key = (
+        upload_task_artifact(task, workspace.mm_srt_path, "mm.srt", task_id=task_id)
+        if workspace.mm_srt_path.exists()
+        else None
+    )
+    mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
+    if mm_txt_path.exists():
+        upload_task_artifact(task, mm_txt_path, "mm.txt", task_id=task_id)
+
+    repo.upsert(
+        task_id,
+        {
+            "origin_srt_path": origin_key,
+            "mm_srt_path": mm_key,
+            "last_step": "subtitles",
         },
     )
 

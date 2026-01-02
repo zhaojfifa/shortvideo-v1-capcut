@@ -217,14 +217,14 @@ async def run_dub_step(req: DubRequest):
     if not mm_exists:
         raise HTTPException(
             status_code=400,
-            detail="translated subtitles not found; run /v1/subtitles first",
+            detail="translated subtitles not found; run /api/tasks/{task_id}/subtitles first",
         )
 
     mm_text = workspace.read_mm_srt_text() or ""
     if not mm_text.strip():
         raise HTTPException(
             status_code=400,
-            detail="translated subtitles file is empty; please rerun /v1/subtitles",
+            detail="translated subtitles file is empty; please rerun /api/tasks/{task_id}/subtitles",
         )
 
     try:

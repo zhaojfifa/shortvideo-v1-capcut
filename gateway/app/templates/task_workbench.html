@@ -325,7 +325,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
         </div>
         <div class="step-card step-wide">
           <h3>Step 2 - Subtitles <span class="muted">/ 字幕</span></h3>
-          <p class="muted">Generate subtitles via /v1/subtitles.</p>
+          <p class="muted">Generate subtitles via /api/tasks/{id}/subtitles.</p>
           <div class="action-row">
             <button id="btn-subtitles" class="btn-primary">Generate subtitles <span class="muted t-secondary">/ 生成</span></button>
             <span id="subs-step-status" class="muted t-secondary">Not ready</span>
@@ -665,12 +665,11 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
 
     document.getElementById("btn-subtitles").addEventListener("click", async () => {
       const taskId = window.currentTask.task_id;
-      appendLog(`Calling /v1/subtitles for ${taskId}...`);
-      const payload = { task_id: taskId };
-      const resp = await fetch("/v1/subtitles", {
+      appendLog(`Calling /api/tasks/${taskId}/subtitles...`);
+      const resp = await fetch(`/api/tasks/${taskId}/subtitles`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({}),
       });
       if (!resp.ok) {
         appendLog(`Subtitles failed: HTTP ${resp.status}`);
