@@ -5,7 +5,7 @@ This repo runs the ShortVideo pipeline (parse -> subtitles -> dub -> pack) and s
 ## Ops baseline (v1.8)
 
 Flow: Task -> Pack -> Download URL
-- Generate pack: `POST /v1/pack` (stores `pack_key` + `pack_status`)
+- Generate pack: `POST /api/tasks/{task_id}/pack` (stores `pack_key` + `pack_status`)
 - Download pack: `GET /v1/tasks/{task_id}/pack` (redirects to a presigned URL)
 - Expected ZIP layout: `deliver/packs/<task_id>/...` (see pack spec)
 
@@ -13,6 +13,7 @@ Flow: Task -> Pack -> Download URL
 - `docs/overview.md`
 - `docs/v1.8/ops_baseline.md`
 - `docs/v1.8/pack_spec.md`
+- `docs/v1.8/ui_routes.md`
 - `docs/architecture/hexagonal.md`
 
 ## v1.7 note

@@ -27,8 +27,11 @@ def test_pipeline_lab_uses_v1_triggers() -> None:
     ]
     for path in targets:
         text = path.read_text(encoding="utf-8")
-        assert "/v1/parse" in text
-        assert "/v1/subtitles" in text
-        assert "/v1/dub" in text
-        assert "/v1/pack" in text
-        assert "/api/tasks/" not in text
+        assert "/api/tasks/${body.task_id}/parse" in text
+        assert "/api/tasks/${body.task_id}/subtitles" in text
+        assert "/api/tasks/${body.task_id}/dub" in text
+        assert "/api/tasks/${body.task_id}/pack" in text
+        assert "/v1/parse" not in text
+        assert "/v1/subtitles" not in text
+        assert "/v1/dub" not in text
+        assert "/v1/pack" not in text
