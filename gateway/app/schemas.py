@@ -108,6 +108,9 @@ class TaskSummary(BaseModel):
     scenes_status: Optional[str] = None
     scenes_key: Optional[str] = None
     scenes_error: Optional[str] = None
+    subtitles_status: Optional[str] = None
+    subtitles_key: Optional[str] = None
+    subtitles_error: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     error_reason: Optional[str] = None

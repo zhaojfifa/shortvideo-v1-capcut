@@ -1,5 +1,6 @@
 """Task API router and simple HTML task board page."""
 
+import asyncio
 from pathlib import Path
 import re
 from typing import Optional
@@ -23,10 +24,11 @@ from gateway.app.core.workspace import (
 )
 from gateway.app.db import get_db
 from gateway.app.web.templates import get_templates
-from gateway.app.schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary
+from gateway.app.schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary, SubtitlesRequest
 from gateway.app.services.artifact_storage import object_exists
 from gateway.app.services.scene_split import enqueue_scenes_build
 from gateway.app.steps.pipeline_v1 import run_pipeline_background
+from gateway.app.services.steps_v1 import run_subtitles_step as run_subtitles_step_v1
 
 router = APIRouter(prefix="/tasks")
 pages_router = APIRouter()
@@ -36,6 +38,12 @@ templates = get_templates()
 
 class ScenesRequest(BaseModel):
     force: bool = False
+
+
+class SubtitlesTaskRequest(BaseModel):
+    target_lang: str | None = None
+    force: bool = False
+    translate: bool = True
 
 
 def _infer_platform_from_url(url: str) -> Optional[str]:
@@ -176,6 +184,9 @@ async def task_workbench_page(
         "scenes_status": getattr(task, "scenes_status", None),
         "scenes_key": getattr(task, "scenes_key", None),
         "scenes_error": getattr(task, "scenes_error", None),
+        "subtitles_status": getattr(task, "subtitles_status", None),
+        "subtitles_key": getattr(task, "subtitles_key", None),
+        "subtitles_error": getattr(task, "subtitles_error", None),
     }
     task_view = {"source_url_open": _extract_first_http_url(task.source_url)}
 
@@ -272,6 +283,9 @@ def create_task(
         scenes_status=db_task.scenes_status,
         scenes_key=db_task.scenes_key,
         scenes_error=db_task.scenes_error,
+        subtitles_status=db_task.subtitles_status,
+        subtitles_key=db_task.subtitles_key,
+        subtitles_error=db_task.subtitles_error,
         created_at=db_task.created_at,
         updated_at=db_task.updated_at,
         error_message=db_task.error_message,
@@ -331,6 +345,9 @@ def list_tasks(
                 scenes_status=t.scenes_status,
                 scenes_key=t.scenes_key,
                 scenes_error=t.scenes_error,
+                subtitles_status=t.subtitles_status,
+                subtitles_key=t.subtitles_key,
+                subtitles_error=t.subtitles_error,
                 created_at=t.created_at,
                 updated_at=t.updated_at,
                 error_message=t.error_message,
@@ -373,6 +390,9 @@ def get_task(task_id: str, db: Session = Depends(get_db)):
         scenes_status=t.scenes_status,
         scenes_key=t.scenes_key,
         scenes_error=t.scenes_error,
+        subtitles_status=t.subtitles_status,
+        subtitles_key=t.subtitles_key,
+        subtitles_error=t.subtitles_error,
         created_at=t.created_at,
         updated_at=t.updated_at,
         error_message=t.error_message,
@@ -406,6 +426,76 @@ def build_scenes(
         object_exists=object_exists,
         update_task=_update,
         background_tasks=background_tasks,
+    )
+
+
+@router.post("/{task_id}/subtitles")
+def build_subtitles(
+    task_id: str,
+    payload: SubtitlesTaskRequest | None = None,
+    db: Session = Depends(get_db),
+):
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.subtitles_status == "ready" and task.subtitles_key:
+        return {
+            "task_id": task_id,
+            "status": "already_ready",
+            "subtitles_key": task.subtitles_key,
+            "message": "Subtitles already ready",
+            "error": None,
+        }
+
+    target_lang = (payload.target_lang if payload else None) or task.content_lang or "my"
+    force = payload.force if payload else False
+    translate = payload.translate if payload else True
+
+    subs_req = SubtitlesRequest(
+        task_id=task_id,
+        target_lang=target_lang,
+        force=force,
+        translate=translate,
+        with_scenes=True,
+    )
+    try:
+        asyncio.run(run_subtitles_step_v1(subs_req))
+    except HTTPException as exc:
+        task.subtitles_status = "error"
+        task.subtitles_error = str(exc.detail)
+        db.commit()
+        raise
+
+    db.refresh(task)
+    return TaskDetail(
+        task_id=task.id,
+        title=task.title,
+        platform=task.platform,
+        account_id=task.account_id,
+        account_name=task.account_name,
+        video_type=task.video_type,
+        template=task.template,
+        category_key=task.category_key or "beauty",
+        content_lang=task.content_lang or "my",
+        ui_lang=task.ui_lang or "en",
+        style_preset=task.style_preset,
+        face_swap_enabled=bool(task.face_swap_enabled),
+        status=task.status,
+        last_step=task.last_step,
+        duration_sec=task.duration_sec,
+        thumb_url=task.thumb_url,
+        raw_path=task.raw_path,
+        mm_audio_path=task.mm_audio_path,
+        pack_path=task.pack_path,
+        scenes_path=task.scenes_key,
+        scenes_status=task.scenes_status,
+        scenes_key=task.scenes_key,
+        scenes_error=task.scenes_error,
+        created_at=task.created_at,
+        updated_at=task.updated_at,
+        error_message=task.error_message,
+        error_reason=task.error_reason,
     )
 
 

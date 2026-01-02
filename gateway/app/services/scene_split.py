@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Iterable
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from fastapi import HTTPException
+
 from gateway.app.core.workspace import raw_path, workspace_root
 from gateway.app.ports.storage_provider import get_storage_service
 
@@ -223,14 +225,31 @@ def _clip_srt(entries: Iterable[SrtEntry], start: float, end: float) -> str:
 
 
 def _find_source_srt(task_id: str) -> tuple[Path, str]:
+    deliver_subs = workspace_root() / "deliver" / "subtitles" / task_id
+    if deliver_subs.exists():
+        subtitles_json = deliver_subs / "subtitles.json"
+        if not subtitles_json.exists():
+            raise HTTPException(
+                status_code=400,
+                detail="subtitles not ready; run subtitles first",
+            )
+        for lang in ("mm", "my"):
+            srt_path = deliver_subs / f"{lang}.srt"
+            if srt_path.exists():
+                return srt_path, lang
+        origin = deliver_subs / "origin.srt"
+        if origin.exists():
+            return origin, "origin"
+
     base = workspace_root() / "deliver" / "packs" / task_id / "subs"
-    mm = base / "mm.srt"
+    for lang in ("mm", "my"):
+        srt_path = base / f"{lang}.srt"
+        if srt_path.exists():
+            return srt_path, lang
     origin = base / "origin.srt"
-    if mm.exists():
-        return mm, "mm"
     if origin.exists():
         return origin, "origin"
-    raise RuntimeError("source subtitles not found under deliver/packs")
+    raise HTTPException(status_code=400, detail="subtitles not ready; run subtitles first")
 
 
 README_TEMPLATE = """# Scenes.zip 使用说明 / Scenes.zip အသုံးပြုနည်း
@@ -397,14 +416,23 @@ def generate_scenes_package(
             }
         )
 
+    try:
+        subs_rel = str(source_srt.resolve().relative_to(workspace_root()))
+    except Exception:
+        subs_rel = str(source_srt)
+    try:
+        raw_rel = str(raw.resolve().relative_to(workspace_root()))
+    except Exception:
+        raw_rel = str(raw)
+
     manifest = {
         "version": "1.8",
         "task_id": task_id,
         "language": source_lang,
         "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "source": {
-            "raw_video": f"deliver/packs/{task_id}/raw/raw.mp4",
-            "subs": f"deliver/packs/{task_id}/subs/{source_lang}.srt",
+            "raw_video": raw_rel,
+            "subs": subs_rel,
         },
         "scenes": manifest_scenes,
     }
