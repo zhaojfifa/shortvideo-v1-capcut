@@ -14,3 +14,14 @@
 - Single trigger path: POST `/api/tasks/{task_id}/scenes`.
 - Single download path: GET `/v1/tasks/{task_id}/scenes`.
 - Gemini failures never stop subtitles; fallback to whisper-only timestamps.
+## UI routing matrix (must not cross-wire)
+
+- Task Workbench (/tasks/{id}): POST triggers must call `/api/tasks/{task_id}/...`
+  - parse: `/api/tasks/{task_id}/parse`
+  - subtitles: `/api/tasks/{task_id}/subtitles`
+  - dub: `/api/tasks/{task_id}/dub`
+  - pack: `/api/tasks/{task_id}/pack`
+  - scenes: `/api/tasks/{task_id}/scenes`
+  - publish: `/api/tasks/{task_id}/publish`
+
+- Pipeline Lab (/ui): debug/admin page; may call `/v1/...` endpoints.
