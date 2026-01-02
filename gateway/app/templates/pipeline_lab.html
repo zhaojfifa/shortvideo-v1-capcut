@@ -406,8 +406,8 @@
 
     async function runParse() {
       const body = { task_id: taskId(), platform: platform(), link: link() };
-      log(`Calling /api/tasks/${body.task_id}/parse for ${body.task_id} · ${LABELS.parse}`);
-      const res = await fetch(`/api/tasks/${body.task_id}/parse`, {
+      log(`Calling /v1/parse for ${body.task_id} · ${LABELS.parse}`);
+      const res = await fetch('/v1/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -425,11 +425,11 @@
 
     async function runSubtitles() {
       const body = { task_id: taskId(), target_lang: 'my', force: false, translate: true, with_scenes: true };
-      log(`Calling /api/tasks/${body.task_id}/subtitles for ${body.task_id} · ${LABELS.subtitles}`);
+      log(`Calling /api/tasks/${body.task_id}/subtitles · ${LABELS.subtitles}`);
       const res = await fetch(`/api/tasks/${body.task_id}/subtitles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({}),
       });
       const json = await res.json();
       document.getElementById('subsOutput').textContent = JSON.stringify(json, null, 2);
@@ -449,11 +449,11 @@
       const body = { task_id: taskId(), voice_id: voiceId(), force: false, target_lang: 'my' };
       const buttons = document.querySelectorAll('button[onclick="runDub()"]');
       buttons.forEach((b) => (b.disabled = true));
-      log(`Calling /api/tasks/${body.task_id}/dub for ${body.task_id} · ${LABELS.dub}`);
+      log(`Calling /v1/dub for ${body.task_id} · ${LABELS.dub}`);
       let res;
       let payloadText = '';
       try {
-        res = await fetch(`/api/tasks/${body.task_id}/dub`, {
+        res = await fetch('/v1/dub', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -500,8 +500,8 @@
 
     async function runPack() {
       const body = { task_id: taskId() };
-      log(`Calling /api/tasks/${body.task_id}/pack for ${body.task_id} · ${LABELS.pack}`);
-      const res = await fetch(`/api/tasks/${body.task_id}/pack`, {
+      log(`Calling /v1/pack for ${body.task_id} · ${LABELS.pack}`);
+      const res = await fetch('/v1/pack', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

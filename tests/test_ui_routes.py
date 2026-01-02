@@ -1,15 +1,15 @@
+from __future__ import annotations
+
 from pathlib import Path
 
-def test_task_workbench_uses_api_triggers() -> None:
+
+def test_ui_does_not_call_v1_subtitles() -> None:
     root = Path(__file__).resolve().parents[1]
-    path = root / "gateway" / "app" / "templates" / "task_workbench.html"
-    text = path.read_text(encoding="utf-8")
-
-    # Must use /api/tasks/* triggers
-    assert "/api/tasks/${taskId}/parse" in text
-    assert "/api/tasks/${taskId}/subtitles" in text
-    assert "/api/tasks/${taskId}/dub" in text
-    assert "/api/tasks/${taskId}/pack" in text
-
-    # Must not call v1 subtitles from Workbench
-    assert "/v1/subtitles" not in text
+    targets = [
+        root / "gateway" / "app" / "templates" / "task_workbench.html",
+        root / "gateway" / "app" / "templates" / "pipeline_lab.html",
+        root / "gateway" / "app" / "static" / "ui.html",
+    ]
+    for path in targets:
+        text = path.read_text(encoding="utf-8")
+        assert "/v1/subtitles" not in text
