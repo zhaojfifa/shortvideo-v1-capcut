@@ -41,9 +41,8 @@ def test_scenes_zip_layout(tmp_path, monkeypatch) -> None:
     raw.parent.mkdir(parents=True, exist_ok=True)
     raw.write_bytes(b"raw")
 
-    subs_dir = tmp_path / "deliver" / "subtitles" / task_id
+    subs_dir = tmp_path / "deliver" / "packs" / task_id / "subs"
     subs_dir.mkdir(parents=True, exist_ok=True)
-    (subs_dir / "subtitles.json").write_text("{}", encoding="utf-8")
     subs_path = subs_dir / "mm.srt"
     subs_path.write_text(
         "1\n00:00:00,000 --> 00:00:02,000\nhello\n\n2\n00:00:02,500 --> 00:00:04,000\nworld\n",

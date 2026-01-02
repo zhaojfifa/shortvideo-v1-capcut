@@ -239,7 +239,7 @@
       const res = await fetch(`/api/tasks/${body.task_id}/subtitles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({}),
       });
       const json = await res.json();
       document.getElementById('subsOutput').textContent = JSON.stringify(json, null, 2);
