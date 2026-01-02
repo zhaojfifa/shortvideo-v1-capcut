@@ -2,26 +2,24 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 import shutil
 import subprocess
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from gateway.app.core.workspace import raw_path, workspace_root
-from gateway.app.db import SessionLocal, engine, ensure_task_extra_columns
-from gateway.app import models
 from gateway.app.ports.storage_provider import get_storage_service
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MIN_SCENE_SEC = 3.0
-DEFAULT_MAX_SCENE_SEC = 18.0
-DEFAULT_SILENCE_GAP_SEC = 0.6
-DEFAULT_CAPTIONS_GROUP = 4
+DEFAULT_MIN_SCENE_SEC = 6.0
+DEFAULT_MAX_SCENE_SEC = 15.0
+DEFAULT_MIN_LINES = 3
+DEFAULT_MAX_LINES = 5
 
 SRT_TIME_RE = re.compile(
     r"(?P<start>\d{2}:\d{2}:\d{2}[,\.]\d{3})\s*-->\s*(?P<end>\d{2}:\d{2}:\d{2}[,\.]\d{3})"
@@ -29,11 +27,10 @@ SRT_TIME_RE = re.compile(
 
 
 @dataclass
-class Segment:
+class SrtEntry:
     start: float
     end: float
     text: str
-    gap_after: float | None
 
 
 @dataclass
@@ -125,90 +122,53 @@ def _generate_silence_audio(dst: Path, seconds: float) -> None:
     _run_ffmpeg(cmd)
 
 
-def _transcribe_segments(audio_path: Path) -> list[Segment]:
-    model_name = os.getenv("FASTER_WHISPER_MODEL", "base")
-    from faster_whisper import WhisperModel  # type: ignore
-
-    model = WhisperModel(model_name, device="cpu", compute_type="int8")
-    segments_iter, _info = model.transcribe(str(audio_path), word_timestamps=True)
-    segs = list(segments_iter)
-    out: list[Segment] = []
-    for idx, seg in enumerate(segs):
-        text = (seg.text or "").strip()
-        gap_after = None
-        if idx + 1 < len(segs):
-            next_seg = segs[idx + 1]
-            if getattr(seg, "words", None) and getattr(next_seg, "words", None):
-                last_word = seg.words[-1]
-                next_first = next_seg.words[0]
-                gap_after = float(next_first.start) - float(last_word.end)
-        out.append(
-            Segment(
-                start=float(seg.start),
-                end=float(seg.end),
-                text=text,
-                gap_after=gap_after,
-            )
-        )
-    return out
-
-
-def _derive_scenes_from_segments(
-    segments: list[Segment],
+def _derive_scenes_from_srt(
+    entries: list[SrtEntry],
     *,
     min_scene_sec: float,
     max_scene_sec: float,
-    silence_gap_sec: float,
-    captions_group: int,
+    min_lines: int,
+    max_lines: int,
 ) -> list[SceneRange]:
-    if not segments:
-        raise RuntimeError("no segments to derive scenes")
+    if not entries:
+        raise RuntimeError("no srt entries to derive scenes")
 
     scenes: list[SceneRange] = []
-    scene_start = segments[0].start
-    count_since_cut = 0
-    last_end = segments[-1].end
+    scene_start = entries[0].start
+    count = 0
 
-    for idx, seg in enumerate(segments):
-        count_since_cut += 1
-        seg_end = seg.end
-        next_start = segments[idx + 1].start if idx + 1 < len(segments) else None
-        gap = seg.gap_after
-        if gap is None and next_start is not None:
-            gap = next_start - seg_end
-        gap = gap or 0.0
+    for idx, entry in enumerate(entries):
+        count += 1
+        scene_end = entry.end
+        duration = scene_end - scene_start
+        next_end = entries[idx + 1].end if idx + 1 < len(entries) else None
 
-        duration = seg_end - scene_start
-        candidate = False
-        if next_start is not None and gap >= silence_gap_sec:
-            candidate = True
-        if count_since_cut >= captions_group:
-            candidate = True
+        cut = False
         if duration >= max_scene_sec:
-            candidate = True
+            cut = True
+        elif count >= max_lines:
+            cut = True
+        elif count >= min_lines and duration >= min_scene_sec:
+            if next_end is None or (next_end - scene_start) > max_scene_sec:
+                cut = True
 
-        if candidate and duration >= min_scene_sec:
-            scenes.append(SceneRange(start=scene_start, end=seg_end))
-            scene_start = seg_end
-            count_since_cut = 0
+        if cut:
+            scenes.append(SceneRange(start=scene_start, end=scene_end))
+            if idx + 1 < len(entries):
+                scene_start = entries[idx + 1].start
+            count = 0
 
+    if count > 0 and scenes:
+        last_end = entries[-1].end
+        scenes.append(SceneRange(start=scene_start, end=last_end))
     if not scenes:
-        scenes.append(SceneRange(start=segments[0].start, end=last_end))
-        return scenes
-
-    if scenes[-1].end < last_end:
-        last_duration = last_end - scene_start
-        if last_duration < min_scene_sec:
-            scenes[-1] = SceneRange(start=scenes[-1].start, end=last_end)
-        else:
-            scenes.append(SceneRange(start=scene_start, end=last_end))
-
+        scenes.append(SceneRange(start=entries[0].start, end=entries[-1].end))
     return scenes
 
 
-def _parse_srt(text: str) -> list[dict]:
+def _parse_srt(text: str) -> list[SrtEntry]:
     blocks = [b for b in text.strip().split("\n\n") if b.strip()]
-    entries: list[dict] = []
+    entries: list[SrtEntry] = []
     for block in blocks:
         lines = [l for l in block.splitlines() if l.strip()]
         if len(lines) < 2:
@@ -220,7 +180,7 @@ def _parse_srt(text: str) -> list[dict]:
         start = _parse_srt_time(match.group("start"))
         end = _parse_srt_time(match.group("end"))
         text_lines = lines[2:] if lines[0].strip().isdigit() else lines[1:]
-        entries.append({"start": start, "end": end, "text": "\n".join(text_lines)})
+        entries.append(SrtEntry(start=start, end=end, text="\n".join(text_lines)))
     return entries
 
 
@@ -242,12 +202,12 @@ def _format_srt_time(seconds: float) -> str:
     return f"{h:02}:{m:02}:{s:02},{ms:03}"
 
 
-def _clip_srt(entries: Iterable[dict], start: float, end: float) -> str:
+def _clip_srt(entries: Iterable[SrtEntry], start: float, end: float) -> str:
     out_lines: list[str] = []
     idx = 1
     for entry in entries:
-        e_start = float(entry["start"])
-        e_end = float(entry["end"])
+        e_start = float(entry.start)
+        e_end = float(entry.end)
         if e_end <= start or e_start >= end:
             continue
         new_start = max(e_start, start) - start
@@ -256,7 +216,7 @@ def _clip_srt(entries: Iterable[dict], start: float, end: float) -> str:
             continue
         out_lines.append(str(idx))
         out_lines.append(f"{_format_srt_time(new_start)} --> {_format_srt_time(new_end)}")
-        out_lines.append(entry["text"].strip())
+        out_lines.append(entry.text.strip())
         out_lines.append("")
         idx += 1
     return "\n".join(out_lines).strip() + ("\n" if idx > 1 else "")
@@ -273,19 +233,81 @@ def _find_source_srt(task_id: str) -> tuple[Path, str]:
     raise RuntimeError("source subtitles not found under deliver/packs")
 
 
-def _write_readme(dst: Path, rows: list[dict]) -> None:
-    lines = [
-        "# Scenes Package",
-        "",
-        "| Scene | Start | End | Duration | Subtitle Preview |",
-        "| --- | --- | --- | --- | --- |",
-    ]
-    for row in rows:
-        lines.append(
-            f"| {row['scene_id']} | {row['start']} | {row['end']} | {row['duration']} | {row['preview']} |"
-        )
-    lines.append("")
-    dst.write_text("\n".join(lines), encoding="utf-8")
+README_TEMPLATE = """# Scenes.zip 使用说明 / Scenes.zip အသုံးပြုနည်း
+
+## 1. 这是什么？ / ဒီကဘာလဲ？
+中文：
+Scenes.zip 是将本次 Task 的原视频按字幕时间切分成多个可复用“场景片段（MSC）”的素材包。
+每个场景都包含：视频片段 video.mp4、音频 audio.wav、字幕 subs.srt、以及说明文件 scene.json。
+
+缅文：
+Scenes.zip သည် ဒီ Task ရဲ့ ဗီဒီယိုကို စာတန်းထိုးအချိန်အလိုက် အပိုင်းများ (MSC) အဖြစ် ခွဲထားတဲ့ အစိတ်အပိုင်းပစ္စည်းအစုပါ။
+Scene တစ်ခုချင်းစီမှာ video.mp4, audio.wav, subs.srt, scene.json ပါဝင်ပါတယ်။
+
+---
+
+## 2. 文件结构 / ဖိုင်ဖွဲ့စည်းပုံ
+
+deliver/scenes/{task_id}/
+README.md
+scenes_manifest.json
+scenes/
+scene_001/
+video.mp4
+audio.wav
+subs.srt
+scene.json
+
+说明 / ရှင်းလင်းချက်：
+- scenes_manifest.json：场景清单（可忽略，不需要编辑）
+- scene.json：每个场景的开始/结束时间与来源说明（可忽略，不需要编辑）
+
+---
+
+## 3. 如何使用（运营/剪辑） / အသုံးပြုနည်း (Operation/Editing)
+
+### A) 快速查看每个场景 / Scene တစ်ခုချင်းစီကို မြန်မြန်ကြည့်ရန်
+中文：
+打开 scenes/scene_001/video.mp4 即可预览该片段内容；subs.srt 是对应字幕。
+
+缅文：
+scenes/scene_001/video.mp4 ကိုဖွင့်ပြီး အပိုင်းကိုကြည့်နိုင်ပါတယ်။ subs.srt က သက်ဆိုင်ရာ စာတန်းထိုးပါ။
+
+### B) 在手机 YouCut 中使用（手工导入） / ဖုန်း YouCut တွင် အသုံးပြုရန် (လက်ဖြင့်ထည့်သွင်း)
+中文（建议流程）：
+1) 解压 Scenes.zip 到手机本地（文件管理器）。
+2) 打开 YouCut → 新建项目。
+3) 逐个导入你需要的 scenes/scene_xxx/video.mp4（按你想要的顺序）。
+4) 如需配音：可将 audio.wav 作为音频素材导入（可选）。
+5) 如需字幕：YouCut 通常不支持直接导入 SRT，请按 subs.srt 手工粘贴字幕，或交给剪辑师在 CapCut/PC 工具中处理。
+
+缅文：
+1) Scenes.zip ကို ဖုန်းထဲမှာ unzip လုပ်ပါ။
+2) YouCut ကိုဖွင့် → Project အသစ်ဖန်တီးပါ။
+3) scenes/scene_xxx/video.mp4 တွေကို လိုအပ်သလို အစဉ်လိုက် ထည့်ပါ။
+4) အသံလိုပါက audio.wav ကို Audio အဖြစ် ထည့်နိုင်ပါတယ် (ရွေးချယ်နိုင်)။
+5) Subtitle အတွက် YouCut မှ SRT တိုက်ရိုက်မသွင်းနိုင်ပါက subs.srt ကိုကြည့်ပြီး လက်ဖြင့်ထည့်ပါ (သို့) CapCut/PC tool သို့ ပို့ပါ။
+
+---
+
+## 4. 常见问题 / မကြာခဏမေးသောမေးခွန်းများ
+
+Q1：我需要打开 JSON 吗？/ JSON ဖွင့်ဖို့လိုလား？
+- 中文：不需要。只用 video.mp4 即可。
+- 缅文：မလိုပါ။ video.mp4 ကိုပဲ အသုံးပြု即可။
+
+Q2：为什么还有 audio.wav？/ audio.wav ဘာကြောင့်ပါလဲ？
+- 中文：方便剪辑时替换/对齐音频。默认包含。
+- 缅文：Edit လုပ်ရာမှာ အသံကို ပြောင်း/ညှိဖို့အတွက်ပါ။ Default အနေဖြင့် ပါဝင်ပါတယ်။
+
+Q3：Scenes.zip 会影响 Pack.zip 吗？/ Scenes.zip က Pack.zip ကိုသက်ရောက်မလား？
+- 中文：不会。两个包相互独立。
+- 缅文：မသက်ရောက်ပါ။ နှစ်ခု သီးခြားပါ။
+"""
+
+
+def _write_readme(dst: Path, task_id: str) -> None:
+    dst.write_text(README_TEMPLATE.format(task_id=task_id), encoding="utf-8")
 
 
 def generate_scenes_package(
@@ -293,23 +315,21 @@ def generate_scenes_package(
     *,
     min_scene_sec: float = DEFAULT_MIN_SCENE_SEC,
     max_scene_sec: float = DEFAULT_MAX_SCENE_SEC,
-    silence_gap_sec: float = DEFAULT_SILENCE_GAP_SEC,
-    captions_group: int = DEFAULT_CAPTIONS_GROUP,
+    min_lines: int = DEFAULT_MIN_LINES,
+    max_lines: int = DEFAULT_MAX_LINES,
 ) -> dict:
-    ensure_task_extra_columns(engine)
     raw = raw_path(task_id)
     if not raw.exists():
         raise RuntimeError("raw video not found")
 
     source_srt, source_lang = _find_source_srt(task_id)
     srt_entries = _parse_srt(source_srt.read_text(encoding="utf-8"))
-    segments = _transcribe_segments(raw)
-    scenes = _derive_scenes_from_segments(
-        segments,
+    scenes = _derive_scenes_from_srt(
+        srt_entries,
         min_scene_sec=min_scene_sec,
         max_scene_sec=max_scene_sec,
-        silence_gap_sec=silence_gap_sec,
-        captions_group=captions_group,
+        min_lines=min_lines,
+        max_lines=max_lines,
     )
 
     out_root = workspace_root() / "deliver" / "scenes" / task_id
@@ -318,7 +338,6 @@ def generate_scenes_package(
     package_root.mkdir(parents=True, exist_ok=True)
     scenes_root.mkdir(parents=True, exist_ok=True)
 
-    readme_rows: list[dict] = []
     manifest_scenes: list[dict] = []
 
     for idx, scene in enumerate(scenes, start=1):
@@ -339,8 +358,8 @@ def generate_scenes_package(
 
         preview = ""
         for entry in srt_entries:
-            if entry["end"] > scene.start and entry["start"] < scene.end:
-                preview = entry["text"].splitlines()[0].strip()
+            if entry.end > scene.start and entry.start < scene.end:
+                preview = entry.text.splitlines()[0].strip()
                 break
 
         scene_payload = {
@@ -353,7 +372,7 @@ def generate_scenes_package(
             "semantics": {
                 "role": "unknown",
                 "language": source_lang,
-                "summary": preview or f"{scene_id} clip",
+                "summary": preview or "",
             },
             "assets": {
                 "video": "video.mp4",
@@ -367,35 +386,26 @@ def generate_scenes_package(
         )
 
         duration = scene.end - scene.start
-        readme_rows.append(
-            {
-                "scene_id": scene_id,
-                "start": f"{scene.start:.2f}s",
-                "end": f"{scene.end:.2f}s",
-                "duration": f"{duration:.2f}s",
-                "preview": preview,
-            }
-        )
         manifest_scenes.append(
             {
                 "scene_id": scene_id,
                 "start": round(scene.start, 3),
                 "end": round(scene.end, 3),
                 "duration": round(duration, 3),
-                "assets": {
-                    "video": f"scenes/{scene_id}/video.mp4",
-                    "audio": f"scenes/{scene_id}/audio.wav",
-                    "subs": f"scenes/{scene_id}/subs.srt",
-                    "scene_json": f"scenes/{scene_id}/scene.json",
-                },
-                "subtitle_preview": preview,
+                "role": "unknown",
+                "dir": f"scenes/{scene_id}",
             }
         )
 
     manifest = {
         "version": "1.8",
         "task_id": task_id,
-        "source_subtitles": source_lang,
+        "language": source_lang,
+        "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "source": {
+            "raw_video": f"deliver/packs/{task_id}/raw/raw.mp4",
+            "subs": f"deliver/packs/{task_id}/subs/{source_lang}.srt",
+        },
         "scenes": manifest_scenes,
     }
     manifest_path = package_root / "scenes_manifest.json"
@@ -404,28 +414,18 @@ def generate_scenes_package(
         encoding="utf-8",
     )
     readme_path = package_root / "README.md"
-    _write_readme(readme_path, readme_rows)
+    _write_readme(readme_path, task_id)
 
     zip_path = out_root / "scenes.zip"
     with ZipFile(zip_path, "w", compression=ZIP_DEFLATED) as zf:
         for item in package_root.rglob("*"):
             if item.is_file():
-                zf.write(item, arcname=item.relative_to(package_root).as_posix())
+                arcname = Path("deliver") / "scenes" / task_id / item.relative_to(package_root)
+                zf.write(item, arcname=arcname.as_posix())
 
     storage = get_storage_service()
     scenes_key = f"deliver/scenes/{task_id}/scenes.zip"
     storage.upload_file(str(zip_path), scenes_key, content_type="application/zip")
-
-    db = SessionLocal()
-    try:
-        task = db.query(models.Task).filter(models.Task.id == task_id).first()
-        if task:
-            task.scenes_key = scenes_key
-            task.scenes_status = "ready"
-            task.scenes_count = len(manifest_scenes)
-            db.commit()
-    finally:
-        db.close()
 
     return {
         "task_id": task_id,
@@ -433,4 +433,60 @@ def generate_scenes_package(
         "scenes_count": len(manifest_scenes),
         "zip_path": str(zip_path),
         "manifest_path": str(manifest_path),
+    }
+
+
+def _task_value(task: object, field: str) -> str | None:
+    if isinstance(task, dict):
+        value = task.get(field)
+    else:
+        value = getattr(task, field, None)
+    return str(value) if value else None
+
+
+def run_scenes_build(task_id: str, update_task) -> dict:
+    update_task(task_id, {"scenes_status": "running", "scenes_error": None})
+    try:
+        result = generate_scenes_package(task_id)
+        update_task(
+            task_id,
+            {
+                "scenes_status": "ready",
+                "scenes_key": result.get("scenes_key"),
+                "scenes_count": result.get("scenes_count"),
+                "scenes_error": None,
+            },
+        )
+        return result
+    except Exception as exc:  # pragma: no cover - defensive logging
+        update_task(task_id, {"scenes_status": "error", "scenes_error": str(exc)})
+        raise
+
+
+def enqueue_scenes_build(
+    task_id: str,
+    *,
+    task: object,
+    object_exists,
+    update_task,
+    background_tasks,
+) -> dict:
+    scenes_key = _task_value(task, "scenes_key")
+    if scenes_key and object_exists(str(scenes_key)):
+        return {
+            "task_id": task_id,
+            "status": "already_ready",
+            "scenes_key": scenes_key,
+            "message": "Scenes already ready",
+            "error": None,
+        }
+
+    update_task(task_id, {"scenes_status": "queued", "scenes_error": None})
+    background_tasks.add_task(run_scenes_build, task_id, update_task)
+    return {
+        "task_id": task_id,
+        "status": "queued",
+        "scenes_key": None,
+        "message": "Scenes build queued",
+        "error": None,
     }

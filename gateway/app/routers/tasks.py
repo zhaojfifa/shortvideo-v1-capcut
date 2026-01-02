@@ -115,6 +115,7 @@ from gateway.app.services.artifact_storage import (
     get_object_bytes,
     object_exists,
 )
+from gateway.app.services.scene_split import enqueue_scenes_build
 
 from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
 from gateway.app.services.task_cleanup import delete_task_record, purge_task_artifacts
@@ -139,6 +140,10 @@ class DubProviderRequest(BaseModel):
 
 class EditedTextRequest(BaseModel):
     text: str
+
+
+class ScenesRequest(BaseModel):
+    force: bool = False
 
 
 pages_router = APIRouter()
@@ -406,8 +411,10 @@ def download_scenes(task_id: str, repo=Depends(get_task_repository)):
         raise HTTPException(status_code=404, detail="Scenes not found")
     scenes_key = _task_value(task, "scenes_key")
     if not scenes_key or not object_exists(str(scenes_key)):
-        raise HTTPException(status_code=404, detail="Scenes not found")
+        raise HTTPException(status_code=404, detail="Scenes not ready")
     return RedirectResponse(url=get_download_url(str(scenes_key)), status_code=302)
+
+
 
 
 def _task_endpoint(task_id: str, kind: str) -> Optional[str]:
@@ -424,6 +431,8 @@ def _task_endpoint(task_id: str, kind: str) -> Optional[str]:
         return f"/v1/tasks/{safe_id}/audio_mm"
     if kind == "pack":
         return f"/v1/tasks/{safe_id}/pack"
+    if kind == "scenes":
+        return f"/v1/tasks/{safe_id}/scenes"
     return None
 
 
@@ -480,6 +489,7 @@ def _resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
         pack_url = _task_endpoint(task_id, "pack")
     elif task.get("pack_path"):
         pack_url = _task_endpoint(task_id, "pack")
+    scenes_url = _task_endpoint(task_id, "scenes") if task.get("scenes_key") else None
 
     return {
         "raw_path": raw_url,
@@ -488,6 +498,7 @@ def _resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
         "mm_audio_path": audio_url,
         "mm_txt_path": mm_txt_url,
         "pack_path": pack_url,
+        "scenes_path": scenes_url,
     }
 
 def _model_allowed_fields(model_cls) -> set[str]:
@@ -529,8 +540,13 @@ def _task_to_detail(task: dict) -> TaskDetail:
         "mm_srt_path": paths.get("mm_srt_path"),
         "mm_audio_path": paths.get("mm_audio_path"),
         "pack_path": paths.get("pack_path"),
+        "scenes_path": paths.get("scenes_path"),
+        "scenes_status": task.get("scenes_status"),
+        "scenes_key": task.get("scenes_key"),
+        "scenes_error": task.get("scenes_error"),
 
         "created_at": _coerce_datetime(task.get("created_at") or task.get("created") or task.get("createdAt")),
+        "updated_at": _coerce_datetime(task.get("updated_at") or task.get("updatedAt")),
         "error_message": task.get("error_message"),
         "error_reason": task.get("error_reason"),
 
@@ -760,6 +776,10 @@ async def task_workbench_page(
         "mm_audio_path": detail.mm_audio_path,
         "mm_txt_path": paths.get("mm_txt_path"),
         "pack_path": detail.pack_path,
+        "scenes_path": detail.scenes_path,
+        "scenes_status": detail.scenes_status,
+        "scenes_key": detail.scenes_key,
+        "scenes_error": detail.scenes_error,
         "publish_status": detail.publish_status,
         "publish_provider": detail.publish_provider,
         "publish_key": detail.publish_key,
@@ -856,6 +876,7 @@ def list_tasks(
     for t in items:
         download_paths = _resolve_download_urls(t)
         pack_path = download_paths.get("pack_path")
+        scenes_path = download_paths.get("scenes_path")
         status = t.get("status") or "pending"
         if status != "error" and pack_path:
             status = "ready"
@@ -880,7 +901,12 @@ def list_tasks(
                 duration_sec=t.get("duration_sec"),
                 thumb_url=t.get("thumb_url"),
                 pack_path=pack_path,
+                scenes_path=scenes_path,
+                scenes_status=t.get("scenes_status"),
+                scenes_key=t.get("scenes_key"),
+                scenes_error=t.get("scenes_error"),
                 created_at=(coerce_datetime(t.get("created_at") or t.get("created") or t.get("createdAt")) or datetime(1970, 1, 1, tzinfo=timezone.utc)),
+                updated_at=coerce_datetime(t.get("updated_at") or t.get("updatedAt")),
                 error_message=t.get("error_message"),
                 error_reason=t.get("error_reason"),
                 parse_provider=t.get("parse_provider"),
@@ -967,6 +993,29 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
         raise HTTPException(status_code=404, detail="Task not found")
 
     return _task_to_detail(t)
+
+
+@api_router.post("/tasks/{task_id}/scenes")
+def build_scenes(
+    task_id: str,
+    background_tasks: BackgroundTasks,
+    payload: ScenesRequest | None = None,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    def _update(task_id: str, fields: dict) -> None:
+        repo.upsert(task_id, fields)
+
+    return enqueue_scenes_build(
+        task_id,
+        task=task,
+        object_exists=object_exists,
+        update_task=_update,
+        background_tasks=background_tasks,
+    )
 
 @api_router.post("/tasks/{task_id}/dub", response_model=TaskDetail)
 async def rerun_dub(

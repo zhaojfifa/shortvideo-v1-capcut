@@ -139,4 +139,6 @@ async def download_scenes(task_id: str):
     finally:
         db.close()
 
-    raise HTTPException(status_code=404, detail="scenes not found")
+    raise HTTPException(status_code=404, detail="Scenes not ready")
+
+

@@ -5,14 +5,15 @@ Define the ZIP layout and manifest for scene slicing output (separate from pack.
 
 ## ZIP layout
 ```
-README.md
-scenes_manifest.json
-scenes/
-  scene_001/
-    video.mp4
-    audio.wav
-    subs.srt
-    scene.json
+deliver/scenes/<task_id>/
+  README.md
+  scenes_manifest.json
+  scenes/
+    scene_001/
+      video.mp4
+      audio.wav
+      subs.srt
+      scene.json
 ```
 
 ## Manifest fields
@@ -21,20 +22,20 @@ scenes/
 {
   "version": "1.8",
   "task_id": "<task_id>",
-  "source_subtitles": "mm|origin",
+  "language": "mm|origin",
+  "created_at": "2026-01-02T10:00:00Z",
+  "source": {
+    "raw_video": "deliver/packs/<task_id>/raw/raw.mp4",
+    "subs": "deliver/packs/<task_id>/subs/mm.srt"
+  },
   "scenes": [
     {
       "scene_id": "scene_001",
       "start": 0.0,
       "end": 4.2,
       "duration": 4.2,
-      "assets": {
-        "video": "scenes/scene_001/video.mp4",
-        "audio": "scenes/scene_001/audio.wav",
-        "subs": "scenes/scene_001/subs.srt",
-        "scene_json": "scenes/scene_001/scene.json"
-      },
-      "subtitle_preview": "first subtitle line"
+      "role": "unknown",
+      "dir": "scenes/scene_001"
     }
   ]
 }

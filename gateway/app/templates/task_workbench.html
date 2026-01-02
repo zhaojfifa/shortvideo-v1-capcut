@@ -170,6 +170,14 @@
           <div class="muted t-secondary" style="margin-top:6px;">Download via redirect (302) / 下载将跳转到对象存储链接</div>
         </div>
         <div class="deliverable-card">
+          <div class="deliverable-title">Scenes Package <span class="muted t-secondary">/ 场景包</span></div>
+          <div class="deliverable-actions">
+            <a id="scenes-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">下载 Scenes.zip / Scenes.zip ဒေါင်းလုပ်</a>
+            <span id="scenes-status" class="muted t-secondary">Not ready</span>
+          </div>
+          <div class="muted t-secondary" style="margin-top:6px;">Download → unzip → open video &amp; SRT / 下载 → 解压 → 打开视频与字幕</div>
+        </div>
+        <div class="deliverable-card">
           <div class="deliverable-title">Video <span class="muted t-secondary">/ 视频</span></div>
           <div class="deliverable-actions">
             <a id="raw-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/raw" target="_blank" rel="noopener">raw.mp4</a>
@@ -192,6 +200,40 @@
             <span id="audio-status" class="muted t-secondary">Not ready</span>
           </div>
           <audio id="audio-preview" controls style="display:none; width: 100%; margin-top:6px;"></audio>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">
+        <h2>场景切片 (Scenes) <span class="muted t-secondary">/ အပိုင်းခွဲ (Scenes)</span></h2>
+        <div class="secondary">Scenes slicing for ops reuse.</div>
+      </div>
+      <div class="section-grid" style="margin-top:12px;">
+        <div class="field">
+          <label>说明 / Explanation</label>
+          <div class="muted t-secondary" style="white-space:pre-wrap;">
+中文：
+生成 Scenes 会把本次 Task 的视频按字幕时间切成多个“可复用片段（MSC）”，并打包为 Scenes.zip。
+用法：先点“生成场景切片”，状态变为 Ready 后点“下载 Scenes.zip”。无需打开或编辑 JSON。
+
+缅文：
+Scenes ကို စာတန်းထိုးအချိန်အလိုက် ဗီဒီယိုကို အပိုင်းများ (MSC) ခွဲပြီး Scenes.zip အဖြစ် ထုတ်ပေးပါတယ်။
+အသုံးပြုရန် — “Scenes ထုတ်မည်” ကိုနှိပ်ပြီး Ready ဖြစ်သွားလျှင် “Scenes.zip ဒေါင်းလုပ်” ကိုနှိပ်ပါ။ JSON ကို မဖွင့်လည်း ရပါတယ်။
+          </div>
+          <div class="muted t-secondary" style="margin-top:8px;">
+中文：Scenes.zip 不会影响 Pack.zip，两个包用途不同。<br/>
+缅文：Scenes.zip သည် Pack.zip ကို မပြောင်းလဲပါ (နှစ်ခု用途 မတူပါ)။
+          </div>
+        </div>
+        <div class="field">
+          <label>操作 / Actions</label>
+          <div class="action-row" style="margin-top:8px; flex-wrap:wrap; gap:8px;">
+            <button id="btn-scenes" class="btn-primary">Build scenes / 生成场景包</button>
+            <a id="btn-scenes-download" class="btn-secondary disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">下载 Scenes.zip / Scenes.zip ဒေါင်းလုပ်</a>
+            <span id="scenes-step-status" class="muted">Not ready</span>
+          </div>
+          <div id="scenes-error" class="muted t-secondary" style="margin-top:6px;"></div>
         </div>
       </div>
     </div>
@@ -412,6 +454,7 @@
         mm_txt: `/v1/tasks/${id}/mm_txt`,
         audio_mm: `/v1/tasks/${id}/audio_mm`,
         pack: `/v1/tasks/${id}/pack`,
+        scenes: `/v1/tasks/${id}/scenes`,
       };
       return map[kind] || null;
     }
@@ -430,6 +473,7 @@
       const hasMmTxt = !!(data.mm_txt_path || data.mm_srt_path);
       const hasAudio = !!data.mm_audio_path;
       const hasPack = !!data.pack_path;
+      const hasScenes = !!data.scenes_path;
 
       setDownloadLink("raw-link", hasRaw ? taskEndpoint(taskId, "raw") : null);
       setDownloadLink("origin-link", hasOrigin ? taskEndpoint(taskId, "origin_srt") : null);
@@ -437,11 +481,14 @@
       setDownloadLink("mm-txt-link", hasMmTxt ? taskEndpoint(taskId, "mm_txt") : null);
       setDownloadLink("audio-link", hasAudio ? taskEndpoint(taskId, "audio_mm") : null);
       setDownloadLink("pack-link", hasPack ? taskEndpoint(taskId, "pack") : null);
+      setDownloadLink("scenes-link", hasScenes ? taskEndpoint(taskId, "scenes") : null);
+      setDownloadLink("btn-scenes-download", hasScenes ? taskEndpoint(taskId, "scenes") : null);
 
       setStatusText("video-status", hasRaw, "Ready", "Not ready");
       setStatusText("subs-status", hasMmSrt || hasMmTxt, "Ready", "Not ready");
       setStatusText("audio-status", hasAudio, "Ready", "Not ready");
       setStatusText("pack-status", hasPack, "Ready", "Not ready");
+      setStatusText("scenes-status", hasScenes, "Ready", "Not ready");
 
       const audioEl = document.getElementById("audio-preview");
       if (audioEl) {
@@ -465,6 +512,45 @@
       setStatusText("subs-step-status", hasSubs, "Ready", "Not ready");
       setStatusText("dub-status", hasAudio, "Ready", "Not ready");
       setStatusText("pack-step-status", hasPack, "Ready", "Not ready");
+    }
+
+    function renderScenesStatus(data) {
+      const status = data.scenes_status || (data.scenes_path ? "ready" : "unknown");
+      const statusEl = document.getElementById("scenes-step-status");
+      const errorEl = document.getElementById("scenes-error");
+      const map = {
+        queued: "处理中… / လုပ်ဆောင်နေသည်…",
+        running: "处理中… / လုပ်ဆောင်နေသည်…",
+        ready: "已就绪 / အဆင်သင့်",
+        error: `失败：${data.scenes_error || "unknown"} / မအောင်မြင်ပါ：${data.scenes_error || "unknown"}`,
+        already_ready: "已就绪 / အဆင်သင့်",
+      };
+      if (statusEl) {
+        statusEl.textContent = map[status] || "Not ready";
+      }
+      if (errorEl) {
+        errorEl.textContent = status === "error" ? (data.scenes_error || "") : "";
+      }
+      if (status === "queued" || status === "running") {
+        startScenesPolling();
+      } else {
+        stopScenesPolling();
+      }
+    }
+
+    let scenesPoller = null;
+
+    function startScenesPolling() {
+      if (scenesPoller) return;
+      scenesPoller = setInterval(() => {
+        refreshTaskState().catch(() => {});
+      }, 2500);
+    }
+
+    function stopScenesPolling() {
+      if (!scenesPoller) return;
+      clearInterval(scenesPoller);
+      scenesPoller = null;
     }
 
     function refreshPublishInfo(data) {
@@ -524,6 +610,7 @@
     updateStatusBadge(window.currentTask);
     updateStepStatuses(window.currentTask);
     refreshPublishInfo(window.currentTask);
+    renderScenesStatus(window.currentTask);
 
     async function refreshTaskState() {
       const taskId = window.currentTask.task_id;
@@ -538,6 +625,7 @@
       updateStatusBadge(data);
       updateStepStatuses(data);
       refreshPublishInfo(data);
+      renderScenesStatus(data);
       if (data.error_message) {
         appendLog(`Last error: ${data.error_message}`);
       }
@@ -626,6 +714,26 @@
         return;
       }
       appendLog("Pack ready.");
+      await refreshTaskState();
+    });
+
+    document.getElementById("btn-scenes").addEventListener("click", async () => {
+      const taskId = window.currentTask.task_id;
+      appendLog(`Calling /api/tasks/${taskId}/scenes...`);
+      const resp = await fetch(`/api/tasks/${taskId}/scenes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!resp.ok) {
+        appendLog(`Scenes failed: HTTP ${resp.status}`);
+        return;
+      }
+      const payload = await resp.json();
+      appendLog(`Scenes status: ${payload.status}`);
+      if (payload.status === "queued" || payload.status === "running") {
+        startScenesPolling();
+      }
       await refreshTaskState();
     });
 

@@ -104,7 +104,12 @@ class TaskSummary(BaseModel):
     duration_sec: Optional[int] = None
     thumb_url: Optional[str] = None
     pack_path: Optional[str] = None
+    scenes_path: Optional[str] = None
+    scenes_status: Optional[str] = None
+    scenes_key: Optional[str] = None
+    scenes_error: Optional[str] = None
     created_at: datetime
+    updated_at: Optional[datetime] = None
     error_reason: Optional[str] = None
     error_message: Optional[str] = None
     parse_provider: Optional[str] = None
@@ -131,6 +136,7 @@ class TaskDetail(TaskSummary):
     mm_srt_path: Optional[str] = None
     mm_audio_path: Optional[str] = None
     pack_path: Optional[str] = None
+    scenes_path: Optional[str] = None
 
 
 class TaskListResponse(BaseModel):

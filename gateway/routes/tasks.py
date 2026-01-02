@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from gateway.app import models
@@ -18,16 +19,23 @@ from gateway.app.core.workspace import (
     pack_zip_path,
     relative_to_workspace,
     translated_srt_path,
+    workspace_root,
 )
 from gateway.app.db import get_db
 from gateway.app.web.templates import get_templates
 from gateway.app.schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary
+from gateway.app.services.artifact_storage import object_exists
+from gateway.app.services.scene_split import enqueue_scenes_build
 from gateway.app.steps.pipeline_v1 import run_pipeline_background
 
 router = APIRouter(prefix="/tasks")
 pages_router = APIRouter()
 
 templates = get_templates()
+
+
+class ScenesRequest(BaseModel):
+    force: bool = False
 
 
 def _infer_platform_from_url(url: str) -> Optional[str]:
@@ -115,12 +123,19 @@ def _resolve_paths(task: models.Task) -> dict[str, Optional[str]]:
         if pack.exists():
             pack_path = relative_to_workspace(pack)
 
+    scenes_path = getattr(task, "scenes_key", None) or None
+    if not scenes_path:
+        candidate = workspace_root() / "deliver" / "scenes" / task.id / "scenes.zip"
+        if candidate.exists():
+            scenes_path = relative_to_workspace(candidate)
+
     return {
         "raw_path": raw_video,
         "origin_srt_path": origin_srt,
         "mm_srt_path": mm_srt,
         "mm_audio_path": mm_audio,
         "pack_path": pack_path,
+        "scenes_path": scenes_path,
     }
 
 
@@ -157,6 +172,10 @@ async def task_workbench_page(
         "mm_srt_path": paths["mm_srt_path"],
         "mm_audio_path": paths["mm_audio_path"],
         "pack_path": paths["pack_path"],
+        "scenes_path": paths["scenes_path"],
+        "scenes_status": getattr(task, "scenes_status", None),
+        "scenes_key": getattr(task, "scenes_key", None),
+        "scenes_error": getattr(task, "scenes_error", None),
     }
     task_view = {"source_url_open": _extract_first_http_url(task.source_url)}
 
@@ -249,7 +268,12 @@ def create_task(
         raw_path=db_task.raw_path,
         mm_audio_path=db_task.mm_audio_path,
         pack_path=db_task.pack_path,
+        scenes_path=db_task.scenes_key,
+        scenes_status=db_task.scenes_status,
+        scenes_key=db_task.scenes_key,
+        scenes_error=db_task.scenes_error,
         created_at=db_task.created_at,
+        updated_at=db_task.updated_at,
         error_message=db_task.error_message,
         error_reason=db_task.error_reason,
     )
@@ -303,7 +327,12 @@ def list_tasks(
                 duration_sec=t.duration_sec,
                 thumb_url=t.thumb_url,
                 pack_path=t.pack_path,
+                scenes_path=t.scenes_key,
+                scenes_status=t.scenes_status,
+                scenes_key=t.scenes_key,
+                scenes_error=t.scenes_error,
                 created_at=t.created_at,
+                updated_at=t.updated_at,
                 error_message=t.error_message,
                 error_reason=t.error_reason,
             )
@@ -340,9 +369,43 @@ def get_task(task_id: str, db: Session = Depends(get_db)):
         raw_path=t.raw_path,
         mm_audio_path=t.mm_audio_path,
         pack_path=t.pack_path,
+        scenes_path=t.scenes_key,
+        scenes_status=t.scenes_status,
+        scenes_key=t.scenes_key,
+        scenes_error=t.scenes_error,
         created_at=t.created_at,
+        updated_at=t.updated_at,
         error_message=t.error_message,
         error_reason=t.error_reason,
+    )
+
+
+@router.post("/{task_id}/scenes")
+def build_scenes(
+    task_id: str,
+    background_tasks: BackgroundTasks,
+    payload: ScenesRequest | None = None,
+    db: Session = Depends(get_db),
+):
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    def _update(task_id: str, fields: dict) -> None:
+        t = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if not t:
+            return
+        for key, value in fields.items():
+            if hasattr(t, key):
+                setattr(t, key, value)
+        db.commit()
+
+    return enqueue_scenes_build(
+        task_id,
+        task=task,
+        object_exists=object_exists,
+        update_task=_update,
+        background_tasks=background_tasks,
     )
 
 

@@ -1,22 +1,33 @@
 from __future__ import annotations
 
 
-def _count_routes(app, path: str) -> int:
-    return sum(1 for route in app.routes if getattr(route, "path", None) == path)
+def _count_routes(app, path: str, method: str | None = None) -> int:
+    hits = 0
+    for route in app.routes:
+        if getattr(route, "path", None) != path:
+            continue
+        if method:
+            methods = getattr(route, "methods", None) or set()
+            if method.upper() not in methods:
+                continue
+        hits += 1
+    return hits
 
 
 def test_pack_route_unique_in_primary_app() -> None:
     from gateway.main import app as primary_app
 
-    assert _count_routes(primary_app, "/v1/tasks/{task_id}/pack") == 1
-    assert _count_routes(primary_app, "/v1/tasks/{task_id}/scenes") == 1
+    assert _count_routes(primary_app, "/v1/tasks/{task_id}/pack", "GET") == 1
+    assert _count_routes(primary_app, "/v1/tasks/{task_id}/scenes", "GET") == 1
+    assert _count_routes(primary_app, "/api/tasks/{task_id}/scenes", "POST") == 1
 
 
 def test_pack_route_unique_in_legacy_app() -> None:
     from gateway.app.main import app as legacy_app
 
-    assert _count_routes(legacy_app, "/v1/tasks/{task_id}/pack") == 1
-    assert _count_routes(legacy_app, "/v1/tasks/{task_id}/scenes") == 1
+    assert _count_routes(legacy_app, "/v1/tasks/{task_id}/pack", "GET") == 1
+    assert _count_routes(legacy_app, "/v1/tasks/{task_id}/scenes", "GET") == 1
+    assert _count_routes(legacy_app, "/api/tasks/{task_id}/scenes", "POST") == 1
 
 
 def test_v17_pack_route_exists() -> None:

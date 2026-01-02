@@ -443,7 +443,7 @@ def parse_gemini_subtitle_payload(
             pass
 
     logger.warning("Gemini subtitles did not return valid JSON. Snippet: %s", snippet)
-    raise ValueError(f"Gemini subtitles did not return valid JSON. Snippet: {snippet}")
+    raise GeminiSubtitlesError(f"Gemini subtitles did not return valid JSON. Snippet: {snippet}")
 
 
 
@@ -597,6 +597,116 @@ Rules:
         raise GeminiSubtitlesError("Gemini subtitles JSON must include a language code")
 
     return _ensure_scenes(data)
+
+
+def _is_truncated_payload(text: str) -> bool:
+    stripped = (text or "").strip()
+    if not stripped:
+        return True
+    if stripped.endswith("...") or stripped.endswith("\u2026"):
+        return True
+    open_braces = stripped.count("{")
+    close_braces = stripped.count("}")
+    if open_braces > close_braces:
+        return True
+    if stripped[-1] not in ("}", "]"):
+        return True
+    return False
+
+
+def _parse_translation_payload(raw_text: str) -> dict[int, str]:
+    payload_text = raw_text
+    try:
+        payload_text = extract_json_block(raw_text)
+    except Exception:
+        payload_text = raw_text
+
+    payload_text = _TRAILING_COMMA_RE.sub(r"\1", payload_text)
+    try:
+        payload_text = sanitize_string_literals(payload_text)
+    except Exception:
+        pass
+
+    data = _safe_json_loads(payload_text)
+
+    if isinstance(data, dict):
+        items = data.get("translations") or data.get("segments") or []
+    elif isinstance(data, list):
+        items = data
+    else:
+        raise GeminiSubtitlesError("Gemini translation payload must be list or object")
+
+    translations: dict[int, str] = {}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        idx = item.get("index") or item.get("idx")
+        text = item.get("mm") or item.get("translation") or item.get("target")
+        if idx is None or text is None:
+            continue
+        try:
+            translations[int(idx)] = str(text).strip()
+        except Exception:
+            continue
+    if not translations:
+        raise GeminiSubtitlesError("Gemini translation payload empty")
+    return translations
+
+
+def translate_segments_with_gemini(
+    *,
+    segments: List[Dict[str, Any]],
+    target_lang: str = "my",
+    debug_dir: Path | None = None,
+    chunk_size: int = 30,
+    retries: int = 2,
+) -> dict[int, str]:
+    translations: dict[int, str] = {}
+    if not segments:
+        return translations
+
+    for offset in range(0, len(segments), chunk_size):
+        chunk = segments[offset : offset + chunk_size]
+        payload = [
+            {"index": seg.get("index"), "origin": seg.get("origin", "")}
+            for seg in chunk
+        ]
+        prompt = f"""
+You are a subtitle translator.
+
+Translate the following segments into target language "{target_lang}".
+Return ONLY JSON with this exact shape:
+{{"translations":[{{"index":1,"mm":"..."}},...]}}
+
+Rules:
+- Preserve indices exactly.
+- Only output JSON. No markdown or extra text.
+
+Segments:
+{json.dumps(payload, ensure_ascii=False)}
+""".strip()
+
+        last_error: str | None = None
+        for attempt in range(retries + 1):
+            resp_json = _call_gemini(prompt)
+            raw_text = _extract_text(resp_json)
+            if _is_truncated_payload(raw_text) and attempt < retries:
+                last_error = "truncated"
+                continue
+            try:
+                chunk_translations = _parse_translation_payload(raw_text)
+                translations.update(chunk_translations)
+                last_error = None
+                break
+            except GeminiSubtitlesError as exc:
+                last_error = str(exc)
+                if attempt >= retries:
+                    break
+
+        if last_error:
+            raise GeminiSubtitlesError(last_error)
+
+    return translations
 
 
 if __name__ == "__main__":
