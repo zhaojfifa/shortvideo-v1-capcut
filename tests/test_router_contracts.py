@@ -9,12 +9,14 @@ def test_pack_route_unique_in_primary_app() -> None:
     from gateway.main import app as primary_app
 
     assert _count_routes(primary_app, "/v1/tasks/{task_id}/pack") == 1
+    assert _count_routes(primary_app, "/v1/tasks/{task_id}/scenes") == 1
 
 
 def test_pack_route_unique_in_legacy_app() -> None:
     from gateway.app.main import app as legacy_app
 
     assert _count_routes(legacy_app, "/v1/tasks/{task_id}/pack") == 1
+    assert _count_routes(legacy_app, "/v1/tasks/{task_id}/scenes") == 1
 
 
 def test_v17_pack_route_exists() -> None:
