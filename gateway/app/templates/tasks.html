@@ -552,16 +552,15 @@
       }
     }
 
-    function hasInFlight(tasks) {
-      return tasks.some((t) => {
-        const s = String(t.status || "").toLowerCase();
-        return s === "pending" || s === "processing";
-      });
-    }
+    let tasksPollTimer = null;
+    let tasksInFlight = false;
+    const TASKS_POLL_MS = 15000;
 
-    let pollTimer = null;
+    async function fetchTasksOnce() {
+      if (document.visibilityState !== "visible") return;
+      if (tasksInFlight) return;
 
-    async function refreshTasks() {
+      tasksInFlight = true;
       if (countPrimaryEl) {
         countPrimaryEl.textContent = "Loading tasks…";
       }
@@ -575,15 +574,6 @@
         const data = await res.json();
         const tasks = Array.isArray(data) ? data : (data.items || []);
         renderTasks(tasks);
-
-        if (hasInFlight(tasks)) {
-          if (!pollTimer) {
-            pollTimer = setInterval(refreshTasks, 5000);
-          }
-        } else if (pollTimer) {
-          clearInterval(pollTimer);
-          pollTimer = null;
-        }
       } catch (err) {
         console.error(err);
         if (countPrimaryEl) {
@@ -592,15 +582,37 @@
         if (countSecondaryEl) {
           countSecondaryEl.textContent = "";
         }
+      } finally {
+        tasksInFlight = false;
       }
     }
 
     renderTasks(initialTasks || []);
 
+    function startTasksPolling() {
+      if (tasksPollTimer) return;
+      fetchTasksOnce();
+      tasksPollTimer = setInterval(fetchTasksOnce, TASKS_POLL_MS);
+    }
+
+    function stopTasksPolling() {
+      if (!tasksPollTimer) return;
+      clearInterval(tasksPollTimer);
+      tasksPollTimer = null;
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        startTasksPolling();
+      } else {
+        stopTasksPolling();
+      }
+    });
+
     if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", refreshTasks, { once: true });
+      document.addEventListener("DOMContentLoaded", startTasksPolling, { once: true });
     } else {
-      refreshTasks();
+      startTasksPolling();
     }
 
     async function handleDeleteClick(event) {
@@ -626,8 +638,8 @@
         if (row) {
           row.remove();
         }
-        if (typeof refreshTasks === "function") {
-          refreshTasks();
+        if (typeof fetchTasksOnce === "function") {
+          fetchTasksOnce();
         }
       } catch (err) {
         console.error(err);
@@ -642,7 +654,7 @@
       tableBody.addEventListener("click", handleDeleteClick);
     }
 
-    window.addEventListener("focus", () => refreshTasks());
+    // Polling is driven by the visibility handler above.
   </script>
 </body>
 </html>
