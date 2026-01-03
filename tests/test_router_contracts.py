@@ -17,6 +17,8 @@ def _count_routes(app, path: str, method: str | None = None) -> int:
 def test_pack_route_unique_in_primary_app() -> None:
     from gateway.main import app as primary_app
 
+    assert _count_routes(primary_app, "/api/tasks/{task_id}/parse", "POST") == 1
+    assert _count_routes(primary_app, "/api/tasks/{task_id}/pack", "POST") == 1
     assert _count_routes(primary_app, "/v1/tasks/{task_id}/pack", "GET") == 1
     assert _count_routes(primary_app, "/v1/tasks/{task_id}/scenes", "GET") == 1
     assert _count_routes(primary_app, "/api/tasks/{task_id}/scenes", "POST") == 1
@@ -26,6 +28,8 @@ def test_pack_route_unique_in_primary_app() -> None:
 def test_pack_route_unique_in_legacy_app() -> None:
     from gateway.app.main import app as legacy_app
 
+    assert _count_routes(legacy_app, "/api/tasks/{task_id}/parse", "POST") == 1
+    assert _count_routes(legacy_app, "/api/tasks/{task_id}/pack", "POST") == 1
     assert _count_routes(legacy_app, "/v1/tasks/{task_id}/pack", "GET") == 1
     assert _count_routes(legacy_app, "/v1/tasks/{task_id}/scenes", "GET") == 1
     assert _count_routes(legacy_app, "/api/tasks/{task_id}/scenes", "POST") == 1

@@ -14,3 +14,11 @@ def test_healthz_build_exists():
     assert "edge_tts" in data
     assert "r2_enabled" in data
     assert data["pack_v17_status"] == "frozen"
+
+
+def test_healthz_exists():
+    client = TestClient(app)
+    r = client.get("/healthz")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["status"] == "ok"
