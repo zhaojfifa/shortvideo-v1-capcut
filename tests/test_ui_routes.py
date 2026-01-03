@@ -26,3 +26,4 @@ def test_pipeline_lab_uses_v1_subtitles_only() -> None:
     assert "/v1/subtitles" in script_text
     assert "/v1/parse" in script_text
     assert "/v1/pack" in script_text
+    assert "/v1/tasks/" in script_text
