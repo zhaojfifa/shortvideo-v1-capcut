@@ -285,7 +285,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
       <div class="section-grid steps-grid">
         <div class="step-card">
           <h3>Step 1 - Parse &amp; Download <span class="muted t-secondary">/ 解析</span></h3>
-          <p class="muted t-secondary">Call /v1/parse for this task.</p>
+          <p class="muted t-secondary">Call /api/tasks/{id}/parse for this task.</p>
           <div class="action-row">
             <button id="btn-parse" class="btn-primary">Run parse <span class="muted t-secondary">/ 运行</span></button>
             <span id="parse-status" class="muted t-secondary">Not parsed</span>
@@ -654,10 +654,9 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
         appendLog("Parse failed: source_url is empty for this task.");
         return;
       }
-      appendLog(`Calling /v1/parse for ${taskId}...`);
-      const payload = { task_id: taskId, link: linkText };
-      if (platform) payload.platform = platform;
-      const resp = await fetch("/v1/parse", {
+      appendLog(`Calling /api/tasks/${taskId}/parse...`);
+      const payload = { platform };
+      const resp = await fetch(`/api/tasks/${taskId}/parse`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -721,12 +720,11 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
 
     document.getElementById("btn-pack").addEventListener("click", async () => {
       const taskId = window.currentTask.task_id;
-      appendLog(`Calling /v1/pack for ${taskId}...`);
-      const payload = { task_id: taskId };
-      const resp = await fetch("/v1/pack", {
+      appendLog(`Calling /api/tasks/${taskId}/pack...`);
+      const resp = await fetch(`/api/tasks/${taskId}/pack`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({}),
       });
       if (!resp.ok) {
         appendLog(`Pack failed: HTTP ${resp.status}`);
@@ -768,7 +766,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
         const statusEl = document.getElementById("publish-status");
         if (statusEl) statusEl.textContent = "Publishing...";
         try {
-          const resp = await fetch("/v1/publish", {
+          const resp = await fetch(`/api/tasks/${taskId}/publish`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ task_id: taskId, force: false }),

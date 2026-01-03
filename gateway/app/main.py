@@ -5,6 +5,7 @@ from pathlib import Path
 import importlib.util
 import logging
 import os
+import shutil
 from typing import Any, Dict
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from gateway.app.config import create_storage_service, get_settings
 from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
 from gateway.app import models
-from gateway.app.ports.storage_provider import set_storage_service
+from gateway.app.ports.storage_provider import get_storage_service, set_storage_service
 from gateway.app.routers import admin_publish, publish as publish_router, tasks as tasks_router
 from gateway.app.routes.v17_pack import router as v17_pack_router
 
@@ -108,6 +109,26 @@ def healthz_build(response: Response) -> Dict[str, Any]:
         response.status_code = 503
 
     return payload
+
+
+@app.get("/healthz", tags=["health"])
+def healthz() -> Dict[str, Any]:
+    ffmpeg_available = bool(shutil.which("ffmpeg"))
+    storage_ok = True
+    storage_type = "unknown"
+    try:
+        storage = get_storage_service()
+        storage_type = storage.__class__.__name__
+    except Exception:
+        storage_ok = False
+
+    return {
+        "status": "ok",
+        "version": os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_SHA") or "unknown",
+        "storage": storage_type,
+        "storage_ok": storage_ok,
+        "ffmpeg": ffmpeg_available,
+    }
 
 
 @app.get("/ui", response_class=HTMLResponse)
