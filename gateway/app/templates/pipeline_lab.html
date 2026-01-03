@@ -1,80 +1,42 @@
 <!DOCTYPE html>
-<html lang="{{ ui_primary_lang }}">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{{ t_primary("app_title") }}</title>
+  <title>Pipeline Lab</title>
   <link rel="stylesheet" href="/static/pipeline_lab.css" />
 </head>
 <body>
   <div class="page">
     <main class="card">
       <header class="hero">
-        <div class="hero-title bilingual">
-          <h1>{{ t_primary("app_title") }}</h1>
-          {% if ui_show_secondary %}
-            <p class="secondary">{{ t_secondary("app_title") }}</p>
-          {% endif %}
+        <div class="hero-title">
+          <h1>Pipeline Lab</h1>
         </div>
-        <p class="hero-subtitle bilingual">
-          <span>{{ t_primary("app_subtitle") }}</span>
-          {% if ui_show_secondary %}
-            <span class="secondary">{{ t_secondary("app_subtitle") }}</span>
-          {% endif %}
-        </p>
+        <p class="hero-subtitle">Debug the legacy v1 pipeline actions.</p>
         <div class="env-grid">
           <div class="env-card">
-            <span class="env-label bilingual">
-              <span>{{ t_primary("workspace") }}</span>
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("workspace") }}</span>
-              {% endif %}
-            </span>
+            <span class="env-label">Workspace</span>
             <span class="env-value">{{ env_summary.workspace_root }}</span>
           </div>
           <div class="env-card">
-            <span class="env-label bilingual">
-              <span>{{ t_primary("asr_backend_label") }}</span>
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("asr_backend_label") }}</span>
-              {% endif %}
-            </span>
+            <span class="env-label">ASR Backend</span>
             <span class="env-value">{{ env_summary.asr_backend }}</span>
           </div>
           <div class="env-card">
-            <span class="env-label bilingual">
-              <span>{{ t_primary("subtitles_backend_label") }}</span>
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("subtitles_backend_label") }}</span>
-              {% endif %}
-            </span>
+            <span class="env-label">Subtitles Backend</span>
             <span class="env-value">{{ env_summary.subtitles_backend }}</span>
           </div>
           <div class="env-card">
-            <span class="env-label bilingual">
-              <span>{{ t_primary("gemini_model_label") }}</span>
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("gemini_model_label") }}</span>
-              {% endif %}
-            </span>
+            <span class="env-label">Gemini Model</span>
             <span class="env-value">{{ env_summary.gemini_model }}</span>
           </div>
           <div class="env-card">
-            <span class="env-label bilingual">
-              <span>{{ t_primary("whisper_model_label") }}</span>
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("whisper_model_label") }}</span>
-              {% endif %}
-            </span>
+            <span class="env-label">Whisper Model</span>
             <span class="env-value">{{ env_summary.whisper_model }}</span>
           </div>
           <div class="env-card">
-            <span class="env-label bilingual">
-              <span>{{ t_primary("gpt_model_label") }}</span>
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("gpt_model_label") }}</span>
-              {% endif %}
-            </span>
+            <span class="env-label">GPT Model</span>
             <span class="env-value">{{ env_summary.gpt_model }}</span>
           </div>
         </div>
@@ -82,50 +44,20 @@
 
       <section id="task" class="panel">
         <div class="section-title">
-          <h2 class="bilingual">
-            <span>{{ t_primary("task") }}</span>
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("task") }}</span>
-            {% endif %}
-          </h2>
+          <h2>Task</h2>
           <div class="action-row">
-            <button class="ghost" type="button" onclick="generateTaskId()">
-              {{ t_primary("generate_task_id") }}
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("generate_task_id") }}</span>
-              {% endif %}
-            </button>
-            <button class="ghost" type="button" onclick="generateFromLink()">
-              {{ t_primary("generate_from_link") }}
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("generate_from_link") }}</span>
-              {% endif %}
-            </button>
-            <button class="ghost" type="button" onclick="resetTaskForm()">
-              {{ t_primary("reset") }}
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("reset") }}</span>
-              {% endif %}
-            </button>
+            <button class="ghost" type="button" id="btn-generate-task">Generate Task ID</button>
+            <button class="ghost" type="button" id="btn-generate-from-link">Generate From Link</button>
+            <button class="ghost" type="button" id="btn-reset-task">Reset</button>
           </div>
         </div>
         <div class="form-grid">
           <div class="field">
-            <label class="bilingual" for="taskId">
-              <span>{{ t_primary("task_id") }}</span>
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("task_id") }}</span>
-              {% endif %}
-            </label>
+            <label for="taskId">Task ID</label>
             <input id="taskId" value="demo_v1" />
           </div>
           <div class="field">
-            <label class="bilingual" for="platform">
-              <span>{{ t_primary("platform") }}</span>
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("platform") }}</span>
-              {% endif %}
-            </label>
+            <label for="platform">Platform</label>
             <select id="platform">
               <option value="douyin">douyin</option>
               <option value="tiktok">tiktok</option>
@@ -133,144 +65,52 @@
             </select>
           </div>
           <div class="field span-2">
-            <label class="bilingual" for="link">
-              <span>{{ t_primary("link") }}</span>
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("link") }}</span>
-              {% endif %}
-            </label>
+            <label for="link">Link</label>
             <input id="link" placeholder="https://www.douyin.com/video/..." />
           </div>
         </div>
         <div class="button-row">
-          <button onclick="runParse()">
-            {{ t_primary("step1") }}
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("step1") }}</span>
-            {% endif %}
-          </button>
-          <button onclick="runSubtitles()">
-            {{ t_primary("step2") }}
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("step2") }}</span>
-            {% endif %}
-          </button>
-          <button onclick="runDub()">
-            {{ t_primary("step3") }}
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("step3") }}</span>
-            {% endif %}
-          </button>
-          <button onclick="runPack()">
-            {{ t_primary("step4") }}
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("step4") }}</span>
-            {% endif %}
-          </button>
-          <button class="primary" onclick="runFullPipeline()">
-            {{ t_primary("run_full_pipeline") }}
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("run_full_pipeline") }}</span>
-            {% endif %}
-          </button>
+          <button id="btn-step1">Step 1: Parse</button>
+          <button id="btn-step2">Step 2: Subtitles</button>
+          <button id="btn-step3">Step 3: Dub</button>
+          <button id="btn-step4">Step 4: Pack</button>
+          <button class="primary" id="btn-run-all">Run Full Pipeline</button>
         </div>
         <div class="downloads">
-          <span class="downloads-title bilingual">
-            <span>{{ t_primary("downloads") }}</span>
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("downloads") }}</span>
-            {% endif %}
-          </span>
+          <span class="downloads-title">Downloads</span>
           <div class="downloads-links">
-            <a id="rawLink" href="#" target="_blank" class="bilingual">
-              <span>{{ t_primary("raw_video") }}</span>
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("raw_video") }}</span>
-              {% endif %}
-            </a>
-            <a id="originLink" href="#" target="_blank" class="bilingual">
-              <span>{{ t_primary("origin_subtitles") }}</span>
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("origin_subtitles") }}</span>
-              {% endif %}
-            </a>
-            <a id="mmLink" href="#" target="_blank" class="bilingual">
-              <span>{{ t_primary("translated_subtitles") }}</span>
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("translated_subtitles") }}</span>
-              {% endif %}
-            </a>
-            <a id="audioLink" href="#" target="_blank" class="bilingual">
-              <span>{{ t_primary("dub_audio") }}</span>
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("dub_audio") }}</span>
-              {% endif %}
-            </a>
-            <a id="packLink" href="#" target="_blank" class="bilingual">
-              <span>{{ t_primary("pack_file") }}</span>
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("pack_file") }}</span>
-              {% endif %}
-            </a>
+            <a id="rawLink" href="#" target="_blank">raw.mp4</a>
+            <a id="originLink" href="#" target="_blank">origin.srt</a>
+            <a id="mmLink" href="#" target="_blank">mm.srt</a>
+            <a id="mmTxtLink" href="#" target="_blank">mm.txt</a>
+            <a id="audioLink" href="#" target="_blank">audio_mm</a>
+            <a id="packLink" href="#" target="_blank">pack.zip</a>
+            <a id="scenesLink" href="#" target="_blank">scenes.zip</a>
           </div>
         </div>
       </section>
 
       <section class="panel">
         <div class="section-title">
-          <h2 class="bilingual">
-            <span>{{ t_primary("parse_download") }}</span>
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("parse_download") }}</span>
-            {% endif %}
-          </h2>
-          <button class="ghost" onclick="runParse()">
-            {{ t_primary("execute") }}
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("execute") }}</span>
-            {% endif %}
-          </button>
+          <h2>Parse</h2>
+          <button class="ghost" id="btn-parse">Execute</button>
         </div>
-        <pre id="parseOutput" class="output">
-{{ t_primary("response") }}{% if ui_show_secondary %} / {{ t_secondary("response") }}{% endif %}
-        </pre>
+        <pre id="parseOutput" class="output">Response</pre>
       </section>
 
       <section class="panel">
         <div class="section-title">
-          <h2 class="bilingual">
-            <span>{{ t_primary("transcribe_translate") }}</span>
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("transcribe_translate") }}</span>
-            {% endif %}
-          </h2>
-          <button class="ghost" onclick="runSubtitles()">
-            {{ t_primary("execute") }}
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("execute") }}</span>
-            {% endif %}
-          </button>
+          <h2>Subtitles</h2>
+          <button class="ghost" id="btn-subtitles">Execute</button>
         </div>
-        <pre id="subsOutput" class="output">
-({{ t_primary("output") }}{% if ui_show_secondary %} / {{ t_secondary("output") }}{% endif %})
-        </pre>
+        <pre id="subsOutput" class="output">(output)</pre>
         <div class="section-grid">
           <div>
-            <strong class="bilingual">
-              <span>{{ t_primary("origin_subtitles") }}</span>
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("origin_subtitles") }}</span>
-              {% endif %}
-            </strong>
+            <strong>Origin subtitles</strong>
             <pre id="originPreview" class="output">(empty)</pre>
           </div>
           <div>
-            <strong class="bilingual">
-              <span>{{ t_primary("translated_subtitles") }}</span>
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("translated_subtitles") }}</span>
-              {% endif %}
-            </strong>
+            <strong>Translated subtitles</strong>
             <pre id="mmPreview" class="output">(empty)</pre>
           </div>
         </div>
@@ -278,26 +118,11 @@
 
       <section class="panel">
         <div class="section-title">
-          <h2 class="bilingual">
-            <span>{{ t_primary("burmese_voiceover") }}</span>
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("burmese_voiceover") }}</span>
-            {% endif %}
-          </h2>
-          <button class="ghost" onclick="runDub()">
-            {{ t_primary("execute") }}
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("execute") }}</span>
-            {% endif %}
-          </button>
+          <h2>Dub</h2>
+          <button class="ghost" id="btn-dub">Execute</button>
         </div>
         <div class="field">
-          <label class="bilingual" for="voiceId">
-            <span>{{ t_primary("voice_id") }}</span>
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("voice_id") }}</span>
-            {% endif %}
-          </label>
+          <label for="voiceId">Voice ID</label>
           <input id="voiceId" value="mm_female_1" />
         </div>
         <pre id="dubOutput" class="output">(empty)</pre>
@@ -306,63 +131,35 @@
 
       <section class="panel">
         <div class="section-title">
-          <h2 class="bilingual">
-            <span>{{ t_primary("pack_capcut") }}</span>
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("pack_capcut") }}</span>
-            {% endif %}
-          </h2>
-          <button class="ghost" onclick="runPack()">
-            {{ t_primary("execute") }}
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("execute") }}</span>
-            {% endif %}
-          </button>
+          <h2>Pack</h2>
+          <button class="ghost" id="btn-pack">Execute</button>
         </div>
         <pre id="packOutput" class="output">(empty)</pre>
       </section>
 
       <section class="panel">
         <div class="section-title">
-          <h2 class="bilingual">
-            <span>{{ t_primary("log") }}</span>
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("log") }}</span>
-            {% endif %}
-          </h2>
-          <button class="ghost" onclick="clearLog()">
-            {{ t_primary("reset") }}
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("reset") }}</span>
-            {% endif %}
-          </button>
+          <h2>Log</h2>
+          <button class="ghost" id="btn-clear-log">Clear</button>
         </div>
-        <pre id="log" class="output">Ready. / အဆင်သင့်</pre>
+        <pre id="log" class="output">Ready.</pre>
       </section>
     </main>
   </div>
 
   <script>
     const logEl = document.getElementById('log');
-    const LABELS = {
-      parse: "{{ t_primary('parse_download') }} / {{ t_secondary('parse_download') }}",
-      subtitles: "{{ t_primary('transcribe_translate') }} / {{ t_secondary('transcribe_translate') }}",
-      dub: "{{ t_primary('burmese_voiceover') }} / {{ t_secondary('burmese_voiceover') }}",
-      pack: "{{ t_primary('pack_capcut') }} / {{ t_secondary('pack_capcut') }}",
-      executing: "{{ t_primary('execute') }} / {{ t_secondary('execute') }}",
-      ready: "{{ t_primary('ready') }} / {{ t_secondary('ready') }}",
-      error: "{{ t_primary('error') }} / {{ t_secondary('error') }}",
-    };
-
-    function clearLog() {
-      logEl.textContent = '';
-      log(`${LABELS.ready}`);
-    }
 
     function log(message) {
       const now = new Date().toISOString();
-      logEl.textContent += `\n[${now}] ${message}`;
+      logEl.textContent += `
+[${now}] ${message}`;
       logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function clearLog() {
+      logEl.textContent = '';
+      log('Ready.');
     }
 
     function taskId() { return document.getElementById('taskId').value.trim(); }
@@ -374,25 +171,31 @@
       document.getElementById('rawLink').href = `/v1/tasks/${id}/raw`;
       document.getElementById('originLink').href = `/v1/tasks/${id}/subs_origin`;
       document.getElementById('mmLink').href = `/v1/tasks/${id}/subs_mm`;
+      document.getElementById('mmTxtLink').href = `/v1/tasks/${id}/mm_txt`;
       document.getElementById('audioLink').href = `/v1/tasks/${id}/audio_mm`;
       document.getElementById('packLink').href = `/v1/tasks/${id}/pack`;
+      document.getElementById('scenesLink').href = `/v1/tasks/${id}/scenes`;
     }
 
     function generateTaskId() {
-      const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
-      document.getElementById('taskId').value = `task_${stamp}`;
-      log(`Task ID updated / Task ID ပြောင်းပြီး`);
+      const stamp = new Date().toISOString().slice(0, 19);
+      const compact = stamp.split('-').join('').split(':').join('').replace('T', '');
+      document.getElementById('taskId').value = `task_${compact}`;
+      log('Task ID updated.');
     }
 
     function generateFromLink() {
       const rawLink = link();
       if (!rawLink) {
-        log(`Missing link / လင့်မရှိပါ`);
+        log('Missing link.');
         return;
       }
-      const safe = rawLink.replace(/https?:\\/\\//, '').split(/[/?#]/)[0];
+      let safe = rawLink;
+      if (safe.startsWith('https://')) safe = safe.slice(8);
+      if (safe.startsWith('http://')) safe = safe.slice(7);
+      safe = safe.split(/[/?#]/)[0];
       document.getElementById('taskId').value = `task_${safe.slice(0, 16)}`;
-      log(`Task ID generated / Task ID ဖန်တီးပြီး`);
+      log('Task ID generated.');
     }
 
     function resetTaskForm() {
@@ -401,12 +204,12 @@
       document.getElementById('link').value = '';
       document.getElementById('voiceId').value = 'mm_female_1';
       updateDownloadLinks('demo_v1');
-      log(`Form reset / ဖောင်ပြန်သတ်မှတ်ပြီး`);
+      log('Form reset.');
     }
 
     async function runParse() {
       const body = { task_id: taskId(), platform: platform(), link: link() };
-      log(`Calling /v1/parse for ${body.task_id} · ${LABELS.parse}`);
+      log(`Calling /v1/parse for ${body.task_id}.`);
       const res = await fetch('/v1/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -415,17 +218,17 @@
       const json = await res.json();
       document.getElementById('parseOutput').textContent = JSON.stringify(json, null, 2);
       if (!res.ok) {
-        log(`Parse failed: ${json.detail || res.status} · ${LABELS.error}`);
+        log(`Parse failed: ${json.detail || res.status}`);
         return json;
       }
       updateDownloadLinks(body.task_id);
-      log(`Parse done, raw downloaded. / Parse ပြီးစီးသည်`);
+      log('Parse done.');
       return json;
     }
 
     async function runSubtitles() {
       const body = { task_id: taskId(), target_lang: 'my', force: false, translate: true, with_scenes: true };
-      log(`Calling /v1/subtitles · ${LABELS.subtitles}`);
+      log('Calling /v1/subtitles.');
       const res = await fetch('/v1/subtitles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -434,22 +237,27 @@
       const json = await res.json();
       document.getElementById('subsOutput').textContent = JSON.stringify(json, null, 2);
       if (!res.ok) {
-        log(`Subtitles failed: ${json.detail || res.status} · ${LABELS.error}`);
+        log(`Subtitles failed: ${json.detail || res.status}`);
       }
-      document.getElementById('originPreview').textContent = (json.origin_preview || []).join('\n') || '(empty)';
-      document.getElementById('mmPreview').textContent = (json.mm_preview || []).join('\n') || '(empty)';
+      document.getElementById('originPreview').textContent = (json.origin_preview || []).join('
+') || '(empty)';
+      document.getElementById('mmPreview').textContent = (json.mm_preview || []).join('
+') || '(empty)';
       if (json.segments_json) {
         log(`Segments JSON ready: ${json.segments_json}`);
       }
-      log(`Subtitles generated. / စာတန်းထိုး ပြီးစီး`);
+      log('Subtitles generated.');
       return json;
     }
 
     async function runDub() {
       const body = { task_id: taskId(), voice_id: voiceId(), force: false, target_lang: 'my' };
-      const buttons = document.querySelectorAll('button[onclick="runDub()"]');
+      const buttons = [
+        document.getElementById('btn-step3'),
+        document.getElementById('btn-dub'),
+      ].filter(Boolean);
       buttons.forEach((b) => (b.disabled = true));
-      log(`Calling /v1/dub for ${body.task_id} · ${LABELS.dub}`);
+      log(`Calling /v1/dub for ${body.task_id}.`);
       let res;
       let payloadText = '';
       try {
@@ -463,7 +271,7 @@
         try {
           json = JSON.parse(payloadText);
         } catch (e) {
-          // non-JSON response (e.g., HTML error)
+          json = null;
         }
 
         const detail = json && json.detail ? json.detail : undefined;
@@ -472,15 +280,8 @@
           : payloadText;
 
         if (!res.ok) {
-          log(`Dub failed: ${detail || res.statusText || res.status} · ${LABELS.error}`);
-          if (detail) {
-            log(`Dub detail: ${detail}`);
-          }
+          log(`Dub failed: ${detail || res.statusText || res.status}`);
           return json || { error: payloadText };
-        }
-
-        if (detail) {
-          log(`Dub detail: ${detail}`);
         }
 
         const audioUrl = `/v1/tasks/${body.task_id}/audio_mm`;
@@ -488,10 +289,10 @@
         player.src = audioUrl;
         player.style.display = 'block';
         updateDownloadLinks(body.task_id);
-        log(`Dub audio ready. / အသံ ဖိုင် ပြီးစီး`);
+        log('Dub audio ready.');
         return json;
       } catch (err) {
-        log(`Dub failed: ${err} · ${LABELS.error}`);
+        log(`Dub failed: ${err}`);
         return { error: err, response: payloadText };
       } finally {
         buttons.forEach((b) => (b.disabled = false));
@@ -500,7 +301,7 @@
 
     async function runPack() {
       const body = { task_id: taskId() };
-      log(`Calling /v1/pack for ${body.task_id} · ${LABELS.pack}`);
+      log(`Calling /v1/pack for ${body.task_id}.`);
       const res = await fetch('/v1/pack', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -509,31 +310,37 @@
       const json = await res.json();
       document.getElementById('packOutput').textContent = JSON.stringify(json, null, 2);
       if (!res.ok) {
-        log(`Pack failed: ${json.detail || res.status} · ${LABELS.error}`);
+        log(`Pack failed: ${json.detail || res.status}`);
         return json;
       }
       updateDownloadLinks(body.task_id);
-      log(`Pack created. / ပက် ပြီးစီး`);
+      log('Pack ready.');
       return json;
     }
 
     async function runFullPipeline() {
-      const id = taskId();
-      log(`Running full pipeline for ${id}`);
-      try {
-        await runParse();
-        await runSubtitles();
-        await runDub();
-        await runPack();
-        log('Full pipeline completed. / Pipeline ပြီးစီး');
-      } catch (err) {
-        console.error(err);
-        log('Pipeline failed: ' + err + ' / Pipeline မအောင်မြင်');
-      }
+      await runParse();
+      await runSubtitles();
+      await runDub();
+      await runPack();
     }
 
-    // Initialize download links for default task id
-    updateDownloadLinks(taskId());
+    document.addEventListener('DOMContentLoaded', () => {
+      updateDownloadLinks(taskId());
+      document.getElementById('btn-generate-task').addEventListener('click', generateTaskId);
+      document.getElementById('btn-generate-from-link').addEventListener('click', generateFromLink);
+      document.getElementById('btn-reset-task').addEventListener('click', resetTaskForm);
+      document.getElementById('btn-step1').addEventListener('click', runParse);
+      document.getElementById('btn-step2').addEventListener('click', runSubtitles);
+      document.getElementById('btn-step3').addEventListener('click', runDub);
+      document.getElementById('btn-step4').addEventListener('click', runPack);
+      document.getElementById('btn-run-all').addEventListener('click', runFullPipeline);
+      document.getElementById('btn-parse').addEventListener('click', runParse);
+      document.getElementById('btn-subtitles').addEventListener('click', runSubtitles);
+      document.getElementById('btn-dub').addEventListener('click', runDub);
+      document.getElementById('btn-pack').addEventListener('click', runPack);
+      document.getElementById('btn-clear-log').addEventListener('click', clearLog);
+    });
   </script>
 </body>
 </html>
