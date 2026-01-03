@@ -403,7 +403,10 @@ def download_audio_mm(task_id: str, repo=Depends(get_task_repository)):
     return RedirectResponse(url=get_download_url(key), status_code=302)
 
 
-@pages_router.get("/v1/tasks/{task_id}/pack")
+## /v1/tasks/{task_id}/pack and /v1/tasks/{task_id}/scenes are served by gateway/routes/v1.py
+## to avoid duplicate route registration in gateway.app.main.
+
+
 def download_pack(task_id: str, repo=Depends(get_task_repository)):
     task = repo.get(task_id)
     if not task:
@@ -421,7 +424,6 @@ def download_pack(task_id: str, repo=Depends(get_task_repository)):
     return RedirectResponse(url=get_download_url(str(key)), status_code=302)
 
 
-@pages_router.get("/v1/tasks/{task_id}/scenes")
 def download_scenes(task_id: str, repo=Depends(get_task_repository)):
     task = repo.get(task_id)
     if not task:
