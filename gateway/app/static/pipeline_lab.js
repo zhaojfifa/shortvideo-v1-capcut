@@ -5,6 +5,7 @@
     subtitles: false,
     dub: false,
     pack: false,
+    status: false,
   };
 
   const buttons = {
@@ -12,6 +13,7 @@
     subtitles: ["btn-step2", "btn-subtitles"],
     dub: ["btn-step3", "btn-dub"],
     pack: ["btn-step4", "btn-pack"],
+    status: ["btn-status"],
     all: ["btn-run-all"],
     clear: ["btn-clear-log"],
     generate: ["btn-generate-task", "btn-generate-from-link", "btn-reset-task"],
@@ -258,6 +260,28 @@
     }
   }
 
+  async function refreshStatus() {
+    if (inFlight.status) return;
+    inFlight.status = true;
+    setButtonsDisabled("status", true);
+    const id = taskId();
+    log(`Calling /v1/tasks/${id}/status.`);
+    try {
+      const json = await fetchJson(`/v1/tasks/${id}/status`, { method: "GET" });
+      const output = getEl("statusOutput");
+      if (output) output.textContent = JSON.stringify(json, null, 2);
+      updateDownloadLinks(id);
+      log("Status refreshed.");
+      return json;
+    } catch (err) {
+      log(`Status failed: ${err}`);
+      throw err;
+    } finally {
+      inFlight.status = false;
+      setButtonsDisabled("status", false);
+    }
+  }
+
   async function runFullPipeline() {
     try {
       await runParse();
@@ -292,6 +316,7 @@
       ["btn-subtitles", runSubtitles],
       ["btn-dub", runDub],
       ["btn-pack", runPack],
+      ["btn-status", refreshStatus],
       ["btn-clear-log", clearLog],
     ];
     map.forEach(([id, handler]) => {

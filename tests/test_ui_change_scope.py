@@ -42,3 +42,5 @@ def test_ui_files_do_not_call_task_api() -> None:
     for path in targets:
         text = path.read_text(encoding="utf-8")
         assert "/api/tasks" not in text, f"/api/tasks referenced in {path}"
+        assert "setInterval(" not in text, f"Polling detected in {path}"
+        assert "setTimeout(" not in text, f"Timer detected in {path}"

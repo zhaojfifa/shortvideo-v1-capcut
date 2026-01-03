@@ -450,6 +450,44 @@ def download_scenes(task_id: str, repo=Depends(get_task_repository)):
     return RedirectResponse(url=get_download_url(str(scenes_key)), status_code=302)
 
 
+@pages_router.get("/v1/tasks/{task_id}/status")
+def task_status(task_id: str, repo=Depends(get_task_repository)):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    raw_key = _task_key(task, "raw_path")
+    origin_key = _task_key(task, "origin_srt_path")
+    mm_key = _task_key(task, "mm_srt_path")
+    mm_txt_key = None
+    if mm_key and mm_key.endswith(".srt"):
+        mm_txt_key = f"{mm_key[:-4]}.txt"
+    audio_key = _task_key(task, "mm_audio_path")
+    pack_key = _task_key(task, "pack_key") or _task_key(task, "pack_path")
+    scenes_key = _task_key(task, "scenes_key")
+
+    return {
+        "task_id": str(_task_value(task, "task_id") or _task_value(task, "id") or task_id),
+        "status": _task_value(task, "status"),
+        "last_step": _task_value(task, "last_step"),
+        "subtitles_status": _task_value(task, "subtitles_status"),
+        "subtitles_error": _task_value(task, "subtitles_error"),
+        "dub_status": _task_value(task, "dub_status"),
+        "dub_error": _task_value(task, "dub_error"),
+        "pack_status": _task_value(task, "pack_status"),
+        "pack_error": _task_value(task, "pack_error"),
+        "scenes_status": _task_value(task, "scenes_status"),
+        "scenes_error": _task_value(task, "scenes_error"),
+        "raw_exists": bool(raw_key and object_exists(raw_key)),
+        "origin_srt_exists": bool(origin_key and object_exists(origin_key)),
+        "mm_srt_exists": bool(mm_key and object_exists(mm_key)),
+        "mm_txt_exists": bool(mm_txt_key and object_exists(mm_txt_key)),
+        "mm_audio_exists": bool(audio_key and object_exists(audio_key)),
+        "pack_exists": bool(pack_key and object_exists(pack_key)),
+        "scenes_exists": bool(scenes_key and object_exists(scenes_key)),
+    }
+
+
 
 
 def _task_endpoint(task_id: str, kind: str) -> Optional[str]:
