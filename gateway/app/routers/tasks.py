@@ -116,6 +116,8 @@ from gateway.app.services.artifact_storage import (
     object_exists,
 )
 from gateway.app.services.scene_split import enqueue_scenes_build
+from gateway.app.services.publish_service import publish_task_pack, resolve_download_url
+from gateway.app.db import SessionLocal
 
 from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
 from gateway.app.services.task_cleanup import delete_task_record, purge_task_artifacts
@@ -154,6 +156,11 @@ class SubtitlesTaskRequest(BaseModel):
 
 class ParseTaskRequest(BaseModel):
     platform: str | None = None
+
+
+class PublishTaskRequest(BaseModel):
+    provider: str | None = None
+    force: bool = False
 
 
 pages_router = APIRouter()
@@ -1197,6 +1204,44 @@ async def rerun_dub(
 
     stored = repo.get(task_id)
     return _task_to_detail(stored)
+
+
+@api_router.post("/tasks/{task_id}/publish")
+def publish_task(
+    task_id: str,
+    payload: PublishTaskRequest | None = None,
+    repo=Depends(get_task_repository),
+):
+    db = SessionLocal()
+    try:
+        res = publish_task_pack(
+            task_id,
+            db,
+            provider=(payload.provider if payload else None),
+            force=(payload.force if payload else False),
+        )
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if task:
+            repo.upsert(
+                task_id,
+                {
+                    "publish_provider": task.publish_provider,
+                    "publish_key": task.publish_key,
+                    "publish_url": task.publish_url,
+                    "publish_status": task.publish_status,
+                    "published_at": task.published_at,
+                },
+            )
+        download_url = res.get("download_url") or (resolve_download_url(task) if task else "")
+        return {
+            "task_id": task_id,
+            "provider": res.get("provider"),
+            "publish_key": res.get("publish_key"),
+            "download_url": download_url,
+            "published_at": res.get("published_at"),
+        }
+    finally:
+        db.close()
 
 
 @api_router.post("/tasks/{task_id}/subtitles")

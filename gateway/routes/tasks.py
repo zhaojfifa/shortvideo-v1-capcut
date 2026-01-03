@@ -24,11 +24,24 @@ from gateway.app.core.workspace import (
 )
 from gateway.app.db import get_db
 from gateway.app.web.templates import get_templates
-from gateway.app.schemas import TaskCreate, TaskDetail, TaskListResponse, TaskSummary, SubtitlesRequest
+from gateway.app.schemas import (
+    PackRequest,
+    ParseRequest,
+    SubtitlesRequest,
+    TaskCreate,
+    TaskDetail,
+    TaskListResponse,
+    TaskSummary,
+)
 from gateway.app.services.artifact_storage import object_exists
 from gateway.app.services.scene_split import enqueue_scenes_build
+from gateway.app.services.publish_service import publish_task_pack, resolve_download_url
 from gateway.app.steps.pipeline_v1 import run_pipeline_background
-from gateway.app.services.steps_v1 import run_subtitles_step as run_subtitles_step_v1
+from gateway.app.services.steps_v1 import (
+    run_pack_step as run_pack_step_v1,
+    run_parse_step as run_parse_step_v1,
+    run_subtitles_step as run_subtitles_step_v1,
+)
 
 router = APIRouter(prefix="/tasks")
 pages_router = APIRouter()
@@ -44,6 +57,15 @@ class SubtitlesTaskRequest(BaseModel):
     target_lang: str | None = None
     force: bool = False
     translate: bool = True
+
+
+class ParseTaskRequest(BaseModel):
+    platform: str | None = None
+
+
+class PublishTaskRequest(BaseModel):
+    provider: str | None = None
+    force: bool = False
 
 
 def _infer_platform_from_url(url: str) -> Optional[str]:
@@ -400,6 +422,40 @@ def get_task(task_id: str, db: Session = Depends(get_db)):
     )
 
 
+@router.post("/{task_id}/parse")
+def build_parse(
+    task_id: str,
+    payload: ParseTaskRequest | None = None,
+    db: Session = Depends(get_db),
+):
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    link = task.source_url or ""
+    if not link:
+        raise HTTPException(status_code=400, detail="source_url is empty; cannot parse")
+
+    platform = (payload.platform if payload else None) or task.platform
+    task.last_step = "parse"
+    task.status = "processing"
+    db.commit()
+
+    req = ParseRequest(task_id=task_id, platform=platform, link=link)
+    try:
+        asyncio.run(run_parse_step_v1(req))
+    except HTTPException as exc:
+        task.last_step = "parse"
+        task.status = "failed"
+        task.error_message = str(exc.detail)
+        task.error_reason = "parse_failed"
+        db.commit()
+        raise
+
+    db.refresh(task)
+    return get_task(task_id, db)
+
+
 @router.post("/{task_id}/scenes")
 def build_scenes(
     task_id: str,
@@ -497,6 +553,59 @@ def build_subtitles(
         error_message=task.error_message,
         error_reason=task.error_reason,
     )
+
+
+@router.post("/{task_id}/pack")
+def build_pack(
+    task_id: str,
+    db: Session = Depends(get_db),
+):
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    task.last_step = "pack"
+    task.status = "processing"
+    db.commit()
+
+    try:
+        asyncio.run(run_pack_step_v1(PackRequest(task_id=task_id)))
+    except HTTPException as exc:
+        task.last_step = "pack"
+        task.status = "failed"
+        task.error_message = str(exc.detail)
+        task.error_reason = "pack_failed"
+        db.commit()
+        raise
+
+    db.refresh(task)
+    return get_task(task_id, db)
+
+
+@router.post("/{task_id}/publish")
+def publish_task(
+    task_id: str,
+    payload: PublishTaskRequest | None = None,
+    db: Session = Depends(get_db),
+):
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    res = publish_task_pack(
+        task_id,
+        db,
+        provider=(payload.provider if payload else None),
+        force=(payload.force if payload else False),
+    )
+    download_url = res.get("download_url") or resolve_download_url(task)
+    return {
+        "task_id": task_id,
+        "provider": res.get("provider"),
+        "publish_key": res.get("publish_key"),
+        "download_url": download_url,
+        "published_at": res.get("published_at"),
+    }
 
 
 # Public exports for API and HTML routers

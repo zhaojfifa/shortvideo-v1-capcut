@@ -766,7 +766,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
         const statusEl = document.getElementById("publish-status");
         if (statusEl) statusEl.textContent = "Publishing...";
         try {
-          const resp = await fetch("/v1/publish", {
+          const resp = await fetch(`/api/tasks/${taskId}/publish`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ task_id: taskId, force: false }),
