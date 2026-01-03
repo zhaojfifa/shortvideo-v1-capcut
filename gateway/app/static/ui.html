@@ -3,41 +3,35 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Shortvideo V1 · Pipeline Lab</title>
+  <title>Pipeline Lab (Static)</title>
   <link rel="stylesheet" href="/static/pipeline_lab.css" />
 </head>
 <body>
   <div class="page">
     <main class="card">
       <header class="hero">
-        <div class="hero-title bilingual">
-          <h1>Shortvideo V1 · Pipeline Lab</h1>
+        <div class="hero-title">
+          <h1>Pipeline Lab (Static)</h1>
         </div>
-        <p class="hero-subtitle">Admin for the V1 shortvideo pipeline.</p>
+        <p class="hero-subtitle">Debug the legacy v1 pipeline actions.</p>
       </header>
 
       <section id="task" class="panel">
         <div class="section-title">
-          <h2 class="bilingual">
-            <span>Task</span>
-          </h2>
+          <h2>Task</h2>
           <div class="action-row">
-            <button class="ghost" type="button" onclick="generateTaskId()">Generate Task ID</button>
-            <button class="ghost" type="button" onclick="generateFromLink()">Generate from link</button>
-            <button class="ghost" type="button" onclick="resetTaskForm()">Reset</button>
+            <button class="ghost" type="button" id="btn-generate-task">Generate Task ID</button>
+            <button class="ghost" type="button" id="btn-generate-from-link">Generate From Link</button>
+            <button class="ghost" type="button" id="btn-reset-task">Reset</button>
           </div>
         </div>
         <div class="form-grid">
           <div class="field">
-            <label class="bilingual" for="taskId">
-              <span>Task ID</span>
-            </label>
+            <label for="taskId">Task ID</label>
             <input id="taskId" value="demo_v1" />
           </div>
           <div class="field">
-            <label class="bilingual" for="platform">
-              <span>Platform</span>
-            </label>
+            <label for="platform">Platform</label>
             <select id="platform">
               <option value="douyin">douyin</option>
               <option value="tiktok">tiktok</option>
@@ -45,62 +39,52 @@
             </select>
           </div>
           <div class="field span-2">
-            <label class="bilingual" for="link">
-              <span>Video Link</span>
-            </label>
+            <label for="link">Link</label>
             <input id="link" placeholder="https://www.douyin.com/video/..." />
           </div>
         </div>
         <div class="button-row">
-          <button onclick="runParse()">Step 1</button>
-          <button onclick="runSubtitles()">Step 2</button>
-          <button onclick="runDub()">Step 3</button>
-          <button onclick="runPack()">Step 4</button>
-          <button class="primary" onclick="runFullPipeline()">Run full pipeline</button>
+          <button id="btn-step1">Step 1: Parse</button>
+          <button id="btn-step2">Step 2: Subtitles</button>
+          <button id="btn-step3">Step 3: Dub</button>
+          <button id="btn-step4">Step 4: Pack</button>
+          <button class="primary" id="btn-run-all">Run Full Pipeline</button>
         </div>
         <div class="downloads">
-          <span class="downloads-title bilingual">
-            <span>Downloads</span>
-          </span>
+          <span class="downloads-title">Downloads</span>
           <div class="downloads-links">
-            <a id="rawLink" href="#" target="_blank">Raw Video</a>
-            <a id="originLink" href="#" target="_blank">Original subtitles</a>
-            <a id="mmLink" href="#" target="_blank">Translated subtitles</a>
-            <a id="audioLink" href="#" target="_blank">Dub Audio</a>
-            <a id="packLink" href="#" target="_blank">CapCut Pack</a>
+            <a id="rawLink" href="#" target="_blank">raw.mp4</a>
+            <a id="originLink" href="#" target="_blank">origin.srt</a>
+            <a id="mmLink" href="#" target="_blank">mm.srt</a>
+            <a id="mmTxtLink" href="#" target="_blank">mm.txt</a>
+            <a id="audioLink" href="#" target="_blank">audio_mm</a>
+            <a id="packLink" href="#" target="_blank">pack.zip</a>
+            <a id="scenesLink" href="#" target="_blank">scenes.zip</a>
           </div>
         </div>
       </section>
 
       <section class="panel">
         <div class="section-title">
-          <h2 class="bilingual">
-            <span>Parse & Download</span>
-          </h2>
-          <button class="ghost" onclick="runParse()">Execute</button>
+          <h2>Parse</h2>
+          <button class="ghost" id="btn-parse">Execute</button>
         </div>
         <pre id="parseOutput" class="output">Response</pre>
       </section>
 
       <section class="panel">
         <div class="section-title">
-          <h2 class="bilingual">
-            <span>Transcribe & Translate</span>
-          </h2>
-          <button class="ghost" onclick="runSubtitles()">Execute</button>
+          <h2>Subtitles</h2>
+          <button class="ghost" id="btn-subtitles">Execute</button>
         </div>
-        <pre id="subsOutput" class="output">(Output)</pre>
+        <pre id="subsOutput" class="output">(output)</pre>
         <div class="section-grid">
           <div>
-            <strong class="bilingual">
-              <span>Original subtitles</span>
-            </strong>
+            <strong>Origin subtitles</strong>
             <pre id="originPreview" class="output">(empty)</pre>
           </div>
           <div>
-            <strong class="bilingual">
-              <span>Translated subtitles</span>
-            </strong>
+            <strong>Translated subtitles</strong>
             <pre id="mmPreview" class="output">(empty)</pre>
           </div>
         </div>
@@ -108,37 +92,29 @@
 
       <section class="panel">
         <div class="section-title">
-          <h2 class="bilingual">
-            <span>Burmese Voiceover</span>
-          </h2>
-          <button class="ghost" onclick="runDub()">Execute</button>
+          <h2>Dub</h2>
+          <button class="ghost" id="btn-dub">Execute</button>
         </div>
         <div class="field">
-          <label class="bilingual" for="voiceId">
-            <span>Voice ID</span>
-          </label>
+          <label for="voiceId">Voice ID</label>
           <input id="voiceId" value="mm_female_1" />
         </div>
         <pre id="dubOutput" class="output">(empty)</pre>
-        <audio id="audioPlayer" controls style="margin-top:8px; display:none;"></audio>
+        <audio id="audioPlayer" controls style="margin-top:8px; width:100%; display:none;"></audio>
       </section>
 
       <section class="panel">
         <div class="section-title">
-          <h2 class="bilingual">
-            <span>Pack for CapCut</span>
-          </h2>
-          <button class="ghost" onclick="runPack()">Execute</button>
+          <h2>Pack</h2>
+          <button class="ghost" id="btn-pack">Execute</button>
         </div>
         <pre id="packOutput" class="output">(empty)</pre>
       </section>
 
       <section class="panel">
         <div class="section-title">
-          <h2 class="bilingual">
-            <span>Log</span>
-          </h2>
-          <button class="ghost" onclick="clearLog()">Reset</button>
+          <h2>Log</h2>
+          <button class="ghost" id="btn-clear-log">Clear</button>
         </div>
         <pre id="log" class="output">Ready.</pre>
       </section>
@@ -147,15 +123,17 @@
 
   <script>
     const logEl = document.getElementById('log');
+
     function log(message) {
       const now = new Date().toISOString();
-      logEl.textContent += `\n[${now}] ${message}`;
+      logEl.textContent += `
+[${now}] ${message}`;
       logEl.scrollTop = logEl.scrollHeight;
     }
 
     function clearLog() {
       logEl.textContent = '';
-      log('Ready');
+      log('Ready.');
     }
 
     function taskId() { return document.getElementById('taskId').value.trim(); }
@@ -167,42 +145,31 @@
       document.getElementById('rawLink').href = `/v1/tasks/${id}/raw`;
       document.getElementById('originLink').href = `/v1/tasks/${id}/subs_origin`;
       document.getElementById('mmLink').href = `/v1/tasks/${id}/subs_mm`;
+      document.getElementById('mmTxtLink').href = `/v1/tasks/${id}/mm_txt`;
       document.getElementById('audioLink').href = `/v1/tasks/${id}/audio_mm`;
       document.getElementById('packLink').href = `/v1/tasks/${id}/pack`;
+      document.getElementById('scenesLink').href = `/v1/tasks/${id}/scenes`;
     }
 
     function generateTaskId() {
       const stamp = new Date().toISOString().slice(0, 19);
-      const compactStamp = stamp.replaceAll('-', '').replaceAll(':', '').replace('T', '');
-      document.getElementById('taskId').value = `task_${compactStamp}`;
-      log('Task ID updated');
+      const compact = stamp.split('-').join('').split(':').join('').replace('T', '');
+      document.getElementById('taskId').value = `task_${compact}`;
+      log('Task ID updated.');
     }
 
     function generateFromLink() {
       const rawLink = link();
       if (!rawLink) {
-        log('Missing link');
+        log('Missing link.');
         return;
       }
       let safe = rawLink;
-      if (safe.startsWith('https://')) {
-        safe = safe.slice('https://'.length);
-      } else if (safe.startsWith('http://')) {
-        safe = safe.slice('http://'.length);
-      }
-      const stopChars = ['/', '?', '#'];
-      const stopIndex = stopChars.reduce((idx, ch) => {
-        const found = safe.indexOf(ch);
-        if (found === -1) {
-          return idx;
-        }
-        return idx === -1 ? found : Math.min(idx, found);
-      }, -1);
-      if (stopIndex >= 0) {
-        safe = safe.slice(0, stopIndex);
-      }
+      if (safe.startsWith('https://')) safe = safe.slice(8);
+      if (safe.startsWith('http://')) safe = safe.slice(7);
+      safe = safe.split(/[/?#]/)[0];
       document.getElementById('taskId').value = `task_${safe.slice(0, 16)}`;
-      log('Task ID generated');
+      log('Task ID generated.');
     }
 
     function resetTaskForm() {
@@ -211,12 +178,12 @@
       document.getElementById('link').value = '';
       document.getElementById('voiceId').value = 'mm_female_1';
       updateDownloadLinks('demo_v1');
-      log('Form reset');
+      log('Form reset.');
     }
 
     async function runParse() {
       const body = { task_id: taskId(), platform: platform(), link: link() };
-      log(`Calling /v1/parse for ${body.task_id}`);
+      log(`Calling /v1/parse for ${body.task_id}.`);
       const res = await fetch('/v1/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -229,13 +196,13 @@
         return json;
       }
       updateDownloadLinks(body.task_id);
-      log('Parse done, raw downloaded.');
+      log('Parse done.');
       return json;
     }
 
     async function runSubtitles() {
       const body = { task_id: taskId(), target_lang: 'my', force: false, translate: true, with_scenes: true };
-      log('Calling /v1/subtitles');
+      log('Calling /v1/subtitles.');
       const res = await fetch('/v1/subtitles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -246,37 +213,69 @@
       if (!res.ok) {
         log(`Subtitles failed: ${json.detail || res.status}`);
       }
-      document.getElementById('originPreview').textContent = (json.origin_preview || []).join('\n') || '(empty)';
-      document.getElementById('mmPreview').textContent = (json.mm_preview || []).join('\n') || '(empty)';
+      document.getElementById('originPreview').textContent = (json.origin_preview || []).join('
+') || '(empty)';
+      document.getElementById('mmPreview').textContent = (json.mm_preview || []).join('
+') || '(empty)';
+      if (json.segments_json) {
+        log(`Segments JSON ready: ${json.segments_json}`);
+      }
       log('Subtitles generated.');
       return json;
     }
 
     async function runDub() {
-      const body = { task_id: taskId(), voice_id: voiceId(), target_lang: 'my', force: false };
-      log(`Calling /v1/dub for ${body.task_id}`);
-      const res = await fetch('/v1/dub', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const json = await res.json();
-      document.getElementById('dubOutput').textContent = JSON.stringify(json, null, 2);
-      if (!res.ok) {
-        log(`Dub failed: ${json.detail || res.status}`);
+      const body = { task_id: taskId(), voice_id: voiceId(), force: false, target_lang: 'my' };
+      const buttons = [
+        document.getElementById('btn-step3'),
+        document.getElementById('btn-dub'),
+      ].filter(Boolean);
+      buttons.forEach((b) => (b.disabled = true));
+      log(`Calling /v1/dub for ${body.task_id}.`);
+      let res;
+      let payloadText = '';
+      try {
+        res = await fetch('/v1/dub', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        payloadText = await res.text();
+        let json = null;
+        try {
+          json = JSON.parse(payloadText);
+        } catch (e) {
+          json = null;
+        }
+
+        const detail = json && json.detail ? json.detail : undefined;
+        document.getElementById('dubOutput').textContent = json
+          ? JSON.stringify(json, null, 2)
+          : payloadText;
+
+        if (!res.ok) {
+          log(`Dub failed: ${detail || res.statusText || res.status}`);
+          return json || { error: payloadText };
+        }
+
+        const audioUrl = `/v1/tasks/${body.task_id}/audio_mm`;
+        const player = document.getElementById('audioPlayer');
+        player.src = audioUrl;
+        player.style.display = 'block';
+        updateDownloadLinks(body.task_id);
+        log('Dub audio ready.');
         return json;
+      } catch (err) {
+        log(`Dub failed: ${err}`);
+        return { error: err, response: payloadText };
+      } finally {
+        buttons.forEach((b) => (b.disabled = false));
       }
-      const audioUrl = `/v1/tasks/${body.task_id}/audio_mm`;
-      const audioEl = document.getElementById('audioPlayer');
-      audioEl.src = audioUrl;
-      audioEl.style.display = 'block';
-      log('Dub audio ready.');
-      return json;
     }
 
     async function runPack() {
       const body = { task_id: taskId() };
-      log(`Calling /v1/pack for ${body.task_id}`);
+      log(`Calling /v1/pack for ${body.task_id}.`);
       const res = await fetch('/v1/pack', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -289,7 +288,7 @@
         return json;
       }
       updateDownloadLinks(body.task_id);
-      log('Pack created.');
+      log('Pack ready.');
       return json;
     }
 
@@ -298,8 +297,24 @@
       await runSubtitles();
       await runDub();
       await runPack();
-      log('Full pipeline completed.');
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      updateDownloadLinks(taskId());
+      document.getElementById('btn-generate-task').addEventListener('click', generateTaskId);
+      document.getElementById('btn-generate-from-link').addEventListener('click', generateFromLink);
+      document.getElementById('btn-reset-task').addEventListener('click', resetTaskForm);
+      document.getElementById('btn-step1').addEventListener('click', runParse);
+      document.getElementById('btn-step2').addEventListener('click', runSubtitles);
+      document.getElementById('btn-step3').addEventListener('click', runDub);
+      document.getElementById('btn-step4').addEventListener('click', runPack);
+      document.getElementById('btn-run-all').addEventListener('click', runFullPipeline);
+      document.getElementById('btn-parse').addEventListener('click', runParse);
+      document.getElementById('btn-subtitles').addEventListener('click', runSubtitles);
+      document.getElementById('btn-dub').addEventListener('click', runDub);
+      document.getElementById('btn-pack').addEventListener('click', runPack);
+      document.getElementById('btn-clear-log').addEventListener('click', clearLog);
+    });
   </script>
 </body>
 </html>
