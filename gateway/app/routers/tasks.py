@@ -343,6 +343,24 @@ async def tasks_new(request: Request) -> HTMLResponse:
     )
 
 
+@pages_router.get("/ui", response_class=HTMLResponse)
+async def pipeline_lab(request: Request) -> HTMLResponse:
+    settings = get_settings()
+    env_summary = {
+        "workspace_root": settings.workspace_root,
+        "douyin_api_base": getattr(settings, "douyin_api_base", ""),
+        "whisper_model": getattr(settings, "whisper_model", ""),
+        "gpt_model": getattr(settings, "gpt_model", ""),
+        "asr_backend": getattr(settings, "asr_backend", None) or "whisper",
+        "subtitles_backend": getattr(settings, "subtitles_backend", None) or "gemini",
+        "gemini_model": getattr(settings, "gemini_model", ""),
+    }
+    return templates.TemplateResponse(
+        "pipeline_lab.html",
+        {"request": request, "env_summary": env_summary},
+    )
+
+
 @pages_router.get("/v1/tasks/{task_id}/raw")
 def download_raw(task_id: str, repo=Depends(get_task_repository)):
     task = repo.get(task_id)
@@ -403,10 +421,7 @@ def download_audio_mm(task_id: str, repo=Depends(get_task_repository)):
     return RedirectResponse(url=get_download_url(key), status_code=302)
 
 
-## /v1/tasks/{task_id}/pack and /v1/tasks/{task_id}/scenes are served by gateway/routes/v1.py
-## to avoid duplicate route registration in gateway.app.main.
-
-
+@pages_router.get("/v1/tasks/{task_id}/pack")
 def download_pack(task_id: str, repo=Depends(get_task_repository)):
     task = repo.get(task_id)
     if not task:
@@ -424,6 +439,7 @@ def download_pack(task_id: str, repo=Depends(get_task_repository)):
     return RedirectResponse(url=get_download_url(str(key)), status_code=302)
 
 
+@pages_router.get("/v1/tasks/{task_id}/scenes")
 def download_scenes(task_id: str, repo=Depends(get_task_repository)):
     task = repo.get(task_id)
     if not task:

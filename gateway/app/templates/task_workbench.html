@@ -543,7 +543,10 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
     let scenesPollInFlight = false;
 
     function startScenesPolling() {
-      if (scenesPoller || document.hidden) return;
+      if (document.hidden) return;
+      if (scenesPoller) {
+        stopScenesPolling();
+      }
       scenesPoller = setInterval(() => {
         if (scenesPollInFlight || document.hidden) return;
         scenesPollInFlight = true;
@@ -800,6 +803,10 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
           startScenesPolling();
         }
       }
+    });
+
+    window.addEventListener("beforeunload", () => {
+      stopScenesPolling();
     });
 
     async function fetchTextOrFallback(url, fallbackMessage) {
