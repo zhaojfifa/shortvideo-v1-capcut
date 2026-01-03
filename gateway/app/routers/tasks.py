@@ -152,6 +152,10 @@ class SubtitlesTaskRequest(BaseModel):
     translate: bool = True
 
 
+class ParseTaskRequest(BaseModel):
+    platform: str | None = None
+
+
 pages_router = APIRouter()
 api_router = APIRouter(prefix="/api", tags=["tasks"])
 templates = get_templates()
@@ -1010,6 +1014,59 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
     return _task_to_detail(t)
 
 
+@api_router.post("/tasks/{task_id}/parse")
+def build_parse(
+    task_id: str,
+    payload: ParseTaskRequest | None = None,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    link = task.get("source_url") or task.get("link")
+    if not link:
+        raise HTTPException(status_code=400, detail="source_url is empty; cannot parse")
+
+    platform = (payload.platform if payload else None) or task.get("platform")
+    repo.upsert(task_id, {"status": "processing", "last_step": "parse"})
+    parse_req = ParseRequest(task_id=task_id, platform=platform, link=link)
+
+    try:
+        parse_res = asyncio.run(run_parse_step_v1(parse_req))
+    except HTTPException as exc:
+        repo.upsert(
+            task_id,
+            {
+                "status": "failed",
+                "last_step": "parse",
+                "error_message": str(exc.detail),
+                "error_reason": "parse_failed",
+            },
+        )
+        raise
+
+    raw_file = raw_path(task_id)
+    raw_key = None
+    if raw_file.exists():
+        raw_key = upload_task_artifact(task, raw_file, "raw.mp4", task_id=task_id)
+    duration_sec = parse_res.get("duration_sec") if isinstance(parse_res, dict) else None
+    repo.upsert(
+        task_id,
+        {
+            "status": "processing",
+            "last_step": "parse",
+            "raw_path": raw_key,
+            "duration_sec": duration_sec,
+            "error_message": None,
+            "error_reason": None,
+        },
+    )
+
+    stored = repo.get(task_id)
+    return _task_to_detail(stored)
+
+
 @api_router.post("/tasks/{task_id}/scenes")
 def build_scenes(
     task_id: str,
@@ -1031,6 +1088,50 @@ def build_scenes(
         update_task=_update,
         background_tasks=background_tasks,
     )
+
+@api_router.post("/tasks/{task_id}/pack")
+def build_pack(
+    task_id: str,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    repo.upsert(task_id, {"status": "processing", "last_step": "pack"})
+    pack_req = PackRequest(task_id=task_id)
+    try:
+        pack_res = asyncio.run(run_pack_step_v1(pack_req))
+    except HTTPException as exc:
+        repo.upsert(
+            task_id,
+            {
+                "status": "failed",
+                "last_step": "pack",
+                "error_message": str(exc.detail),
+                "error_reason": "pack_failed",
+            },
+        )
+        raise
+
+    pack_key = None
+    if isinstance(pack_res, dict):
+        pack_key = pack_res.get("pack_key") or pack_res.get("zip_key")
+    repo.upsert(
+        task_id,
+        {
+            "status": "ready",
+            "last_step": "pack",
+            "pack_key": pack_key,
+            "pack_type": "capcut_v18" if pack_key else None,
+            "pack_status": "ready" if pack_key else None,
+            "error_message": None,
+            "error_reason": None,
+        },
+    )
+
+    stored = repo.get(task_id)
+    return _task_to_detail(stored)
 
 @api_router.post("/tasks/{task_id}/dub", response_model=TaskDetail)
 async def rerun_dub(
