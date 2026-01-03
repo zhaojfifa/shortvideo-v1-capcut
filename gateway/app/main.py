@@ -19,6 +19,7 @@ from gateway.app import models
 from gateway.app.ports.storage_provider import get_storage_service, set_storage_service
 from gateway.app.routers import admin_publish, publish as publish_router, tasks as tasks_router
 from gateway.app.routes.v17_pack import router as v17_pack_router
+from gateway.routes.v1 import router as v1_router
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -55,6 +56,7 @@ def log_routes_on_startup() -> None:
         name = getattr(route, "name", "")
         logger.info("route=%s methods=%s name=%s", path, methods, name)
 
+app.include_router(v1_router, prefix="/v1")
 app.include_router(tasks_router.pages_router)
 app.include_router(tasks_router.api_router)
 app.include_router(publish_router.router)
@@ -152,5 +154,4 @@ def serve_workspace_file(rel_path: str):
         raise HTTPException(status_code=404, detail="Not Found")
 
     return FileResponse(path=str(file_path))
-
 
