@@ -538,13 +538,21 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
       }
     }
 
+    const SCENES_POLL_INTERVAL_MS = 15000;
     let scenesPoller = null;
+    let scenesPollInFlight = false;
 
     function startScenesPolling() {
-      if (scenesPoller) return;
+      if (scenesPoller || document.hidden) return;
       scenesPoller = setInterval(() => {
-        refreshTaskState().catch(() => {});
-      }, 2500);
+        if (scenesPollInFlight || document.hidden) return;
+        scenesPollInFlight = true;
+        refreshTaskState()
+          .catch(() => {})
+          .finally(() => {
+            scenesPollInFlight = false;
+          });
+      }, SCENES_POLL_INTERVAL_MS);
     }
 
     function stopScenesPolling() {
@@ -612,22 +620,29 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
     refreshPublishInfo(window.currentTask);
     renderScenesStatus(window.currentTask);
 
+    let taskRefreshInFlight = false;
     async function refreshTaskState() {
-      const taskId = window.currentTask.task_id;
-      const resp = await fetch(`/api/tasks/${taskId}`);
-      if (!resp.ok) {
-        appendLog(`Failed to refresh task: HTTP ${resp.status}`);
-        return;
-      }
-      const data = await resp.json();
-      window.currentTask = data;
-      updateDownloadsFromTask(data);
-      updateStatusBadge(data);
-      updateStepStatuses(data);
-      refreshPublishInfo(data);
-      renderScenesStatus(data);
-      if (data.error_message) {
-        appendLog(`Last error: ${data.error_message}`);
+      if (taskRefreshInFlight) return;
+      taskRefreshInFlight = true;
+      try {
+        const taskId = window.currentTask.task_id;
+        const resp = await fetch(`/api/tasks/${taskId}`);
+        if (!resp.ok) {
+          appendLog(`Failed to refresh task: HTTP ${resp.status}`);
+          return;
+        }
+        const data = await resp.json();
+        window.currentTask = data;
+        updateDownloadsFromTask(data);
+        updateStatusBadge(data);
+        updateStepStatuses(data);
+        refreshPublishInfo(data);
+        renderScenesStatus(data);
+        if (data.error_message) {
+          appendLog(`Last error: ${data.error_message}`);
+        }
+      } finally {
+        taskRefreshInFlight = false;
       }
     }
 
@@ -776,6 +791,17 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
         console.error(err);
         appendLog("Initial refresh failed: " + err);
       });
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        stopScenesPolling();
+      } else if (window.currentTask && window.currentTask.scenes_status) {
+        const status = window.currentTask.scenes_status;
+        if (status === "queued" || status === "running") {
+          startScenesPolling();
+        }
+      }
     });
 
     async function fetchTextOrFallback(url, fallbackMessage) {
