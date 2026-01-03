@@ -554,7 +554,26 @@
 
     let tasksPollTimer = null;
     let tasksInFlight = false;
-    const TASKS_POLL_MS = 15000;
+    const TASKS_POLL_MS = 10000;
+    let currentPollMs = TASKS_POLL_MS;
+
+    function stopTasksPolling() {
+      if (!tasksPollTimer) return;
+      clearInterval(tasksPollTimer);
+      tasksPollTimer = null;
+    }
+
+    function startTasksPolling() {
+      if (tasksPollTimer) return;
+      fetchTasksOnce();
+      tasksPollTimer = setInterval(fetchTasksOnce, currentPollMs);
+    }
+
+    function restartTasksPolling() {
+      if (!tasksPollTimer) return;
+      stopTasksPolling();
+      tasksPollTimer = setInterval(fetchTasksOnce, currentPollMs);
+    }
 
     async function fetchTasksOnce() {
       if (document.visibilityState !== "visible") return;
@@ -574,6 +593,10 @@
         const data = await res.json();
         const tasks = Array.isArray(data) ? data : (data.items || []);
         renderTasks(tasks);
+        if (currentPollMs != TASKS_POLL_MS) {
+          currentPollMs = TASKS_POLL_MS;
+          restartTasksPolling();
+        }
       } catch (err) {
         console.error(err);
         if (countPrimaryEl) {
@@ -582,24 +605,17 @@
         if (countSecondaryEl) {
           countSecondaryEl.textContent = "";
         }
+        const nextMs = Math.min(currentPollMs * 2, 60000);
+        if (nextMs != currentPollMs) {
+          currentPollMs = nextMs;
+          restartTasksPolling();
+        }
       } finally {
         tasksInFlight = false;
       }
     }
 
     renderTasks(initialTasks || []);
-
-    function startTasksPolling() {
-      if (tasksPollTimer) return;
-      fetchTasksOnce();
-      tasksPollTimer = setInterval(fetchTasksOnce, TASKS_POLL_MS);
-    }
-
-    function stopTasksPolling() {
-      if (!tasksPollTimer) return;
-      clearInterval(tasksPollTimer);
-      tasksPollTimer = null;
-    }
 
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") {
