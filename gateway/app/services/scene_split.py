@@ -28,6 +28,9 @@ DEFAULT_MAX_LINES = 5
 SRT_TIME_RE = re.compile(
     r"(?P<start>\d{2}:\d{2}:\d{2}[,\.]\d{3})\s*-->\s*(?P<end>\d{2}:\d{2}:\d{2}[,\.]\d{3})"
 )
+SRT_LINE_TIME_RE = re.compile(
+    r"^\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}"
+)
 
 
 @dataclass
@@ -187,6 +190,29 @@ def _parse_srt(text: str) -> list[SrtEntry]:
         text_lines = lines[2:] if lines[0].strip().isdigit() else lines[1:]
         entries.append(SrtEntry(start=start, end=end, text="\n".join(text_lines)))
     return entries
+
+
+def _srt_to_plain_text(srt_text: str) -> str:
+    lines: list[str] = []
+    for raw in srt_text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.isdigit():
+            continue
+        if SRT_LINE_TIME_RE.match(line):
+            continue
+        lines.append(line)
+    return "\n".join(lines).strip() + ("\n" if lines else "")
+
+
+def _write_scene_subtitles(scene_dir: Path, srt_content: str) -> None:
+    scene_dir.mkdir(parents=True, exist_ok=True)
+    (scene_dir / "subs.srt").write_text(srt_content, encoding="utf-8")
+    (scene_dir / "subs.txt").write_text(
+        _srt_to_plain_text(srt_content),
+        encoding="utf-8",
+    )
 
 
 def _parse_srt_time(value: str) -> float:
@@ -369,14 +395,13 @@ def generate_scenes_package(
 
         video_path = scene_dir / "video.mp4"
         audio_path = scene_dir / "audio.wav"
-        subs_path = scene_dir / "subs.srt"
         scene_json_path = scene_dir / "scene.json"
 
         _slice_video(raw, video_path, scene.start, scene.end)
         _slice_audio(raw, audio_path, scene.start, scene.end)
 
         clipped_srt = _clip_srt(srt_entries, scene.start, scene.end)
-        subs_path.write_text(clipped_srt, encoding="utf-8")
+        _write_scene_subtitles(scene_dir, clipped_srt)
 
         preview = ""
         for entry in srt_entries:
