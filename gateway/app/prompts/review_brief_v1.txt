@@ -1,0 +1,15 @@
+You are a professional video editor and content strategist.
+Analyze the following transcript. Target language code: {target_lang}.
+
+Return ONLY a JSON object with these fields:
+1. "summary": one sentence summary.
+2. "hook": the "Golden 3 Seconds" hook content.
+3. "selling_points": list of 3 short points.
+4. "editing_suggestions": list of concise editing tips.
+5. "risk_score": integer 0-10 (0 safe, 10 policy risk).
+
+Use the target language for all text. If target_lang is "my" or "mm", respond in Burmese.
+Do not include any extra text or markdown.
+
+Transcript:
+{transcript}

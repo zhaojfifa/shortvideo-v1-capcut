@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -28,6 +29,7 @@ from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.parse import detect_platform, parse_douyin_video
 from gateway.app.services.subtitles import generate_subtitles
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
+from gateway.app.utils.timing import log_step_timing
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +150,8 @@ def _maybe_fill_missing_for_pack(*, raw_path: Path, audio_path: Path, subs_path:
 async def run_parse_step(req: ParseRequest):
     """Run the parse step for the given request."""
 
+    start_time = time.perf_counter()
+    platform = None
     try:
         platform = detect_platform(req.link, req.platform)
     except ValueError as exc:
@@ -178,11 +182,20 @@ async def run_parse_step(req: ParseRequest):
     except Exception as exc:  # pragma: no cover
         logger.exception("Unexpected error in parse step for task %s", req.task_id)
         raise HTTPException(status_code=500, detail=f"Unexpected server error: {exc}") from exc
+    finally:
+        log_step_timing(
+            logger,
+            task_id=req.task_id,
+            step="parse",
+            start_time=start_time,
+            provider=platform,
+        )
 
 
 async def run_subtitles_step(req: SubtitlesRequest):
     """Run the subtitles step for the given request."""
 
+    start_time = time.perf_counter()
     try:
         _update_task(req.task_id, subtitles_status="running", subtitles_error=None)
         result = await generate_subtitles(
@@ -238,11 +251,22 @@ async def run_subtitles_step(req: SubtitlesRequest):
         logger.exception("Unexpected error in subtitles step for task %s", req.task_id)
         _update_task(req.task_id, subtitles_status="error", subtitles_error=str(exc))
         raise HTTPException(status_code=500, detail="internal error") from exc
+    finally:
+        provider = os.getenv("SUBTITLES_BACKEND", None)
+        log_step_timing(
+            logger,
+            task_id=req.task_id,
+            step="subtitles",
+            start_time=start_time,
+            provider=provider,
+        )
 
 
 async def run_dub_step(req: DubRequest):
     """Run the dubbing step for the given request."""
 
+    start_time = time.perf_counter()
+    provider = os.getenv("DUB_PROVIDER", None)
     workspace = Workspace(req.task_id)
     origin_exists = workspace.origin_srt_path.exists()
     mm_exists = workspace.mm_srt_exists()
@@ -316,19 +340,31 @@ async def run_dub_step(req: DubRequest):
             last_step="dub",
         )
 
-    audio_url = f"/v1/tasks/{req.task_id}/audio_mm"
-    return {
-        "task_id": req.task_id,
-        "voice_id": req.voice_id,
-        "audio_mm_url": audio_url,
-        "duration_sec": result.get("duration_sec") if isinstance(result, dict) else None,
-        "audio_path": (result.get("audio_path") or result.get("path")) if isinstance(result, dict) else None,
-    }
+    try:
+        audio_url = f"/v1/tasks/{req.task_id}/audio_mm"
+        resp = {
+            "task_id": req.task_id,
+            "voice_id": req.voice_id,
+            "audio_mm_url": audio_url,
+            "duration_sec": result.get("duration_sec") if isinstance(result, dict) else None,
+            "audio_path": (result.get("audio_path") or result.get("path")) if isinstance(result, dict) else None,
+        }
+        return resp
+    finally:
+        log_step_timing(
+            logger,
+            task_id=req.task_id,
+            step="dub",
+            start_time=start_time,
+            provider=provider,
+            voice_id=req.voice_id,
+        )
 
 
 async def run_pack_step(req: PackRequest):
     """Run the packaging step for the given request."""
 
+    start_time = time.perf_counter()
     task_id = req.task_id
     workspace = Workspace(task_id)
 
@@ -459,7 +495,7 @@ async def run_pack_step(req: PackRequest):
         )
     except TypeError:
         download_url = storage.generate_presigned_url(zip_key, expiration=3600)
-    return {
+    resp = {
         "task_id": task_id,
         "zip_key": zip_key,
         "pack_key": zip_key,
@@ -467,6 +503,15 @@ async def run_pack_step(req: PackRequest):
         "download_url": download_url,
         "files": files,
     }
+    try:
+        return resp
+    finally:
+        log_step_timing(
+            logger,
+            task_id=req.task_id,
+            step="pack",
+            start_time=start_time,
+        )
 
 
 def _update_task(task_id: str, **fields) -> None:
