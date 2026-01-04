@@ -25,4 +25,8 @@ def test_scene_slice_video_is_muted(monkeypatch, tmp_path: Path) -> None:
     scene_split._slice_video(src, dst, 0.0, 1.0)
 
     assert captured["args"] is not None
+    assert "-map" in captured["args"]
+    assert "0:v:0" in captured["args"]
     assert "-an" in captured["args"]
+    assert "-sn" in captured["args"]
+    assert "-dn" in captured["args"]
