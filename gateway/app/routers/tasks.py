@@ -5,6 +5,8 @@ import hashlib
 import logging
 import os
 import re
+import shutil
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -30,7 +32,8 @@ from ..schemas import (
 )
 
 from gateway.app.web.templates import get_templates
-from gateway.app.deps import get_task_repository  # 只保留这一处依赖注入入口
+from gateway.app.deps import get_task_repository
+from gateway.app.ports.storage_provider import get_storage_service  # 只保留这一处依赖注入入口
 
 # Ports / typing
 from gateway.ports.repository import ITaskRepository  # 如路径不对，按你们 ports 实际文件修
@@ -538,6 +541,33 @@ def _text_or_redirect(key: str, inline: bool) -> Response:
     return RedirectResponse(url=get_download_url(key), status_code=302)
 
 
+def _ensure_mp3_audio(src_path: Path, dst_path: Path) -> Path:
+    if src_path.suffix.lower() == ".mp3":
+        return src_path
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise HTTPException(status_code=500, detail="ffmpeg not found for mp3 conversion")
+
+    dst_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-i",
+        str(src_path),
+        "-codec:a",
+        "libmp3lame",
+        str(dst_path),
+    ]
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if p.returncode != 0 or not dst_path.exists() or dst_path.stat().st_size == 0:
+        raise HTTPException(
+            status_code=500,
+            detail=f"ffmpeg mp3 conversion failed: {p.stderr[-800:]}",
+        )
+    return dst_path
+
+
 def _resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
     task_id = str(task.get("task_id") or task.get("id"))
     raw_url = _task_endpoint(task_id, "raw") if task.get("raw_path") else None
@@ -772,7 +802,10 @@ def _run_pipeline_background(task_id: str, repo) -> None:
         audio_key = None
         if workspace.mm_audio_exists():
             audio_path = workspace.mm_audio_path
-            audio_key = upload_task_artifact(task, audio_path, "mm_audio.mp3", task_id=task_id)
+            mp3_path = _ensure_mp3_audio(audio_path, workspace.mm_audio_mp3_path)
+            audio_key = f"deliver/packs/{task_id}/audio_mm.mp3"
+            storage = get_storage_service()
+            storage.upload_file(str(mp3_path), audio_key, content_type="audio/mpeg")
         _repo_upsert(
             repo,
             task_id,

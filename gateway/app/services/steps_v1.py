@@ -39,6 +39,7 @@ RAW_ARTIFACT = "raw/raw.mp4"
 ORIGIN_SRT_ARTIFACT = "subs/origin.srt"
 MM_SRT_ARTIFACT = "subs/mm.srt"
 MM_TXT_ARTIFACT = "subs/mm.txt"
+AUDIO_MM_KEY_TEMPLATE = "deliver/packs/{task_id}/audio_mm.mp3"
 
 README_TEMPLATE = """CapCut pack usage
 
@@ -107,6 +108,30 @@ def _ensure_silence_audio_ffmpeg(out_path: Path, seconds: int = 1) -> None:
     p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if p.returncode != 0 or not out_path.exists() or out_path.stat().st_size == 0:
         raise PackError(f"ffmpeg silence generation failed: {p.stderr[-800:]}")
+
+
+def _ensure_mp3_audio(src_path: Path, dst_path: Path) -> Path:
+    if src_path.suffix.lower() == ".mp3":
+        return src_path
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise PackError("ffmpeg not found in PATH (required for mp3 conversion).")
+
+    dst_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-i",
+        str(src_path),
+        "-codec:a",
+        "libmp3lame",
+        str(dst_path),
+    ]
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if p.returncode != 0 or not dst_path.exists() or dst_path.stat().st_size == 0:
+        raise PackError(f"ffmpeg mp3 conversion failed: {p.stderr[-800:]}")
+    return dst_path
 
 
 def _maybe_fill_missing_for_pack(*, raw_path: Path, audio_path: Path, subs_path: Path) -> None:
@@ -268,8 +293,10 @@ async def run_dub_step(req: DubRequest):
             p = workspace.mm_audio_path
 
         if p.exists():
-            audio_artifact = f"audio/{p.name}"
-            audio_key = _upload_artifact(req.task_id, p, audio_artifact)
+            mp3_path = _ensure_mp3_audio(p, workspace.mm_audio_mp3_path)
+            audio_key = AUDIO_MM_KEY_TEMPLATE.format(task_id=req.task_id)
+            storage = get_storage_service()
+            storage.upload_file(str(mp3_path), audio_key, content_type="audio/mpeg")
 
     _update_task(req.task_id, mm_audio_path=audio_key, last_step="dub")
 
@@ -295,6 +322,13 @@ async def run_pack_step(req: PackRequest):
 
     # audio：优先 workspace.mm_audio_path（你的 dub 可能输出 mp3），不存在则 fallback 到 wav 命名
     audio_file = workspace.mm_audio_path
+    audio_key = _get_task_mm_audio_key(task_id)
+    if audio_key and not audio_file.exists():
+        storage = get_storage_service()
+        target_path = workspace.mm_audio_mp3_path
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        storage.download_file(audio_key, str(target_path))
+        audio_file = target_path
     if not audio_file.exists():
         wav_candidate = (workspace.audio_dir / f"{task_id}_mm_vo.wav") if hasattr(workspace, "audio_dir") else None
         if wav_candidate and wav_candidate.exists():
@@ -449,5 +483,16 @@ def _upload_artifact(task_id: str, local_path: Path, artifact_name: str) -> str 
 
         # 关键：不要再额外传 task_id=...，避免 wrapper 内部签名变化导致重复参数
         return upload_task_artifact(task, local_path, artifact_name)
+    finally:
+        db.close()
+
+
+def _get_task_mm_audio_key(task_id: str) -> str | None:
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if not task:
+            return None
+        return getattr(task, "mm_audio_path", None)
     finally:
         db.close()
