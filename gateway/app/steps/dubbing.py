@@ -7,6 +7,7 @@ async def run_dub_step(task):
     if not task_id:
         raise ValueError("Missing task id for dub step")
     voice_id = getattr(task, "voice_id", None)
+    force = bool(getattr(task, "force_dub", False) or getattr(task, "force", False))
     target_lang = (
         getattr(task, "target_lang", None)
         or getattr(task, "content_lang", None)
@@ -16,6 +17,6 @@ async def run_dub_step(task):
         task_id=task_id,
         voice_id=voice_id,
         target_lang=target_lang,
-        force=False,
+        force=force,
     )
     return await run_dub_step_v1(req)
