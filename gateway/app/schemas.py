@@ -138,6 +138,7 @@ class TaskDetail(TaskSummary):
     origin_srt_path: Optional[str] = None
     mm_srt_path: Optional[str] = None
     mm_audio_path: Optional[str] = None
+    mm_audio_key: Optional[str] = None
     pack_path: Optional[str] = None
     scenes_path: Optional[str] = None
 

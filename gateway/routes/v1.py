@@ -4,11 +4,11 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from gateway.app.config import get_settings
 from gateway.app.services.artifact_storage import get_download_url, object_exists
+import logging
 from gateway.app.db import SessionLocal
 from gateway.app import models
 from gateway.app.web.templates import get_templates
 from gateway.app.core.workspace import (
-    Workspace,
     origin_srt_path,
     raw_path,
     translated_srt_path,
@@ -23,6 +23,7 @@ from gateway.app.services.steps_v1 import (
 
 router = APIRouter()
 templates = get_templates()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/ui", response_class=HTMLResponse)
@@ -86,11 +87,24 @@ async def dub(request: DubRequest):
 
 @router.get("/tasks/{task_id}/audio_mm")
 async def get_audio(task_id: str):
-    workspace = Workspace(task_id)
-    audio = workspace.mm_audio_path
-    if not audio.exists():
-        raise HTTPException(status_code=404, detail="dubbed audio not found")
-    return FileResponse(audio, media_type=workspace.mm_audio_media_type(), filename=audio.name)
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        key = str(task.mm_audio_key) if task and task.mm_audio_key else ""
+        if key and object_exists(key):
+            logger.info("audio_mm download: task_id=%s key=%s", task_id, key)
+            presigned_url = get_download_url(
+                key,
+                expiration=3600,
+                content_type="audio/mpeg",
+                filename=f"{task_id}_audio_mm.mp3",
+                disposition="attachment",
+            )
+            return RedirectResponse(url=presigned_url, status_code=302)
+    finally:
+        db.close()
+
+    raise HTTPException(status_code=404, detail="dubbed audio not found")
 
 
 @router.post("/pack")
@@ -140,5 +154,3 @@ async def download_scenes(task_id: str):
         db.close()
 
     raise HTTPException(status_code=404, detail="Scenes not ready")
-
-
