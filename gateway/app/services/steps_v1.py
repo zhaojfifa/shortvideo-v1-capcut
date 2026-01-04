@@ -39,7 +39,7 @@ RAW_ARTIFACT = "raw/raw.mp4"
 ORIGIN_SRT_ARTIFACT = "subs/origin.srt"
 MM_SRT_ARTIFACT = "subs/mm.srt"
 MM_TXT_ARTIFACT = "subs/mm.txt"
-AUDIO_MM_KEY_TEMPLATE = "deliver/packs/{task_id}/audio_mm.mp3"
+AUDIO_MM_KEY_TEMPLATE = "deliver/tasks/{task_id}/audio_mm.mp3"
 
 README_TEMPLATE = """CapCut pack usage
 
@@ -294,11 +294,27 @@ async def run_dub_step(req: DubRequest):
 
         if p.exists():
             mp3_path = _ensure_mp3_audio(p, workspace.mm_audio_mp3_path)
-            audio_key = AUDIO_MM_KEY_TEMPLATE.format(task_id=req.task_id)
+            key_template = AUDIO_MM_KEY_TEMPLATE.format(task_id=req.task_id)
             storage = get_storage_service()
-            storage.upload_file(str(mp3_path), audio_key, content_type="audio/mpeg")
+            uploaded_key = storage.upload_file(
+                str(mp3_path),
+                key_template,
+                content_type="audio/mpeg",
+            )
+            if not uploaded_key:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Audio upload failed; no storage key returned",
+                )
+            audio_key = uploaded_key
 
-    _update_task(req.task_id, mm_audio_path=audio_key, last_step="dub")
+    if audio_key:
+        _update_task(
+            req.task_id,
+            mm_audio_path=audio_key,
+            mm_audio_key=audio_key,
+            last_step="dub",
+        )
 
     audio_url = f"/v1/tasks/{req.task_id}/audio_mm"
     return {
@@ -493,6 +509,6 @@ def _get_task_mm_audio_key(task_id: str) -> str | None:
         task = db.query(models.Task).filter(models.Task.id == task_id).first()
         if not task:
             return None
-        return getattr(task, "mm_audio_path", None)
+        return getattr(task, "mm_audio_key", None) or getattr(task, "mm_audio_path", None)
     finally:
         db.close()

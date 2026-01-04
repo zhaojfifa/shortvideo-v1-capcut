@@ -120,6 +120,7 @@ from gateway.app.services.artifact_storage import (
     get_object_bytes,
     object_exists,
 )
+from gateway.app.ports.storage_provider import get_storage_service
 from gateway.app.services.scene_split import enqueue_scenes_build
 from gateway.app.services.publish_service import publish_task_pack, resolve_download_url
 from gateway.app.db import SessionLocal
@@ -138,6 +139,7 @@ from ..core.workspace import (
 
 logger = logging.getLogger(__name__)
 
+AUDIO_MM_KEY_TEMPLATE = "deliver/tasks/{task_id}/audio_mm.mp3"
 
 
 class DubProviderRequest(BaseModel):
@@ -422,8 +424,11 @@ def download_audio_mm(task_id: str, repo=Depends(get_task_repository)):
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="dubbed audio not found")
-    key = _require_storage_key(task, "mm_audio_path", "dubbed audio not found")
-    return RedirectResponse(url=get_download_url(key), status_code=302)
+    key = _task_value(task, "mm_audio_key")
+    if not key:
+        raise HTTPException(status_code=404, detail="dubbed audio not found")
+    logger.info("audio_mm download: task_id=%s key=%s", task_id, key)
+    return RedirectResponse(url=get_download_url(str(key)), status_code=302)
 
 
 @pages_router.get("/v1/tasks/{task_id}/pack")
@@ -467,7 +472,7 @@ def task_status(task_id: str, repo=Depends(get_task_repository)):
     mm_txt_key = None
     if mm_key and mm_key.endswith(".srt"):
         mm_txt_key = f"{mm_key[:-4]}.txt"
-    audio_key = _task_key(task, "mm_audio_path")
+    audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
     pack_key = _task_key(task, "pack_key") or _task_key(task, "pack_path")
     scenes_key = _task_key(task, "scenes_key")
 
@@ -583,7 +588,7 @@ def _resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
     )
     audio_url = (
         _task_endpoint(task_id, "audio")
-        if task.get("mm_audio_path")
+        if task.get("mm_audio_key") or task.get("mm_audio_path")
         else None
     )
     mm_txt_url = _task_endpoint(task_id, "mm_txt") if mm_url else None
@@ -644,6 +649,7 @@ def _task_to_detail(task: dict) -> TaskDetail:
         "origin_srt_path": paths.get("origin_srt_path"),
         "mm_srt_path": paths.get("mm_srt_path"),
         "mm_audio_path": paths.get("mm_audio_path"),
+        "mm_audio_key": task.get("mm_audio_key"),
         "pack_path": paths.get("pack_path"),
         "scenes_path": paths.get("scenes_path"),
         "scenes_status": task.get("scenes_status"),
@@ -803,9 +809,16 @@ def _run_pipeline_background(task_id: str, repo) -> None:
         if workspace.mm_audio_exists():
             audio_path = workspace.mm_audio_path
             mp3_path = _ensure_mp3_audio(audio_path, workspace.mm_audio_mp3_path)
-            audio_key = f"deliver/packs/{task_id}/audio_mm.mp3"
+            audio_key = AUDIO_MM_KEY_TEMPLATE.format(task_id=task_id)
             storage = get_storage_service()
-            storage.upload_file(str(mp3_path), audio_key, content_type="audio/mpeg")
+            uploaded_key = storage.upload_file(
+                str(mp3_path), audio_key, content_type="audio/mpeg"
+            )
+            if not uploaded_key:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Audio upload failed; no storage key returned",
+                )
         _repo_upsert(
             repo,
             task_id,
@@ -813,6 +826,7 @@ def _run_pipeline_background(task_id: str, repo) -> None:
                 **status_update,
                 "last_step": current_step,
                 "mm_audio_path": audio_key,
+                "mm_audio_key": audio_key,
             },
         )
 
@@ -1271,9 +1285,11 @@ async def rerun_dub(
     workspace = Workspace(task_id)
     audio_present = False
     if isinstance(task, dict):
-        audio_present = bool(task.get("mm_audio_path"))
+        audio_present = bool(task.get("mm_audio_key") or task.get("mm_audio_path"))
     else:
-        audio_present = bool(getattr(task, "mm_audio_path", None))
+        audio_present = bool(
+            getattr(task, "mm_audio_key", None) or getattr(task, "mm_audio_path", None)
+        )
     audio_present = audio_present or workspace.mm_audio_exists()
     voice_changed = bool(req_voice_id and req_voice_id != prev_voice_id)
     force_dub = bool(audio_present and voice_changed)
@@ -1313,18 +1329,17 @@ async def rerun_dub(
         # 核心：SSOT dubbing
         await run_dub_step_ssot(task_adapter)
 
-        from gateway.app.utils.keys import KeyBuilder
-        audio_key = KeyBuilder.build(
-            task_adapter.tenant_id,
-            task_adapter.project_id,
-            task_adapter.task_id,
-            "artifacts/voice/full.mp3",
-        )
         audio_path = (
             workspace.mm_audio_mp3_path
             if workspace.mm_audio_mp3_path.exists()
             else workspace.mm_audio_path
         )
+        if not audio_path.exists():
+            raise HTTPException(status_code=500, detail="Dubbing output missing")
+
+        audio_key = AUDIO_MM_KEY_TEMPLATE.format(task_id=task_id)
+        storage = get_storage_service()
+        storage.upload_file(str(audio_path), audio_key, content_type="audio/mpeg")
         audio_sha256 = _sha256_file(audio_path)
 
     except HTTPException:
@@ -1338,6 +1353,7 @@ async def rerun_dub(
         task_id,
         {
             "mm_audio_path": audio_key,
+            "mm_audio_key": audio_key,
             "dub_provider": provider,
             "last_step": "dubbing",
             "voice_id": final_voice_id,
@@ -1347,7 +1363,7 @@ async def rerun_dub(
     stored = repo.get(task_id)
     detail = _task_to_detail(stored)
     return DubResponse(
-        **detail.dict(),
+        **detail.dict(exclude={"mm_audio_key"}),
         resolved_voice_id=final_voice_id,
         resolved_edge_voice=edge_voice,
         audio_sha256=audio_sha256,

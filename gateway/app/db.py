@@ -99,6 +99,8 @@ def ensure_task_extra_columns(engine) -> None:
         alter_statements.append("ALTER TABLE tasks ADD COLUMN pack_type VARCHAR(32)")
     if "pack_status" not in columns:
         alter_statements.append("ALTER TABLE tasks ADD COLUMN pack_status VARCHAR(32)")
+    if "mm_audio_key" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN mm_audio_key TEXT")
     if "subtitle_structure_path" not in columns:
         alter_statements.append("ALTER TABLE tasks ADD COLUMN subtitle_structure_path TEXT")
     if "subtitles_status" not in columns:

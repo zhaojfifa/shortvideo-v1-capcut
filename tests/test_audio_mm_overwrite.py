@@ -8,12 +8,13 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 
 from gateway.app.core import workspace as workspace_module
-from gateway.app.db import SessionLocal
+from gateway.app.db import SessionLocal, ensure_task_extra_columns, engine
 from gateway.app.schemas import DubRequest, PackRequest
 from gateway.app.services import steps_v1
 
 
 def _ensure_task(task_id: str) -> None:
+    ensure_task_extra_columns(engine)
     db = SessionLocal()
     try:
         row = db.execute(
@@ -82,12 +83,12 @@ def test_run_dub_step_uploads_audio_mm_key(monkeypatch, tmp_path: Path) -> None:
         )
     )
 
-    assert dummy.uploaded_key == f"deliver/packs/{task_id}/audio_mm.mp3"
+    assert dummy.uploaded_key == f"deliver/tasks/{task_id}/audio_mm.mp3"
 
     db = SessionLocal()
     try:
         row = db.execute(
-            text("SELECT mm_audio_path FROM tasks WHERE id = :task_id"),
+            text("SELECT mm_audio_key FROM tasks WHERE id = :task_id"),
             {"task_id": task_id},
         ).fetchone()
         assert row and row[0] == dummy.uploaded_key
@@ -95,17 +96,16 @@ def test_run_dub_step_uploads_audio_mm_key(monkeypatch, tmp_path: Path) -> None:
         db.close()
 
 
-def test_audio_mm_download_uses_mm_audio_path(monkeypatch) -> None:
+def test_audio_mm_download_uses_mm_audio_key(monkeypatch) -> None:
     from gateway.app.main import app
     from gateway.app.deps import get_task_repository
     from gateway.app.routers import tasks as tasks_module
 
     class DummyRepo:
         def get(self, _task_id):
-            return {"mm_audio_path": "deliver/packs/demo/audio_mm.mp3"}
+            return {"mm_audio_key": "deliver/tasks/demo/audio_mm.mp3"}
 
     app.dependency_overrides[get_task_repository] = lambda: DummyRepo()
-    monkeypatch.setattr(tasks_module, "object_exists", lambda _k: True)
     monkeypatch.setattr(
         tasks_module,
         "get_download_url",
@@ -115,7 +115,7 @@ def test_audio_mm_download_uses_mm_audio_path(monkeypatch) -> None:
         with TestClient(app, follow_redirects=False) as client:
             resp = client.get("/v1/tasks/demo/audio_mm")
             assert resp.status_code == 302
-            assert resp.headers["location"] == "https://example.invalid/deliver/packs/demo/audio_mm.mp3"
+            assert resp.headers["location"] == "https://example.invalid/deliver/tasks/demo/audio_mm.mp3"
     finally:
         app.dependency_overrides.clear()
 
@@ -133,8 +133,8 @@ def test_pack_step_downloads_mm_audio_key(monkeypatch, tmp_path: Path) -> None:
     db = SessionLocal()
     try:
         db.execute(
-            text("UPDATE tasks SET mm_audio_path = :key WHERE id = :task_id"),
-            {"key": f"deliver/packs/{task_id}/audio_mm.mp3", "task_id": task_id},
+            text("UPDATE tasks SET mm_audio_key = :key WHERE id = :task_id"),
+            {"key": f"deliver/tasks/{task_id}/audio_mm.mp3", "task_id": task_id},
         )
         db.commit()
     finally:
@@ -159,4 +159,4 @@ def test_pack_step_downloads_mm_audio_key(monkeypatch, tmp_path: Path) -> None:
 
     asyncio.run(steps_v1.run_pack_step(PackRequest(task_id=task_id)))
 
-    assert dummy.download_key == f"deliver/packs/{task_id}/audio_mm.mp3"
+    assert dummy.download_key == f"deliver/tasks/{task_id}/audio_mm.mp3"

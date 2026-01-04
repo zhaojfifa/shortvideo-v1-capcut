@@ -21,7 +21,7 @@ I18N.setdefault("zh", {}).update(
     {
         "task_board": "任务看板",
         "task_count": "已加载 {n} 个任务。",
-        "new_suitcase_task": "新建任务",
+        "new_suitcase_task": "新建行李箱任务",
         "status_legend": "状态说明",
         "status_ready": "已就绪",
         "status_processing": "处理中",
@@ -45,7 +45,7 @@ I18N.setdefault("my", {}).update(
     {
         "task_board": "တာဝန်ဘုတ်",
         "task_count": "တာဝန် {n} ခု တင်ပြီး။",
-        "new_suitcase_task": "တာဝန်အသစ် ဖန်တီးရန်",
+        "new_suitcase_task": "ခရီးဆောင်အိတ် တာဝန်အသစ်",
         "status_legend": "အခြေအနေဖော်ပြချက်",
         "status_ready": "အဆင်သင့်",
         "status_processing": "လုပ်ဆောင်နေသည်",

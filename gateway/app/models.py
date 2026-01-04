@@ -44,6 +44,7 @@ class Task(Base):
     origin_srt_path = Column(Text, nullable=True)      # [新增]
     mm_srt_path = Column(Text, nullable=True)          # [新增]
     mm_audio_path = Column(Text, nullable=True)
+    mm_audio_key = Column(Text, nullable=True)
     pack_path = Column(Text, nullable=True)
     pack_key = Column(Text, nullable=True)
     pack_type = Column(String(32), nullable=True)
