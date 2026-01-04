@@ -5,6 +5,7 @@ import logging
 import re
 import shutil
 import subprocess
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +16,7 @@ from fastapi import HTTPException
 
 from gateway.app.core.workspace import raw_path, workspace_root
 from gateway.app.ports.storage_provider import get_storage_service
+from gateway.app.utils.timing import log_step_timing
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +68,8 @@ def _slice_video(src: Path, dst: Path, start: float, end: float) -> None:
         f"{end:.3f}",
         "-i",
         str(src),
-        "-c",
+        "-an",
+        "-c:v",
         "copy",
         str(dst),
     ]
@@ -473,6 +476,7 @@ def _task_value(task: object, field: str) -> str | None:
 
 
 def run_scenes_build(task_id: str, update_task) -> dict:
+    start_time = time.perf_counter()
     update_task(task_id, {"scenes_status": "running", "scenes_error": None})
     try:
         result = generate_scenes_package(task_id)
@@ -489,6 +493,13 @@ def run_scenes_build(task_id: str, update_task) -> dict:
     except Exception as exc:  # pragma: no cover - defensive logging
         update_task(task_id, {"scenes_status": "error", "scenes_error": str(exc)})
         raise
+    finally:
+        log_step_timing(
+            logger,
+            task_id=task_id,
+            step="scenes",
+            start_time=start_time,
+        )
 
 
 def enqueue_scenes_build(
