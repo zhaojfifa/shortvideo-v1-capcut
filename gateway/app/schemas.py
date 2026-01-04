@@ -142,6 +142,13 @@ class TaskDetail(TaskSummary):
     scenes_path: Optional[str] = None
 
 
+class DubResponse(TaskDetail):
+    resolved_voice_id: Optional[str] = None
+    resolved_edge_voice: Optional[str] = None
+    audio_sha256: Optional[str] = None
+    mm_audio_key: Optional[str] = None
+
+
 class TaskListResponse(BaseModel):
     items: list[TaskSummary]
     page: int

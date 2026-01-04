@@ -1,6 +1,7 @@
 """Task API and HTML routers for the gateway application."""
 
 import asyncio
+import hashlib
 import logging
 import os
 import re
@@ -18,6 +19,7 @@ from ..config import get_settings
 from ..core.features import get_features
 from ..schemas import (
     DubRequest,
+    DubResponse,
     PackRequest,
     ParseRequest,
     SubtitlesRequest,
@@ -654,6 +656,16 @@ def _extract_first_http_url(text: str | None) -> str | None:
     return match.group(0) if match else None
 
 
+def _sha256_file(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(8192), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
 def _repo_upsert(repo, task_id: str, patch: dict) -> None:
     repo.upsert(task_id, patch)
 
@@ -1196,7 +1208,7 @@ def build_pack(
     stored = repo.get(task_id)
     return _task_to_detail(stored)
 
-@api_router.post("/tasks/{task_id}/dub", response_model=TaskDetail)
+@api_router.post("/tasks/{task_id}/dub", response_model=DubResponse)
 async def rerun_dub(
     task_id: str,
     payload: DubProviderRequest,
@@ -1208,19 +1220,47 @@ async def rerun_dub(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    provider = (payload.provider or "edge-tts").lower()
-    if provider == "edge":
-        provider = "edge-tts"
-    if provider not in {"edge-tts", "lovo"}:
+    provider_raw = payload.provider or "edge-tts"
+    provider_norm = provider_raw.lower().replace("-", "_")
+    if provider_norm == "edge":
+        provider_norm = "edge_tts"
+    if provider_norm not in {"edge_tts", "lovo"}:
         raise HTTPException(status_code=400, detail="Unsupported dub provider")
+    provider = "edge-tts" if provider_norm == "edge_tts" else "lovo"
 
     settings = get_settings()
     if provider == "lovo" and not getattr(settings, "lovo_api_key", None):
         raise HTTPException(status_code=400, detail="LOVO_API_KEY is not configured")
 
+    req_voice_id = payload.voice_id or None
+    prev_voice_id = task.get("voice_id") if isinstance(task, dict) else getattr(task, "voice_id", None)
+    final_voice_id = req_voice_id or prev_voice_id or "mm_female_1"
+    workspace = Workspace(task_id)
+    audio_present = False
+    if isinstance(task, dict):
+        audio_present = bool(task.get("mm_audio_path"))
+    else:
+        audio_present = bool(getattr(task, "mm_audio_path", None))
+    audio_present = audio_present or workspace.mm_audio_exists()
+    voice_changed = bool(req_voice_id and req_voice_id != prev_voice_id)
+    force_dub = bool(audio_present and voice_changed)
+
+    edge_voice = None
+    if provider == "edge-tts":
+        edge_voice = settings.edge_tts_voice_map.get(final_voice_id, final_voice_id)
+
+    logger.info(
+        "dub: task=%s req_voice_id=%s prev_voice_id=%s final_voice_id=%s edge_voice=%s",
+        task_id,
+        req_voice_id,
+        prev_voice_id,
+        final_voice_id,
+        edge_voice,
+    )
+
     try:
         class TaskAdapter:
-            def __init__(self, t: dict, voice_override: str | None, provider: str):
+            def __init__(self, t: dict, voice_override: str | None, provider: str, force_dub: bool):
                 self.task_id = t.get("task_id") or t.get("id")
                 self.id = self.task_id
                 self.tenant_id = t.get("tenant_id") or t.get("tenant") or "default"
@@ -1228,8 +1268,14 @@ async def rerun_dub(
                 self.target_lang = t.get("target_lang") or t.get("content_lang") or "my"
                 self.voice_id = voice_override or t.get("voice_id")
                 self.dub_provider = provider
+                self.force_dub = force_dub
 
-        task_adapter = TaskAdapter(task, voice_override=payload.voice_id, provider=provider)
+        task_adapter = TaskAdapter(
+            task,
+            voice_override=final_voice_id,
+            provider=provider,
+            force_dub=force_dub,
+        )
 
         # 核心：SSOT dubbing
         await run_dub_step_ssot(task_adapter)
@@ -1241,6 +1287,12 @@ async def rerun_dub(
             task_adapter.task_id,
             "artifacts/voice/full.mp3",
         )
+        audio_path = (
+            workspace.mm_audio_mp3_path
+            if workspace.mm_audio_mp3_path.exists()
+            else workspace.mm_audio_path
+        )
+        audio_sha256 = _sha256_file(audio_path)
 
     except HTTPException:
         raise
@@ -1255,11 +1307,19 @@ async def rerun_dub(
             "mm_audio_path": audio_key,
             "dub_provider": provider,
             "last_step": "dubbing",
+            "voice_id": final_voice_id,
         },
     )
 
     stored = repo.get(task_id)
-    return _task_to_detail(stored)
+    detail = _task_to_detail(stored)
+    return DubResponse(
+        **detail.dict(),
+        resolved_voice_id=final_voice_id,
+        resolved_edge_voice=edge_voice,
+        audio_sha256=audio_sha256,
+        mm_audio_key=audio_key,
+    )
 
 
 @api_router.post("/tasks/{task_id}/publish")
