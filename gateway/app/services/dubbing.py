@@ -53,6 +53,11 @@ def _normalize_text(mm_srt_text: str) -> str:
     return mm_srt_text.strip()
 
 
+def _map_edge_voice_id(voice_id: str | None, settings) -> str:
+    voice_key = voice_id or "mm_female_1"
+    return settings.edge_tts_voice_map.get(voice_key, voice_key)
+
+
 async def _synthesize_from_text(
     *,
     task_id: str,
@@ -76,8 +81,7 @@ async def _synthesize_from_text(
         provider = "edge-tts"
 
     if provider == "edge-tts":
-        voice_key = voice_id or "mm_female_1"
-        voice = settings.edge_tts_voice_map.get(voice_key, voice_key)
+        voice = _map_edge_voice_id(voice_id, settings)
         output_path = ws.mm_audio_mp3_path
         try:
             await generate_audio_edge_tts(text, voice, str(output_path))
