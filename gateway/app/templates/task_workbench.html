@@ -33,6 +33,24 @@
       text-decoration: none;
       font-weight: 700;
     }
+
+    .btn-primary {
+      background: #2563eb;
+      color: #ffffff;
+      border: 1px solid #2563eb;
+    }
+    .btn-primary:hover { filter: brightness(.95); }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111827;
+      border: 1px solid #d1d5db;
+    }
+    .btn-secondary:hover { filter: brightness(.98); }
+    .btn-primary:disabled,
+    .btn-secondary:disabled {
+      opacity: 0.7;
+      color: #111827;
+    }
     h1 { margin: 0; font-size: 1.6rem; font-weight: 800; }
     .status-pill {
       padding: 6px 12px;
@@ -157,47 +175,47 @@
 
     <div class="panel">
       <div class="section-title">
-        <h2>Deliverables <span class="muted t-secondary">/ 交付物</span></h2>
-        <div class="secondary">Download-ready outputs for operators.</div>
+        <h2>交付物 <span class="muted t-secondary">/ ပေးပို့ပစ္စည်းများ</span></h2>
+        <div class="secondary">运营可下载交付物 / အော်ပရေးရှင်းအတွက် ဒေါင်းလုပ်ပစ္စည်းများ</div>
       </div>
       <div class="section-grid deliverables-grid">
         <div class="deliverable-card primary">
-          <div class="deliverable-title">CapCut Pack <span class="muted t-secondary">/ 剪辑包</span></div>
+          <div class="deliverable-title">剪辑包 <span class="muted t-secondary">/ အထုပ်</span></div>
           <div class="deliverable-actions">
-            <a id="pack-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/pack" target="_blank" rel="noopener">Download</a>
-            <span id="pack-status" class="muted t-secondary">Not ready</span>
+            <a id="pack-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/pack" target="_blank" rel="noopener">下载 / ဒေါင်းလုပ်</a>
+            <span id="pack-status" class="muted t-secondary">未就绪 / မအဆင်သင့်</span>
           </div>
-          <div class="muted t-secondary" style="margin-top:6px;">Download via redirect (302) / 下载将跳转到对象存储链接</div>
+          <div class="muted t-secondary" style="margin-top:6px;">下载将跳转到对象存储链接 / 302 ဖြင့် အရာဝတ္ထုသိုလှောင်သို့</div>
         </div>
         <div class="deliverable-card">
-          <div class="deliverable-title">Scenes Package <span class="muted t-secondary">/ 场景包</span></div>
+          <div class="deliverable-title">场景包 <span class="muted t-secondary">/ အပိုင်းခွဲ (Scenes)</span></div>
           <div class="deliverable-actions">
             <a id="scenes-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">下载 Scenes.zip / Scenes.zip ဒေါင်းလုပ်</a>
-            <span id="scenes-status" class="muted t-secondary">Not ready</span>
+            <span id="scenes-status" class="muted t-secondary">未就绪 / မအဆင်သင့်</span>
           </div>
-          <div class="muted t-secondary" style="margin-top:6px;">Download → unzip → open video &amp; SRT / 下载 → 解压 → 打开视频与字幕</div>
+          <div class="muted t-secondary" style="margin-top:6px;">下载 → 解压 → 打开视频与字幕 / ဒေါင်းလုပ် → ဖြုတ်ထုတ် → ဗီဒီယိုနှင့် စာတန်းထိုးဖွင့်</div>
         </div>
         <div class="deliverable-card">
-          <div class="deliverable-title">Video <span class="muted t-secondary">/ 视频</span></div>
+          <div class="deliverable-title">视频 <span class="muted t-secondary">/ ဗီဒီယို</span></div>
           <div class="deliverable-actions">
             <a id="raw-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/raw" target="_blank" rel="noopener">raw.mp4</a>
-            <span id="video-status" class="muted t-secondary">Not ready</span>
+            <span id="video-status" class="muted t-secondary">未就绪 / မအဆင်သင့်</span>
           </div>
         </div>
         <div class="deliverable-card">
-          <div class="deliverable-title">Subtitles (MM) <span class="muted t-secondary">/ 缅文字幕</span></div>
+          <div class="deliverable-title">缅文字幕 <span class="muted t-secondary">/ မြန်မာစာတန်းထိုး</span></div>
           <div class="deliverable-actions">
             <a id="mm-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/subs_mm" target="_blank" rel="noopener">mm.srt</a>
             <a id="mm-txt-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/mm_txt" target="_blank" rel="noopener">mm.txt</a>
             <a id="origin-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/subs_origin" target="_blank" rel="noopener">origin.srt</a>
-            <span id="subs-status" class="muted t-secondary">Not ready</span>
+            <span id="subs-status" class="muted t-secondary">未就绪 / မအဆင်သင့်</span>
           </div>
         </div>
         <div class="deliverable-card">
-          <div class="deliverable-title">Audio (MM) <span class="muted t-secondary">/ 缅语配音</span></div>
+          <div class="deliverable-title">缅语配音 <span class="muted t-secondary">/ မြန်မာအသံ</span></div>
           <div class="deliverable-actions">
             <a id="audio-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/audio_mm" target="_blank" rel="noopener">mm_audio</a>
-            <span id="audio-status" class="muted t-secondary">Not ready</span>
+            <span id="audio-status" class="muted t-secondary">未就绪 / မအဆင်သင့်</span>
           </div>
           <audio id="audio-preview" controls style="display:none; width: 100%; margin-top:6px;"></audio>
         </div>
@@ -207,11 +225,11 @@
     <div class="panel">
       <div class="section-title">
         <h2>场景切片 (Scenes) <span class="muted t-secondary">/ အပိုင်းခွဲ (Scenes)</span></h2>
-        <div class="secondary">Scenes slicing for ops reuse.</div>
+        <div class="secondary">用于运营复用的场景切片 / အော်ပရေးရှင်းအသုံးပြုရန် Scene အပိုင်းများ</div>
       </div>
       <div class="section-grid" style="margin-top:12px;">
         <div class="field">
-          <label>说明 / Explanation</label>
+          <label>说明 / ရှင်းလင်းချက်</label>
           <div class="muted t-secondary" style="white-space:pre-wrap;">
 中文：
 生成 Scenes 会把本次 Task 的视频按字幕时间切成多个“可复用片段（MSC）”，并打包为 Scenes.zip。
@@ -227,11 +245,11 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
           </div>
         </div>
         <div class="field">
-          <label>操作 / Actions</label>
+          <label>操作 / လုပ်ဆောင်ချက်များ</label>
           <div class="action-row" style="margin-top:8px; flex-wrap:wrap; gap:8px;">
-            <button id="btn-scenes" class="btn-primary">Build scenes / 生成场景包</button>
+            <button id="btn-scenes" class="btn-primary">生成场景切片 / Scenes ထုတ်</button>
             <a id="btn-scenes-download" class="btn-secondary disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">下载 Scenes.zip / Scenes.zip ဒေါင်းလုပ်</a>
-            <span id="scenes-step-status" class="muted">Not ready</span>
+            <span id="scenes-step-status" class="muted">未就绪 / မအဆင်သင့်</span>
           </div>
           <div id="scenes-error" class="muted t-secondary" style="margin-top:6px;"></div>
         </div>
@@ -240,62 +258,62 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
 
     <div class="panel">
       <div class="section-title">
-        <h2>Publish Info <span class="muted t-secondary">/ 发布信息</span></h2>
-        <div class="secondary">Share-ready details for operators.</div>
+        <h2>发布信息 <span class="muted t-secondary">/ ထုတ်ဝေမှုအချက်အလက်</span></h2>
+        <div class="secondary">运营交付信息 / အော်ပရေးရှင်းအသုံးပြုရန်အချက်အလက်</div>
       </div>
       <div class="info-row">
-        <div class="info-pill">Provider: <span id="publish-provider">-</span></div>
-        <div class="info-pill">Status: <span id="publish-status">-</span></div>
-        <div class="info-pill">Published: <span id="published-at">-</span></div>
+        <div class="info-pill">引擎 / ပံ့ပိုးသူ: <span id="publish-provider">-</span></div>
+        <div class="info-pill">状态 / အခြေအနေ: <span id="publish-status">-</span></div>
+        <div class="info-pill">已发布 / ထုတ်ဝေပြီး: <span id="published-at">-</span></div>
       </div>
       <div class="section-grid" style="margin-top:12px;">
         <div class="field">
-          <label>Publish Key <span class="muted t-secondary">/ 发布Key</span></label>
+          <label>发布Key <span class="muted t-secondary">/ ထုတ်ဝေ Key</span></label>
           <div class="copy-row">
             <code id="publish-key">-</code>
-            <button type="button" class="copy-btn" data-copy-target="publish-key">Copy</button>
+            <button type="button" class="copy-btn" data-copy-target="publish-key">复制 / ကူးယူ</button>
           </div>
         </div>
         <div class="field">
-          <label>Publish URL <span class="muted t-secondary">/ 发布链接</span></label>
+          <label>发布链接 <span class="muted t-secondary">/ ထုတ်ဝေလင့်ခ်</span></label>
           <div class="copy-row">
             <a id="publish-url" href="#" target="_blank" rel="noopener">-</a>
-            <button type="button" class="copy-btn" data-copy-target="publish-url">Copy</button>
+            <button type="button" class="copy-btn" data-copy-target="publish-url">复制 / ကူးယူ</button>
           </div>
         </div>
       </div>
       <div class="field" style="margin-top:12px;">
         <label>Publishing Text (မြန်မာ) <span class="muted t-secondary">/ 发布文案</span></label>
         <div class="copy-row">
-          <button type="button" class="copy-btn" id="copy-publish-text">Copy</button>
-          <span class="muted t-secondary">From MM text</span>
+          <button type="button" class="copy-btn" id="copy-publish-text">复制 / ကူးယူ</button>
+          <span class="muted t-secondary">来自缅文文本 / မြန်မာစာသားမှ</span>
         </div>
         <textarea id="publish-text" class="publish-textarea" readonly></textarea>
       </div>
       <div class="action-row" style="margin-top:12px;">
-        <button id="publish-btn" class="btn-success">Publish now <span class="muted t-secondary">/ 立即发布</span></button>
+        <button id="publish-btn" class="btn-success">立即发布 <span class="muted t-secondary">/ ယခုပဲထုတ်ဝေ</span></button>
       </div>
     </div>
 
     <div class="panel">
       <div class="section-title">
-        <h2>Steps <span class="muted t-secondary">/ 流程</span></h2>
-        <div class="secondary">Operator view of the processing pipeline.</div>
+        <h2>流程 <span class="muted t-secondary">/ လုပ်ငန်းစဉ်</span></h2>
+        <div class="secondary">运营流程视图 / အော်ပရေးရှင်းကြည့်ရှုမှု</div>
       </div>
       <div class="section-grid steps-grid">
         <div class="step-card">
-          <h3>Step 1 - Parse &amp; Download <span class="muted t-secondary">/ 解析</span></h3>
-          <p class="muted t-secondary">Call /api/tasks/{id}/parse for this task.</p>
+          <h3>步骤1 - 解析与下载 <span class="muted t-secondary">/ ခွဲခြမ်းစိတ်ဖြာ</span></h3>
+          <p class="muted t-secondary">调用 /api/tasks/{id}/parse / /api/tasks/{id}/parse ကို ခေါ်ပါ</p>
           <div class="action-row">
-            <button id="btn-parse" class="btn-primary">Run parse <span class="muted t-secondary">/ 运行</span></button>
-            <span id="parse-status" class="muted t-secondary">Not parsed</span>
+            <button id="btn-parse" class="btn-primary">运行解析 <span class="muted t-secondary">/ ခွဲခြမ်းစိတ်ဖြာ</span></button>
+            <span id="parse-status" class="muted t-secondary">未解析 / မပြီးသေး</span>
           </div>
         </div>
         <div class="step-card">
-          <h3>Step 3 - Voiceover (MM) <span class="muted">/ 缅语配音</span></h3>
+          <h3>步骤3 - 缅语配音 <span class="muted">/ မြန်မာအသံ</span></h3>
           <div class="form-grid">
             <div class="field">
-              <label for="voice-id">Voice ID <span class="muted">/ 音色</span></label>
+              <label for="voice-id">音色 <span class="muted">/ အသံအရည်အသွေး</span></label>
               <select id="voice-id">
                 <option value="mm_female_1">mm_female_1</option>
                 <option value="mm_male_1">mm_male_1</option>
@@ -303,7 +321,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
               </select>
             </div>
             <div class="field">
-              <label for="dub-provider">Provider <span class="muted">/ 引擎</span></label>
+              <label for="dub-provider">引擎 <span class="muted">/ ပံ့ပိုးသူ</span></label>
               <select id="dub-provider">
                 <option value="edge-tts">edge-tts</option>
                 <option value="lovo">lovo</option>
@@ -311,39 +329,39 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
             </div>
           </div>
           <div class="action-row" style="margin-top:8px;">
-            <button id="btn-dub" class="btn-primary">Generate dub <span class="muted t-secondary">/ 生成</span></button>
-            <span id="dub-status" class="muted">Not ready</span>
+            <button id="btn-dub" class="btn-primary">生成配音 <span class="muted t-secondary">/ အသံထုတ်</span></button>
+            <span id="dub-status" class="muted">未就绪 / မအဆင်သင့်</span>
           </div>
         </div>
         <div class="step-card">
-          <h3>Step 4 - Pack <span class="muted">/ 打包</span></h3>
-          <p class="muted">Bundle the CapCut project for this task.</p>
+          <h3>步骤4 - 打包 <span class="muted">/ အထုပ်</span></h3>
+          <p class="muted">生成本任务剪辑包 / ဤတာဝန်အတွက် အထုပ်ထုတ်</p>
           <div class="action-row">
-            <button id="btn-pack" class="btn-primary">Build pack <span class="muted t-secondary">/ 生成</span></button>
-            <span id="pack-step-status" class="muted">Not ready</span>
+            <button id="btn-pack" class="btn-primary">生成剪辑包 <span class="muted t-secondary">/ အထုပ်ထုတ်</span></button>
+            <span id="pack-step-status" class="muted">未就绪 / မအဆင်သင့်</span>
           </div>
         </div>
         <div class="step-card step-wide">
-          <h3>Step 2 - Subtitles <span class="muted">/ 字幕</span></h3>
-          <p class="muted">Generate subtitles via /api/tasks/{id}/subtitles.</p>
+          <h3>步骤2 - 字幕 <span class="muted">/ စာတန်းထိုး</span></h3>
+          <p class="muted">调用 /api/tasks/{id}/subtitles 生成字幕 / /api/tasks/{id}/subtitles ကို အသုံးပြုပါ</p>
           <div class="action-row">
-            <button id="btn-subtitles" class="btn-primary">Generate subtitles <span class="muted t-secondary">/ 生成</span></button>
-            <span id="subs-step-status" class="muted t-secondary">Not ready</span>
+            <button id="btn-subtitles" class="btn-primary">生成字幕 <span class="muted t-secondary">/ စာတန်းထိုးထုတ်</span></button>
+            <span id="subs-step-status" class="muted t-secondary">未就绪 / မအဆင်သင့်</span>
           </div>
           <details id="subs-compare" style="margin-top:10px;">
-            <summary>Compare subtitles <span class="muted t-secondary">/ 对比字幕</span></summary>
+            <summary>对比字幕 <span class="muted t-secondary">/ စာတန်းထိုးနှိုင်းယှဉ်</span></summary>
             <div style="margin-top:12px; display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
               <div>
                 <div class="copy-row" style="justify-content:space-between;">
-                  <label style="margin:0;">Origin (SRT) <span class="muted t-secondary">/ 原始</span></label>
-                  <button type="button" id="btn-copy-origin" class="copy-btn">Copy</button>
+                  <label style="margin:0;">原始 <span class="muted t-secondary">/ မူရင်း</span></label>
+                  <button type="button" id="btn-copy-origin" class="copy-btn">复制 / ကူးယူ</button>
                 </div>
                 <pre id="origin-text" class="output"></pre>
               </div>
               <div>
                 <div class="copy-row" style="justify-content:space-between;">
-                  <label style="margin:0;">MM (Myanmar) <span class="muted t-secondary">/ 缅文</span></label>
-                  <button type="button" id="btn-copy-mm" class="copy-btn">Copy</button>
+                  <label style="margin:0;">缅文 <span class="muted t-secondary">/ မြန်မာ</span></label>
+                  <button type="button" id="btn-copy-mm" class="copy-btn">复制 / ကူးယူ</button>
                 </div>
                 <pre id="mm-text" class="output"></pre>
               </div>
@@ -351,10 +369,10 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
 
             <div style="margin-top:12px;">
               <div class="copy-row" style="justify-content:space-between;">
-                <label for="mm-edit" style="margin:0;">MM Edited (mm_edited.txt) <span class="muted t-secondary">/ 缅文编辑</span></label>
+                <label for="mm-edit" style="margin:0;">缅文编辑 (mm_edited.txt) <span class="muted t-secondary">/ မြန်မာတည်းဖြတ်</span></label>
                 <div class="copy-row">
-                  <button type="button" id="btn-load-edited" class="copy-btn">Reload</button>
-                  <button type="button" id="btn-save-edited" class="copy-btn">Save</button>
+                  <button type="button" id="btn-load-edited" class="copy-btn">刷新 / ပြန်တင်</button>
+                  <button type="button" id="btn-save-edited" class="copy-btn">保存 / သိမ်း</button>
                 </div>
               </div>
               <textarea id="mm-edit" rows="6" style="width:100%; margin-top:8px;"></textarea>
@@ -484,11 +502,11 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
       setDownloadLink("scenes-link", hasScenes ? taskEndpoint(taskId, "scenes") : null);
       setDownloadLink("btn-scenes-download", hasScenes ? taskEndpoint(taskId, "scenes") : null);
 
-      setStatusText("video-status", hasRaw, "Ready", "Not ready");
-      setStatusText("subs-status", hasMmSrt || hasMmTxt, "Ready", "Not ready");
-      setStatusText("audio-status", hasAudio, "Ready", "Not ready");
-      setStatusText("pack-status", hasPack, "Ready", "Not ready");
-      setStatusText("scenes-status", hasScenes, "Ready", "Not ready");
+      setStatusText("video-status", hasRaw, "已就绪 / အဆင်သင့်", "未就绪 / မအဆင်သင့်");
+      setStatusText("subs-status", hasMmSrt || hasMmTxt, "已就绪 / အဆင်သင့်", "未就绪 / မအဆင်သင့်");
+      setStatusText("audio-status", hasAudio, "已就绪 / အဆင်သင့်", "未就绪 / မအဆင်သင့်");
+      setStatusText("pack-status", hasPack, "已就绪 / အဆင်သင့်", "未就绪 / မအဆင်သင့်");
+      setStatusText("scenes-status", hasScenes, "已就绪 / အဆင်သင့်", "未就绪 / မအဆင်သင့်");
 
       const audioEl = document.getElementById("audio-preview");
       if (audioEl) {
@@ -508,10 +526,10 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
       const hasAudio = !!data.mm_audio_path;
       const hasPack = !!data.pack_path;
 
-      setStatusText("parse-status", hasRaw, "Parsed", "Not parsed");
-      setStatusText("subs-step-status", hasSubs, "Ready", "Not ready");
-      setStatusText("dub-status", hasAudio, "Ready", "Not ready");
-      setStatusText("pack-step-status", hasPack, "Ready", "Not ready");
+      setStatusText("parse-status", hasRaw, "已解析 / ပြီးသည်", "未解析 / မပြီးသေး");
+      setStatusText("subs-step-status", hasSubs, "已就绪 / အဆင်သင့်", "未就绪 / မအဆင်သင့်");
+      setStatusText("dub-status", hasAudio, "已就绪 / အဆင်သင့်", "未就绪 / မအဆင်သင့်");
+      setStatusText("pack-step-status", hasPack, "已就绪 / အဆင်သင့်", "未就绪 / မအဆင်သင့်");
     }
 
     function renderScenesStatus(data) {
@@ -526,7 +544,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
         already_ready: "已就绪 / အဆင်သင့်",
       };
       if (statusEl) {
-        statusEl.textContent = map[status] || "Not ready";
+        statusEl.textContent = map[status] || "未就绪 / မအဆင်သင့်";
       }
       if (errorEl) {
         errorEl.textContent = status === "error" ? (data.scenes_error || "") : "";

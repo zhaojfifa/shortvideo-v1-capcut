@@ -70,6 +70,8 @@ def test_create_capcut_pack_zip_structure(tmp_path, monkeypatch) -> None:
         f"{prefix}raw/raw.mp4",
         f"{prefix}audio/voice_my.wav",
         f"{prefix}subs/my.srt",
+        f"{prefix}subs/mm.srt",
+        f"{prefix}subs/mm.txt",
         f"{prefix}scenes/.keep",
         f"{prefix}manifest.json",
         f"{prefix}README.md",

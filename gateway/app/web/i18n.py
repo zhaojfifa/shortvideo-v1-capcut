@@ -20,8 +20,8 @@ I18N: Dict[str, Dict[str, str]] = {
 I18N.setdefault("zh", {}).update(
     {
         "task_board": "任务看板",
-        "task_count": "已加载 {n} 个任务。",
-        "new_suitcase_task": "新建行李箱任务",
+        "task_count": "已加载 {n} 个任务",
+        "new_suitcase_task": "新建任务",
         "status_legend": "状态说明",
         "status_ready": "已就绪",
         "status_processing": "处理中",
@@ -43,26 +43,26 @@ I18N.setdefault("zh", {}).update(
 )
 I18N.setdefault("my", {}).update(
     {
-        "task_board": "တာဝန်ဘုတ်",
-        "task_count": "တာဝန် {n} ခု တင်ပြီး။",
-        "new_suitcase_task": "ခရီးဆောင်အိတ် တာဝန်အသစ်",
-        "status_legend": "အခြေအနေဖော်ပြချက်",
+        "task_board": "တာဝန်စာရင်း",
+        "task_count": "တာဝန် {n} ခု",
+        "new_suitcase_task": "တာဝန်အသစ်",
+        "status_legend": "အခြေအနေ",
         "status_ready": "အဆင်သင့်",
         "status_processing": "လုပ်ဆောင်နေသည်",
-        "status_pending": "စောင့်ဆိုင်းနေသည်",
+        "status_pending": "စောင့်ဆိုင်း",
         "status_error": "မအောင်မြင်",
-        "download": "ဒေါင်းလုဒ်",
+        "download": "ဒေါင်းလုပ်",
         "open": "ဖွင့်",
         "json": "JSON",
-        "pack": "ဖြတ်တည်းပုံး",
-        "publish": "ထုတ်ပြန်/သိမ်းဆည်း",
-        "publish_now": "သိမ်းဆည်းရန်",
-        "published": "သိမ်းပြီး",
-        "not_published": "မသိမ်းရသေး",
-        "publish_provider": "သိမ်းရာနေရာ",
-        "publish_key": "သိမ်းဆည်း Key",
-        "publish_url": "ဒေါင်းလုဒ်လင့်",
-        "refresh_link": "လင့်ကို ပြန်ယူ",
+        "pack": "အထုပ်",
+        "publish": "ထုတ်ဝေမှတ်တမ်း",
+        "publish_now": "ယခုပဲထုတ်ဝေ",
+        "published": "ထုတ်ဝေပြီး",
+        "not_published": "မထုတ်ဝေသေး",
+        "publish_provider": "ထုတ်ဝေရာနေရာ",
+        "publish_key": "ထုတ်ဝေ Key",
+        "publish_url": "ထုတ်ဝေလင့်ခ်",
+        "refresh_link": "လင့်ခ် ပြန်လည်ရယူ",
     }
 )
 
