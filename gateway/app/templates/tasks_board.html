@@ -157,6 +157,16 @@
       return code;
     }
 
+    function platformLabel(code) {
+      if (!code) return "";
+      const lower = String(code).toLowerCase();
+      if (lower === "douyin") return "抖音 / ဒေါ်ယင်";
+      if (lower === "xhs") return "小红书 / 小红书";
+      if (lower === "tk" || lower === "tiktok") return "TikTok / TikTok";
+      if (lower === "fb" || lower === "facebook") return "Facebook / Facebook";
+      return code;
+    }
+
     function shortText(text, limit = 28) {
       if (!text) return "";
       return text.length > limit ? text.slice(0, limit - 1) + "..." : text;
@@ -175,7 +185,7 @@
           <td title="${task.title || ""}">${shortText(task.title, 20)}</td>
           <td>${categoryLabel(task.category_key)}</td>
           <td>${langLabel(task.content_lang)}</td>
-          <td>${task.platform || ""}</td>
+          <td>${platformLabel(task.platform)}</td>
           <td>${task.account_id || ""}</td>
           <td><span class="status ${statusClass(status)}">${status}</span></td>
           <td>${task.last_step || ""}</td>
