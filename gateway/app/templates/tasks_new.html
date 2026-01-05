@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>New Suitcase Task - ShortVideo</title>
+  <title>???? / ????????? - ShortVideo</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
   <link rel="stylesheet" href="/static/i18n.css" />
   <style>
@@ -69,78 +69,76 @@
 <body>
   <div class="page">
     <header>
-      <h1>{{ t_primary("new_suitcase_task") }}</h1>
-      {% if ui_show_secondary %}
-        <div class="muted t-secondary">{{ t_secondary("new_suitcase_task") }}</div>
-      {% endif %}
-      <a href="/tasks">Back to Task Board <span class="muted t-secondary">/ Back to Task Board</span></a>
+      <h1>???? / ?????????</h1>
+      
+      <a href="/tasks">?????? / ????????????????????? ???????????</a>
     </header>
 
     <main class="card">
       <form id="task-form">
         <div class="field">
-          <label for="source_url">Source URL <span class="muted t-secondary">/ Source URL</span> *</label>
-          <input id="source_url" name="source_url" type="text" autocomplete="off" required placeholder="Paste source URL (Douyin/XHS/TK/FB)" />
+          <label for="source_url">???? / ?????????? *</label>
+          <input id="source_url" name="source_url" type="text" autocomplete="off" required placeholder="?????????/???/TikTok/FB? / ????????????? ?????????" />
         </div>
 
         <div class="row">
           <div class="field">
-            <label for="platform">Platform <span class="muted t-secondary">/ Platform</span></label>
+            <label for="platform">?? / ??????????</label>
             <select id="platform" name="platform">
-              <option value="douyin" selected>Douyin</option>
-              <option value="xhs">XHS</option>
+              <option value="douyin" selected>?? / Douyin</option>
+              <option value="xhs">??? / XHS</option>
               <option value="tk">TikTok</option>
               <option value="fb">Facebook</option>
             </select>
           </div>
           <div class="field">
-            <label for="account_id">Account <span class="muted t-secondary">/ Account</span></label>
+            <label for="account_id">?? / ???????</label>
             <select id="account_id" name="account_id">
-              <option value="suitcase_mm_1">Suitcase MM #1</option>
+              <option value="suitcase_mm_1">????? #1 / Suitcase MM #1</option>
             </select>
             <input type="hidden" id="account_name" name="account_name" value="Suitcase MM #1" />
           </div>
         </div>
 
         <div class="field">
-          <label>Video type <span class="muted t-secondary">/ Video type</span></label>
-          <div class="muted t-secondary">Choose the business intent. <span class="muted t-secondary">/ Pick intent</span></div>
+          <label>???? / ?????????????????</label>
+          <div class="muted t-secondary">?????? / ?????????????????</div>
           <div class="radio-group" style="margin-top:6px;">
-            <label class="radio"><input type="radio" name="video_type" value="review" checked /> Comparison Review</label>
-            <label class="radio"><input type="radio" name="video_type" value="scenario" /> Scenario Usage</label>
+            <label class="radio"><input type="radio" name="video_type" value="review" checked /> ???? / ??????????????????</label>
+            <label class="radio"><input type="radio" name="video_type" value="scenario" /> ???? / ????????????</label>
           </div>
         </div>
 
         <div class="field">
-          <label>Style preset <span class="muted t-secondary">/ Style preset</span></label>
-          <div class="muted t-secondary">Defines pacing and editing intent. <span class="muted t-secondary">/ Editing pace</span></div>
+          <label>???? / ?????????</label>
+          <div class="muted t-secondary">????????? / ???????????????? ?????????????</div>
           <div class="radio-group" style="margin-top:6px;">
-            <label class="radio"><input type="radio" name="style_preset" value="review_brief" checked /> Short review, fast pace</label>
-            <label class="radio"><input type="radio" name="style_preset" value="scenario_story" /> Scenario story, normal pace</label>
+            <label class="radio"><input type="radio" name="style_preset" value="review_brief" checked /> ????????? / ??????????????</label>
+            <label class="radio"><input type="radio" name="style_preset" value="scenario_story" /> ?????????? / ??????????????????</label>
           </div>
         </div>
 
         <div class="field">
-          <label for="title">Title (optional) <span class="muted t-secondary">/ Title</span></label>
-          <input id="title" name="title" type="text" placeholder="Optional title" />
+          <label for="title">?????? / ????????? (?????????????)</label>
+          <input id="title" name="title" type="text" placeholder="???? / ????????? ????????????" />
         </div>
 
         <div class="field">
-          <label for="note">Note / Operator hint <span class="muted t-secondary">/ Notes</span></label>
-          <textarea id="note" name="note" placeholder="Optional note for operators"></textarea>
+          <label for="note">?? / ?????????????</label>
+          <textarea id="note" name="note" placeholder="?????????? / ???????? (?????????????)"></textarea>
         </div>
 
         <div class="summary" id="summary-block">
           <div class="summary-grid">
-            <div class="summary-item"><strong>Platform <span class="muted t-secondary">/ Platform</span></strong><span id="summary-platform">-</span></div>
-            <div class="summary-item"><strong>Account <span class="muted t-secondary">/ Account</span></strong><span id="summary-account">-</span></div>
-            <div class="summary-item"><strong>Video type <span class="muted t-secondary">/ Video type</span></strong><span id="summary-video">-</span></div>
-            <div class="summary-item"><strong>Style <span class="muted t-secondary">/ Style</span></strong><span id="summary-style">-</span></div>
-            <div class="summary-item"><strong>Language <span class="muted t-secondary">/ Language</span></strong><span id="summary-lang">Burmese (MM)</span></div>
+            <div class="summary-item"><strong>?? / ??????????</strong><span id="summary-platform">-</span></div>
+            <div class="summary-item"><strong>?? / ???????</strong><span id="summary-account">-</span></div>
+            <div class="summary-item"><strong>???? / ?????????????????</strong><span id="summary-video">-</span></div>
+            <div class="summary-item"><strong>?? / ?????????</strong><span id="summary-style">-</span></div>
+            <div class="summary-item"><strong>?? / ????????</strong><span id="summary-lang">?? (MM)</span></div>
           </div>
         </div>
 
-        <button class="btn-primary" type="submit">Create &amp; run pipeline <span class="muted t-secondary">/ Create</span></button>
+        <button class="btn-primary" type="submit">??????? / ?????????? ???????????</button>
         <div class="muted t-secondary" style="margin-top: 6px;">Auto-category: Suitcase · Language: Burmese · UI: Chinese <span class="muted t-secondary">/ Auto category · Language · UI</span></div>
       </form>
 
@@ -171,11 +169,11 @@
 
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
-      resultEl.textContent = "Submitting...";
+      resultEl.textContent = "???... / ?????????????...";
 
       const rawSource = document.getElementById("source_url").value.trim();
       if (!rawSource) {
-        alert("Source URL is required.");
+        alert("???????? / ?????????? ?????????");
         resultEl.textContent = "";
         return;
       }
@@ -215,17 +213,17 @@
         try { data = JSON.parse(text); } catch (_) { /* noop */ }
 
         if (!res.ok) {
-          resultEl.textContent = `Error ${res.status}: ${text}`;
+          resultEl.textContent = `?? ${res.status}: ${text}`;
           resultEl.classList.add("error");
           return;
         }
 
         const taskId = data?.task_id || "(unknown)";
         resultEl.classList.remove("error");
-        resultEl.textContent = `Created task ${taskId}, status: ${data?.status || "pending"}`;
+        resultEl.textContent = `????? ${taskId}????${data?.status || "pending"}`;
         setTimeout(() => { window.location.href = "/tasks"; }, 800);
       } catch (err) {
-        resultEl.textContent = "Request failed: " + err.message;
+        resultEl.textContent = "????? " + err.message;
         resultEl.classList.add("error");
       }
     });

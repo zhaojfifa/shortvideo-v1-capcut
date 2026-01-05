@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Task Board - ShortVideo</title>
+  <title>???? / ????????????????? - ShortVideo</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
   <link rel="stylesheet" href="/static/i18n.css" />
   <style>
@@ -89,14 +89,14 @@
 </head>
 <body>
   <header>
-    <h1>Task Board <span class="muted t-secondary">/ Task Board</span></h1>
+    <h1>???? / ?????????????????</h1>
     <div class="actions">
-      <a class="btn" href="/tasks/new">New task <span class="muted t-secondary">/ New task</span></a>
+      <a class="btn" href="/tasks/new">???? / ?????????</a>
       <button id="refresh-btn" type="button">Refresh <span class="muted t-secondary">/ Refresh</span></button>
     </div>
   </header>
 
-  <div id="message" class="small">Loading tasks...</div>
+  <div id="message" class="small">??????... / ????????????????? ??????????????...</div>
 
   <div class="card">
     <table>
@@ -111,7 +111,7 @@
           <th>Status <span class="muted t-secondary">/ Status</span></th>
           <th>Last Step <span class="muted t-secondary">/ Last step</span></th>
           <th>Pack <span class="muted t-secondary">/ Pack</span></th>
-          <th>Created <span class="muted t-secondary">/ Created</span></th>
+          <th>???? / ???????????</th>
           <th>JSON <span class="muted t-secondary">(Engineering)</span></th>
         </tr>
       </thead>
@@ -188,17 +188,17 @@
     }
 
     async function loadTasks() {
-      messageEl.textContent = "Loading tasks...";
+      messageEl.textContent = "??????... / ????????????????? ??????????????...";
       try {
         const res = await fetch("/api/tasks?limit=50");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const tasks = Array.isArray(data) ? data : (data.items || []);
-        messageEl.textContent = tasks.length ? `Loaded ${tasks.length} tasks.` : "No tasks yet.";
+        messageEl.textContent = tasks.length ? `??? ${tasks.length} ???` : "???? / ??????????????????????";
         renderTasks(tasks);
       } catch (err) {
         console.error(err);
-        messageEl.textContent = "Failed to load tasks: " + err.message;
+        messageEl.textContent = "???????" + err.message;
       }
     }
 
@@ -228,7 +228,7 @@
     renderTasks(initialTasks || []);
     messageEl.textContent = initialTasks.length
       ? `Loaded ${initialTasks.length} tasks.`
-      : "No tasks yet.";
+      : "???? / ??????????????????????";
     document.getElementById("refresh-btn").addEventListener("click", loadTasks);
     document.addEventListener("DOMContentLoaded", loadTasks);
   </script>

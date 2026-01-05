@@ -158,14 +158,14 @@
     <div class="panel">
       <div class="section-title">
         <h2>Deliverables <span class="muted t-secondary">/ 交付物</span></h2>
-        <div class="secondary">Download-ready outputs for operators.</div>
+        <div class="secondary">???????????? / ???????????????? ???????????</div>
       </div>
       <div class="section-grid deliverables-grid">
         <div class="deliverable-card primary">
           <div class="deliverable-title">CapCut Pack <span class="muted t-secondary">/ 剪辑包</span></div>
           <div class="deliverable-actions">
-            <a id="pack-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/pack" target="_blank" rel="noopener">Download</a>
-            <span id="pack-status" class="muted t-secondary">Not ready</span>
+            <a id="pack-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/pack" target="_blank" rel="noopener">?? / ??????????</a>
+            <span id="pack-status" class="muted t-secondary">??? / ?????????</span>
           </div>
           <div class="muted t-secondary" style="margin-top:6px;">Download via redirect (302) / 下载将跳转到对象存储链接</div>
         </div>
@@ -173,7 +173,7 @@
           <div class="deliverable-title">Scenes Package <span class="muted t-secondary">/ 场景包</span></div>
           <div class="deliverable-actions">
             <a id="scenes-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">下载 Scenes.zip / Scenes.zip ဒေါင်းလုပ်</a>
-            <span id="scenes-status" class="muted t-secondary">Not ready</span>
+            <span id="scenes-status" class="muted t-secondary">??? / ?????????</span>
           </div>
           <div class="muted t-secondary" style="margin-top:6px;">Download → unzip → open video &amp; SRT / 下载 → 解压 → 打开视频与字幕</div>
         </div>
@@ -181,7 +181,7 @@
           <div class="deliverable-title">Video <span class="muted t-secondary">/ 视频</span></div>
           <div class="deliverable-actions">
             <a id="raw-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/raw" target="_blank" rel="noopener">raw.mp4</a>
-            <span id="video-status" class="muted t-secondary">Not ready</span>
+            <span id="video-status" class="muted t-secondary">??? / ?????????</span>
           </div>
         </div>
         <div class="deliverable-card">
@@ -190,14 +190,14 @@
             <a id="mm-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/subs_mm" target="_blank" rel="noopener">mm.srt</a>
             <a id="mm-txt-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/mm_txt" target="_blank" rel="noopener">mm.txt</a>
             <a id="origin-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/subs_origin" target="_blank" rel="noopener">origin.srt</a>
-            <span id="subs-status" class="muted t-secondary">Not ready</span>
+            <span id="subs-status" class="muted t-secondary">??? / ?????????</span>
           </div>
         </div>
         <div class="deliverable-card">
           <div class="deliverable-title">Audio (MM) <span class="muted t-secondary">/ 缅语配音</span></div>
           <div class="deliverable-actions">
             <a id="audio-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/audio_mm" target="_blank" rel="noopener">mm_audio</a>
-            <span id="audio-status" class="muted t-secondary">Not ready</span>
+            <span id="audio-status" class="muted t-secondary">??? / ?????????</span>
           </div>
           <audio id="audio-preview" controls style="display:none; width: 100%; margin-top:6px;"></audio>
         </div>
@@ -215,11 +215,11 @@
           <div class="muted t-secondary" style="white-space:pre-wrap;">
 中文：
 生成 Scenes 会把本次 Task 的视频按字幕时间切成多个“可复用片段（MSC）”，并打包为 Scenes.zip。
-用法：先点“生成场景切片”，状态变为 Ready 后点“下载 Scenes.zip”。无需打开或编辑 JSON。
+用法：先点“生成场景切片”，状态变为 ??? / ???????? 后点“下载 Scenes.zip”。无需打开或编辑 JSON。
 
 缅文：
 Scenes ကို စာတန်းထိုးအချိန်အလိုက် ဗီဒီယိုကို အပိုင်းများ (MSC) ခွဲပြီး Scenes.zip အဖြစ် ထုတ်ပေးပါတယ်။
-အသုံးပြုရန် — “Scenes ထုတ်မည်” ကိုနှိပ်ပြီး Ready ဖြစ်သွားလျှင် “Scenes.zip ဒေါင်းလုပ်” ကိုနှိပ်ပါ။ JSON ကို မဖွင့်လည်း ရပါတယ်။
+အသုံးပြုရန် — “Scenes ထုတ်မည်” ကိုနှိပ်ပြီး ??? / ???????? ဖြစ်သွားလျှင် “Scenes.zip ဒေါင်းလုပ်” ကိုနှိပ်ပါ။ JSON ကို မဖွင့်လည်း ရပါတယ်။
           </div>
           <div class="muted t-secondary" style="margin-top:8px;">
 中文：Scenes.zip 不会影响 Pack.zip，两个包用途不同。<br/>
@@ -231,7 +231,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
           <div class="action-row" style="margin-top:8px; flex-wrap:wrap; gap:8px;">
             <button id="btn-scenes" class="btn-primary">Build scenes / 生成场景包</button>
             <a id="btn-scenes-download" class="btn-secondary disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">下载 Scenes.zip / Scenes.zip ဒေါင်းလုပ်</a>
-            <span id="scenes-step-status" class="muted">Not ready</span>
+            <span id="scenes-step-status" class="muted">??? / ?????????</span>
           </div>
           <div id="scenes-error" class="muted t-secondary" style="margin-top:6px;"></div>
         </div>
@@ -246,7 +246,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
       <div class="info-row">
         <div class="info-pill">Provider: <span id="publish-provider">-</span></div>
         <div class="info-pill">Status: <span id="publish-status">-</span></div>
-        <div class="info-pill">Published: <span id="published-at">-</span></div>
+        <div class="info-pill">???? <span id="published-at">-</span></div>
       </div>
       <div class="section-grid" style="margin-top:12px;">
         <div class="field">
@@ -312,7 +312,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
           </div>
           <div class="action-row" style="margin-top:8px;">
             <button id="btn-dub" class="btn-primary">Generate dub <span class="muted t-secondary">/ 生成</span></button>
-            <span id="dub-status" class="muted">Not ready</span>
+            <span id="dub-status" class="muted">??? / ?????????</span>
           </div>
         </div>
         <div class="step-card">
@@ -320,7 +320,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
           <p class="muted">Bundle the CapCut project for this task.</p>
           <div class="action-row">
             <button id="btn-pack" class="btn-primary">Build pack <span class="muted t-secondary">/ 生成</span></button>
-            <span id="pack-step-status" class="muted">Not ready</span>
+            <span id="pack-step-status" class="muted">??? / ?????????</span>
           </div>
         </div>
         <div class="step-card step-wide">
@@ -328,7 +328,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
           <p class="muted">Generate subtitles via /api/tasks/{id}/subtitles.</p>
           <div class="action-row">
             <button id="btn-subtitles" class="btn-primary">Generate subtitles <span class="muted t-secondary">/ 生成</span></button>
-            <span id="subs-step-status" class="muted t-secondary">Not ready</span>
+            <span id="subs-step-status" class="muted t-secondary">??? / ?????????</span>
           </div>
           <details id="subs-compare" style="margin-top:10px;">
             <summary>Compare subtitles <span class="muted t-secondary">/ 对比字幕</span></summary>
@@ -369,7 +369,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
       <summary>Logs &amp; Debug <span class="muted t-secondary">/ 日志与调试</span></summary>
       <div style="margin-top:12px;">
         <h3 style="margin:0 0 8px;">Logs <span class="muted t-secondary">/ 日志</span></h3>
-        <pre id="log-output" class="output-log">Ready.</pre>
+        <pre id="log-output" class="output-log">??? / ????????.</pre>
       </div>
       <div style="margin-top:12px;">
         <h3 style="margin:0 0 8px;">Engineering details <span class="muted t-secondary">/ 工程信息</span></h3>
@@ -439,10 +439,10 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
       }
     }
 
-    function setStatusText(id, isReady, readyText, missingText) {
+    function setStatusText(id, is??? / ????????, readyText, missingText) {
       const el = document.getElementById(id);
       if (!el) return;
-      el.textContent = isReady ? readyText : missingText;
+      el.textContent = is??? / ???????? ? readyText : missingText;
     }
 
     function taskEndpoint(taskId, kind) {
@@ -484,11 +484,11 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
       setDownloadLink("scenes-link", hasScenes ? taskEndpoint(taskId, "scenes") : null);
       setDownloadLink("btn-scenes-download", hasScenes ? taskEndpoint(taskId, "scenes") : null);
 
-      setStatusText("video-status", hasRaw, "Ready", "Not ready");
-      setStatusText("subs-status", hasMmSrt || hasMmTxt, "Ready", "Not ready");
-      setStatusText("audio-status", hasAudio, "Ready", "Not ready");
-      setStatusText("pack-status", hasPack, "Ready", "Not ready");
-      setStatusText("scenes-status", hasScenes, "Ready", "Not ready");
+      setStatusText("video-status", hasRaw, "??? / ????????", "??? / ?????????");
+      setStatusText("subs-status", hasMmSrt || hasMmTxt, "??? / ????????", "??? / ?????????");
+      setStatusText("audio-status", hasAudio, "??? / ????????", "??? / ?????????");
+      setStatusText("pack-status", hasPack, "??? / ????????", "??? / ?????????");
+      setStatusText("scenes-status", hasScenes, "??? / ????????", "??? / ?????????");
 
       const audioEl = document.getElementById("audio-preview");
       if (audioEl) {
@@ -509,9 +509,9 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
       const hasPack = !!data.pack_path;
 
       setStatusText("parse-status", hasRaw, "Parsed", "Not parsed");
-      setStatusText("subs-step-status", hasSubs, "Ready", "Not ready");
-      setStatusText("dub-status", hasAudio, "Ready", "Not ready");
-      setStatusText("pack-step-status", hasPack, "Ready", "Not ready");
+      setStatusText("subs-step-status", hasSubs, "??? / ????????", "??? / ?????????");
+      setStatusText("dub-status", hasAudio, "??? / ????????", "??? / ?????????");
+      setStatusText("pack-step-status", hasPack, "??? / ????????", "??? / ?????????");
     }
 
     function renderScenesStatus(data) {
@@ -526,7 +526,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
         already_ready: "已就绪 / အဆင်သင့်",
       };
       if (statusEl) {
-        statusEl.textContent = map[status] || "Not ready";
+        statusEl.textContent = map[status] || "??? / ?????????";
       }
       if (errorEl) {
         errorEl.textContent = status === "error" ? (data.scenes_error || "") : "";
@@ -698,8 +698,8 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
 
     document.getElementById("btn-dub").addEventListener("click", async () => {
       const taskId = window.currentTask.task_id;
-      const subsReady = window.currentTask.subtitles_status === "ready" || !!window.currentTask.mm_srt_path;
-      if (!subsReady) {
+      const subs??? / ???????? = window.currentTask.subtitles_status === "ready" || !!window.currentTask.mm_srt_path;
+      if (!subs??? / ????????) {
         appendLog("Please generate subtitles first / 请先生成字幕 / အရင် စာတန်းထိုးကို ထုတ်ပါ");
         return;
       }
@@ -739,8 +739,8 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
 
     document.getElementById("btn-scenes").addEventListener("click", async () => {
       const taskId = window.currentTask.task_id;
-      const subsReady = window.currentTask.subtitles_status === "ready" || !!window.currentTask.mm_srt_path;
-      if (!subsReady) {
+      const subs??? / ???????? = window.currentTask.subtitles_status === "ready" || !!window.currentTask.mm_srt_path;
+      if (!subs??? / ????????) {
         appendLog("Please generate subtitles first / 请先生成字幕 / အရင် စာတန်းထိုးကို ထုတ်ပါ");
         return;
       }
@@ -767,7 +767,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
       publishBtn.addEventListener("click", async () => {
         const taskId = window.currentTask.task_id;
         const statusEl = document.getElementById("publish-status");
-        if (statusEl) statusEl.textContent = "Publishing...";
+        if (statusEl) statusEl.textContent = "???... / ???????????...";
         try {
           const resp = await fetch(`/api/tasks/${taskId}/publish`, {
             method: "POST",
@@ -776,13 +776,13 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
           });
           if (!resp.ok) {
             const detail = await resp.text();
-            if (statusEl) statusEl.textContent = `Publish failed: ${resp.status} ${detail}`;
+            if (statusEl) statusEl.textContent = `?????${resp.status} ${detail}`;
             return;
           }
-          if (statusEl) statusEl.textContent = "Published.";
+          if (statusEl) statusEl.textContent = "??? / ??????????";
           await refreshTaskState();
         } catch (err) {
-          if (statusEl) statusEl.textContent = `Publish error: ${err}`;
+          if (statusEl) statusEl.textContent = `?????${err}`;
         }
       });
     }
