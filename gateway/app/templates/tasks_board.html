@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Task Board - ShortVideo</title>
+  <title>{{ t_primary("task_board") }}{% if ui_bilingual %} / {{ t_secondary("task_board") }}{% endif %} - ShortVideo</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
   <link rel="stylesheet" href="/static/i18n.css" />
   <style>
@@ -24,8 +24,8 @@
     h1 { margin: 0; font-size: 1.25rem; font-weight: 700; }
     .actions { display: flex; gap: 8px; }
     button, .btn {
-      background: #2563eb;
-      color: #ffffff;
+      background: transparent;
+      color: inherit;
       border: none;
       border-radius: 6px;
       padding: 8px 12px;
@@ -36,7 +36,7 @@
       align-items: center;
       justify-content: center;
     }
-    button:hover, .btn:hover { background: #1d4ed8; }
+    button:hover, .btn:hover { filter: brightness(0.95); }
     .card {
       background: #ffffff;
       border-radius: 10px;
@@ -89,10 +89,10 @@
 </head>
 <body>
   <header>
-    <h1>Task Board <span class="muted t-secondary">/ Task Board</span></h1>
+    <h1>{{ bi(t_primary("task_board"), t_secondary("task_board")) }}</h1>
     <div class="actions">
-      <a class="btn" href="/tasks/new">New task <span class="muted t-secondary">/ New task</span></a>
-      <button id="refresh-btn" type="button">Refresh <span class="muted t-secondary">/ Refresh</span></button>
+      <a class="btn btn-primary" href="/tasks/new">{{ bi(t_primary("new_task"), t_secondary("new_task")) }}</a>
+      <button id="refresh-btn" type="button" class="btn btn-secondary">{{ bi(t_primary("refresh"), t_secondary("refresh")) }}</button>
     </div>
   </header>
 
@@ -102,17 +102,17 @@
     <table>
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Title <span class="muted t-secondary">/ Title</span></th>
-          <th>Category <span class="muted t-secondary">/ Category</span></th>
-          <th>Lang <span class="muted t-secondary">/ Language</span></th>
-          <th>Platform <span class="muted t-secondary">/ Platform</span></th>
-          <th>Account <span class="muted t-secondary">/ Account</span></th>
-          <th>Status <span class="muted t-secondary">/ Status</span></th>
-          <th>Last Step <span class="muted t-secondary">/ Last step</span></th>
-          <th>Pack <span class="muted t-secondary">/ Pack</span></th>
-          <th>Created <span class="muted t-secondary">/ Created</span></th>
-          <th>JSON <span class="muted t-secondary">(Engineering)</span></th>
+          <th>{{ bi(t_primary("id"), t_secondary("id")) }}</th>
+          <th>{{ bi(t_primary("title"), t_secondary("title")) }}</th>
+          <th>{{ bi(t_primary("category"), t_secondary("category")) }}</th>
+          <th>{{ bi(t_primary("lang"), t_secondary("lang")) }}</th>
+          <th>{{ bi(t_primary("platform"), t_secondary("platform")) }}</th>
+          <th>{{ bi(t_primary("account"), t_secondary("account")) }}</th>
+          <th>{{ bi(t_primary("status"), t_secondary("status")) }}</th>
+          <th>{{ bi(t_primary("steps"), t_secondary("steps")) }}</th>
+          <th>{{ bi(t_primary("pack"), t_secondary("pack")) }}</th>
+          <th>{{ bi(t_primary("created"), t_secondary("created")) }}</th>
+          <th>{{ bi(t_primary("json"), t_secondary("json")) }}</th>
         </tr>
       </thead>
       <tbody id="task-rows"></tbody>
