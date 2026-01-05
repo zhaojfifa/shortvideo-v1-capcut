@@ -292,9 +292,37 @@
                 {% set lang_label = lang_key %}
               {% endif %}
 
+              {% set platform_key = (t.platform or "") | lower %}
+              {% if platform_key == "douyin" %}
+                {% set platform_label_primary = "抖音" %}
+                {% set platform_label_secondary = "ဒေါ်ယင်" %}
+              {% elif platform_key in ["tk", "tiktok"] %}
+                {% set platform_label_primary = "TikTok" %}
+                {% set platform_label_secondary = "TikTok" %}
+              {% elif platform_key == "xhs" %}
+                {% set platform_label_primary = "小红书" %}
+                {% set platform_label_secondary = "小红书" %}
+              {% elif platform_key in ["fb", "facebook"] %}
+                {% set platform_label_primary = "Facebook" %}
+                {% set platform_label_secondary = "Facebook" %}
+              {% elif platform_key == "" %}
+                {% set platform_label_primary = "-" %}
+                {% set platform_label_secondary = "-" %}
+              {% else %}
+                {% set platform_label_primary = t.platform %}
+                {% set platform_label_secondary = t.platform %}
+              {% endif %}
+
               <tr>
                 <td class="truncate" data-label="{{ t_primary('id') }} / {{ t_secondary('id') }}" title="{{ t.task_id }}"><a href="/tasks/{{ t.task_id }}">{{ t.task_id }}</a></td>
-                <td data-label="{{ t_primary('platform') }} / {{ t_secondary('platform') }}">{{ t.platform or "" }}</td>
+                <td data-label="{{ t_primary('platform') }} / {{ t_secondary('platform') }}">
+                  <div class="bilingual">
+                    <span>{{ platform_label_primary }}</span>
+                    {% if ui_show_secondary %}
+                      <span class="secondary">{{ platform_label_secondary }}</span>
+                    {% endif %}
+                  </div>
+                </td>
                 <td class="truncate" data-label="{{ t_primary('source') }} / {{ t_secondary('source') }}" title="{{ t.source_url }}">
                   {% if t.source_url %}
                     <span class="source-text">{{ t.source_url }}</span>
@@ -397,6 +425,14 @@
       beauty: { primary: "{{ t_primary('category_beauty') }}", secondary: "{{ t_secondary('category_beauty') }}" },
       other: { primary: "{{ t_primary('category_other') }}", secondary: "{{ t_secondary('category_other') }}" },
     };
+    const PLATFORM_LABELS = {
+      douyin: { primary: "抖音", secondary: "ဒေါ်ယင်" },
+      tk: { primary: "TikTok", secondary: "TikTok" },
+      tiktok: { primary: "TikTok", secondary: "TikTok" },
+      xhs: { primary: "小红书", secondary: "小红书" },
+      fb: { primary: "Facebook", secondary: "Facebook" },
+      facebook: { primary: "Facebook", secondary: "Facebook" },
+    };
     const COUNT_LABELS = {
       primary: "{{ t_primary('task_count') }}",
       secondary: "{{ t_secondary('task_count') }}",
@@ -415,6 +451,13 @@
       if (!key) return { primary: "-", secondary: "-" };
       const lower = String(key).toLowerCase();
       if (CATEGORY_LABELS[lower]) return CATEGORY_LABELS[lower];
+      return { primary: key, secondary: key };
+    }
+
+    function platformLabel(key) {
+      if (!key) return { primary: "-", secondary: "-" };
+      const lower = String(key).toLowerCase();
+      if (PLATFORM_LABELS[lower]) return PLATFORM_LABELS[lower];
       return { primary: key, secondary: key };
     }
 
@@ -481,12 +524,18 @@
           const catLabel = categoryLabel(t.category_key);
           const statusLabels = statusLabel(status);
           const lang = langLabel(t.content_lang);
+          const platform = platformLabel(t.platform);
           const srcRaw = t.source_url || "";
           const srcUrl = extractFirstHttpUrl(srcRaw);
           const row = document.createElement("tr");
           row.innerHTML = `
             <td class="truncate" data-label="${LABELS.id}" title="${t.task_id || ""}"><a href="/tasks/${t.task_id}">${truncate(t.task_id, 16)}</a></td>
-            <td data-label="${LABELS.platform}">${t.platform || ""}</td>
+            <td data-label="${LABELS.platform}">
+              <div class="bilingual">
+                <span>${platform.primary}</span>
+                ${showSecondary ? `<span class="secondary">${platform.secondary}</span>` : ""}
+              </div>
+            </td>
             <td class="truncate" data-label="${LABELS.source}" title="${srcRaw}">
               ${srcRaw
                 ? (srcUrl

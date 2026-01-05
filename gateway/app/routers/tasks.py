@@ -145,6 +145,7 @@ AUDIO_MM_KEY_TEMPLATE = "deliver/tasks/{task_id}/audio_mm.mp3"
 class DubProviderRequest(BaseModel):
     provider: str | None = None
     voice_id: str | None = None
+    mm_text: str | None = None
 
 
 class EditedTextRequest(BaseModel):
@@ -1282,6 +1283,7 @@ async def rerun_dub(
     req_voice_id = payload.voice_id or None
     prev_voice_id = task.get("voice_id") if isinstance(task, dict) else getattr(task, "voice_id", None)
     final_voice_id = req_voice_id or prev_voice_id or "mm_female_1"
+    mm_text_override = (payload.mm_text or "").strip() or None
     workspace = Workspace(task_id)
     audio_present = False
     if isinstance(task, dict):
@@ -1309,7 +1311,14 @@ async def rerun_dub(
 
     try:
         class TaskAdapter:
-            def __init__(self, t: dict, voice_override: str | None, provider: str, force_dub: bool):
+            def __init__(
+                self,
+                t: dict,
+                voice_override: str | None,
+                provider: str,
+                force_dub: bool,
+                mm_text: str | None,
+            ):
                 self.task_id = t.get("task_id") or t.get("id")
                 self.id = self.task_id
                 self.tenant_id = t.get("tenant_id") or t.get("tenant") or "default"
@@ -1318,12 +1327,14 @@ async def rerun_dub(
                 self.voice_id = voice_override or t.get("voice_id")
                 self.dub_provider = provider
                 self.force_dub = force_dub
+                self.mm_text = mm_text
 
         task_adapter = TaskAdapter(
             task,
             voice_override=final_voice_id,
             provider=provider,
             force_dub=force_dub,
+            mm_text=mm_text_override,
         )
 
         # 核心：SSOT dubbing

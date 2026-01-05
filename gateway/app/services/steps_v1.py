@@ -288,7 +288,8 @@ async def run_dub_step(req: DubRequest):
             detail="translated subtitles not found; run /api/tasks/{task_id}/subtitles first",
         )
 
-    mm_text = workspace.read_mm_srt_text() or ""
+    override_text = (req.mm_text or "").strip()
+    mm_text = override_text or (workspace.read_mm_srt_text() or "")
     if not mm_text.strip():
         raise HTTPException(
             status_code=400,

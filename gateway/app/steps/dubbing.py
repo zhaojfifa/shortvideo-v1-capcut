@@ -13,10 +13,14 @@ async def run_dub_step(task):
         or getattr(task, "content_lang", None)
         or "my"
     )
+    mm_text = getattr(task, "mm_text", None)
+    if isinstance(mm_text, str):
+        mm_text = mm_text.strip() or None
     req = DubRequest(
         task_id=task_id,
         voice_id=voice_id,
         target_lang=target_lang,
         force=force,
+        mm_text=mm_text,
     )
     return await run_dub_step_v1(req)

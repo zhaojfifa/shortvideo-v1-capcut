@@ -47,6 +47,7 @@ class DubRequest(BaseModel):
     voice_id: str | None = None
     target_lang: str = "my"
     force: bool = False
+    mm_text: Optional[str] = None
 
 
 class PackRequest(BaseModel):

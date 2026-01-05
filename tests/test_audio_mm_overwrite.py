@@ -96,6 +96,49 @@ def test_run_dub_step_uploads_audio_mm_key(monkeypatch, tmp_path: Path) -> None:
         db.close()
 
 
+def test_run_dub_step_uses_mm_text_override(monkeypatch, tmp_path: Path) -> None:
+    task_id = "demo_dub_override"
+    _ensure_task(task_id)
+
+    monkeypatch.setattr(workspace_module, "workspace_root", lambda: tmp_path)
+    ws = workspace_module.Workspace(task_id)
+    ws.write_mm_srt("1\n00:00:00,000 --> 00:00:01,000\noriginal\n")
+
+    audio_path = tmp_path / "audio_override.mp3"
+    audio_path.write_bytes(b"audio")
+
+    captured = {}
+
+    async def fake_synthesize_voice(**kwargs):
+        captured["mm_srt_text"] = kwargs.get("mm_srt_text")
+        return {"audio_path": str(audio_path)}
+
+    class DummyStorage:
+        def __init__(self):
+            self.uploaded_key = None
+
+        def upload_file(self, _local, key, content_type=None):
+            self.uploaded_key = key
+            return key
+
+    dummy = DummyStorage()
+    monkeypatch.setattr(steps_v1, "synthesize_voice", fake_synthesize_voice)
+    monkeypatch.setattr(steps_v1, "get_storage_service", lambda: dummy)
+
+    asyncio.run(
+        steps_v1.run_dub_step(
+            DubRequest(
+                task_id=task_id,
+                target_lang="my",
+                voice_id="mm_male_1",
+                mm_text="override text",
+            )
+        )
+    )
+
+    assert captured["mm_srt_text"] == "override text"
+
+
 def test_audio_mm_download_uses_mm_audio_key(monkeypatch) -> None:
     from gateway.app.main import app
     from gateway.app.deps import get_task_repository

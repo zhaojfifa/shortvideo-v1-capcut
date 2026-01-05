@@ -378,6 +378,13 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
               <textarea id="mm-edit" rows="6" style="width:100%; margin-top:8px;"></textarea>
               <div class="muted t-secondary" id="mm-edit-status" style="margin-top:6px;">-</div>
             </div>
+            <div style="margin-top:12px;">
+              <div class="copy-row" style="justify-content:space-between;">
+                <label for="mm-text-override" style="margin:0;">MM 文本修订 (仅用于本次配音) <span class="muted t-secondary">/ ဒီတစ်ကြိမ်အသံထုတ်ရန်သာ အသုံးပြုမည့် စာသား</span></label>
+              </div>
+              <textarea id="mm-text-override" rows="6" style="width:100%; margin-top:8px;" placeholder="仅本次配音使用，不会覆盖字幕文件 / ဒီတစ်ကြိမ်အသံထုတ်ရန်သာ၊ စာတန်းထိုးဖိုင် မပြောင်းပါ"></textarea>
+              <div class="muted t-secondary" style="margin-top:6px;">仅用于本次重新配音，不会覆盖字幕文件 / ဒီတစ်ကြိမ်အသံထုတ်ရန်သာ၊ စာတန်းထိုးဖိုင် မပြောင်းပါ</div>
+            </div>
           </details>
         </div>
       </div>
@@ -725,6 +732,11 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
       const provider = document.getElementById("dub-provider").value || "edge-tts";
       appendLog(`Calling /api/tasks/${taskId}/dub (provider=${provider}, voice=${voiceId})...`);
       const payload = { provider, voice_id: voiceId };
+      const overrideEl = document.getElementById("mm-text-override");
+      const overrideText = overrideEl ? overrideEl.value.trim() : "";
+      if (overrideText) {
+        payload.mm_text = overrideText;
+      }
       const resp = await fetch(`/api/tasks/${taskId}/dub`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -845,6 +857,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
       const mmEdit = document.getElementById("mm-edit");
       const statusEl = document.getElementById("mm-edit-status");
       const publishText = document.getElementById("publish-text");
+      const overrideEl = document.getElementById("mm-text-override");
       if (!originPre || !mmPre || !mmEdit) return;
 
       if (!forceReload && originPre.getAttribute("data-loaded") === "1") {
@@ -869,6 +882,12 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
       originPre.textContent = originText || "";
       mmPre.textContent = mmText || "";
       if (publishText && !publishText.value) publishText.value = mmText || "";
+      if (overrideEl && !overrideEl.value.trim()) {
+        const candidate = (mmText || "").trim();
+        if (candidate && !candidate.startsWith("Unable to load") && !candidate.startsWith("Failed to load")) {
+          overrideEl.value = mmText;
+        }
+      }
       originPre.setAttribute("data-loaded", "1");
 
       try {
