@@ -422,6 +422,7 @@ async def run_pack_step(req: PackRequest):
             shutil.copy(raw_file, raw_dir / "raw.mp4")
             shutil.copy(audio_file, audio_dir / audio_filename)
             shutil.copy(subs_mm_srt, subs_dir / "my.srt")
+            _ensure_txt_from_srt(subs_dir / "mm.txt", subs_mm_srt)
 
             (scenes_dir / ".keep").write_text("", encoding="utf-8")
 
@@ -465,6 +466,7 @@ async def run_pack_step(req: PackRequest):
         f"deliver/packs/{task_id}/raw/raw.mp4",
         f"deliver/packs/{task_id}/audio/{audio_filename}",
         f"deliver/packs/{task_id}/subs/my.srt",
+        f"deliver/packs/{task_id}/subs/mm.txt",
         f"deliver/packs/{task_id}/scenes/.keep",
         f"deliver/packs/{task_id}/manifest.json",
         f"deliver/packs/{task_id}/README.md",
