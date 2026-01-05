@@ -41,6 +41,7 @@ RAW_ARTIFACT = "raw/raw.mp4"
 ORIGIN_SRT_ARTIFACT = "subs/origin.srt"
 MM_SRT_ARTIFACT = "subs/mm.srt"
 MM_TXT_ARTIFACT = "subs/mm.txt"
+
 AUDIO_MM_KEY_TEMPLATE = "deliver/tasks/{task_id}/audio_mm.mp3"
 
 README_TEMPLATE = """CapCut pack usage
@@ -422,6 +423,13 @@ async def run_pack_step(req: PackRequest):
             shutil.copy(raw_file, raw_dir / "raw.mp4")
             shutil.copy(audio_file, audio_dir / audio_filename)
             shutil.copy(subs_mm_srt, subs_dir / "my.srt")
+            shutil.copy(subs_mm_srt, subs_dir / "mm.srt")
+
+            mm_txt_path = subs_mm_srt.with_suffix(".txt")
+            if mm_txt_path.exists():
+                shutil.copy(mm_txt_path, subs_dir / "mm.txt")
+            else:
+                _ensure_txt_from_srt(subs_dir / "mm.txt", subs_mm_srt)
 
             (scenes_dir / ".keep").write_text("", encoding="utf-8")
 
@@ -465,6 +473,8 @@ async def run_pack_step(req: PackRequest):
         f"deliver/packs/{task_id}/raw/raw.mp4",
         f"deliver/packs/{task_id}/audio/{audio_filename}",
         f"deliver/packs/{task_id}/subs/my.srt",
+        f"deliver/packs/{task_id}/subs/mm.srt",
+        f"deliver/packs/{task_id}/subs/mm.txt",
         f"deliver/packs/{task_id}/scenes/.keep",
         f"deliver/packs/{task_id}/manifest.json",
         f"deliver/packs/{task_id}/README.md",
