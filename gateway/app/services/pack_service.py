@@ -15,7 +15,7 @@ README_TEMPLATE = """CapCut pack usage
 
 1. Create a new CapCut project and import the extracted zip files.
 2. Place raw/raw.mp4 on the video track.
-3. Import subs/my.srt and adjust styling.
+3. Import subs/mm.srt and adjust styling.
 4. Place audio/{audio_filename} on the audio track and align with subtitles.
 5. Add transitions or stickers as needed.
 """
@@ -129,7 +129,6 @@ def create_capcut_pack(
 
         shutil.copy(raw_path, raw_dir / "raw.mp4")
         shutil.copy(audio_path, audio_dir / audio_filename)
-        shutil.copy(subs_path, subs_dir / "my.srt")
         shutil.copy(subs_path, subs_dir / "mm.srt")
 
         mm_txt_path = txt_path or subs_path.with_suffix(".txt")
@@ -148,7 +147,7 @@ def create_capcut_pack(
             "assets": {
                 "raw_video": "raw/raw.mp4",
                 "voice": f"audio/{audio_filename}",
-                "subtitle": "subs/my.srt",
+                "subtitle": "subs/mm.srt",
                 "scenes_dir": "scenes/",
             },
         }
@@ -178,7 +177,6 @@ def create_capcut_pack(
     files = [
         f"deliver/packs/{task_id}/raw/raw.mp4",
         f"deliver/packs/{task_id}/audio/{audio_filename}",
-        f"deliver/packs/{task_id}/subs/my.srt",
         f"deliver/packs/{task_id}/subs/mm.srt",
         f"deliver/packs/{task_id}/subs/mm.txt",
         f"deliver/packs/{task_id}/scenes/.keep",
