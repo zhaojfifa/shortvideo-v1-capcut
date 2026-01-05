@@ -41,19 +41,3 @@ body {
 .btn-secondary:hover {
   filter: brightness(0.98);
 }
-
-.btn-primary:disabled,
-.btn-primary[disabled] {
-  background: #1e40af;
-  color: #ffffff;
-  border-color: #1e40af;
-  opacity: 0.8;
-}
-
-.btn-secondary:disabled,
-.btn-secondary[disabled] {
-  background: #e5e7eb;
-  color: #111827;
-  border-color: #d1d5db;
-  opacity: 0.85;
-}
