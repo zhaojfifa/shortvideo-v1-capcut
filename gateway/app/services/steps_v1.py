@@ -48,7 +48,7 @@ README_TEMPLATE = """CapCut pack usage
 
 1. Create a new CapCut project and import the extracted zip files.
 2. Place raw/raw.mp4 on the video track.
-3. Import subs/my.srt and adjust styling.
+3. Import subs/mm.srt and adjust styling.
 4. Place audio/{audio_filename} on the audio track and align with subtitles.
 5. Add transitions or stickers as needed.
 """
@@ -422,7 +422,6 @@ async def run_pack_step(req: PackRequest):
 
             shutil.copy(raw_file, raw_dir / "raw.mp4")
             shutil.copy(audio_file, audio_dir / audio_filename)
-            shutil.copy(subs_mm_srt, subs_dir / "my.srt")
             shutil.copy(subs_mm_srt, subs_dir / "mm.srt")
 
             mm_txt_path = subs_mm_srt.with_suffix(".txt")
@@ -441,7 +440,7 @@ async def run_pack_step(req: PackRequest):
                 "assets": {
                     "raw_video": "raw/raw.mp4",
                     "voice": f"audio/{audio_filename}",
-                    "subtitle": "subs/my.srt",
+                    "subtitle": "subs/mm.srt",
                     "scenes_dir": "scenes/",
                 },
             }
@@ -472,7 +471,6 @@ async def run_pack_step(req: PackRequest):
     files = [
         f"deliver/packs/{task_id}/raw/raw.mp4",
         f"deliver/packs/{task_id}/audio/{audio_filename}",
-        f"deliver/packs/{task_id}/subs/my.srt",
         f"deliver/packs/{task_id}/subs/mm.srt",
         f"deliver/packs/{task_id}/subs/mm.txt",
         f"deliver/packs/{task_id}/scenes/.keep",
