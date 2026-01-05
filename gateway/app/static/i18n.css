@@ -7,37 +7,3 @@ body {
   font-size: 0.88em;
   color: #6b7280;
 }
-
-.bi-zh {
-  display: block;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.bi-mm {
-  display: block;
-  font-size: 0.92em;
-  opacity: 0.9;
-  line-height: 1.2;
-  margin-top: 2px;
-}
-
-.btn-primary {
-  background: #2563eb;
-  color: #ffffff;
-  border: 1px solid #2563eb;
-}
-
-.btn-primary:hover {
-  filter: brightness(0.95);
-}
-
-.btn-secondary {
-  background: #e5e7eb;
-  color: #111827;
-  border: 1px solid #d1d5db;
-}
-
-.btn-secondary:hover {
-  filter: brightness(0.98);
-}

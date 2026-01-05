@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{{ t_primary("new_task") }}{% if ui_bilingual %} / {{ t_secondary("new_task") }}{% endif %} - ShortVideo</title>
+  <title>New Suitcase Task - ShortVideo</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
   <link rel="stylesheet" href="/static/i18n.css" />
   <style>
@@ -69,21 +69,23 @@
 <body>
   <div class="page">
     <header>
-      <h1>{{ bi(t_primary("new_task"), t_secondary("new_task")) }}</h1>
-      
-      <a href="/tasks">{{ bi(t_primary("back_to_task_board"), t_secondary("back_to_task_board")) }}</a>
+      <h1>{{ t_primary("new_suitcase_task") }}</h1>
+      {% if ui_show_secondary %}
+        <div class="muted t-secondary">{{ t_secondary("new_suitcase_task") }}</div>
+      {% endif %}
+      <a href="/tasks">Back to Task Board <span class="muted t-secondary">/ Back to Task Board</span></a>
     </header>
 
     <main class="card">
       <form id="task-form">
         <div class="field">
-          <label for="source_url">{{ bi(t_primary("source_url"), t_secondary("source_url")) }} *</label>
-          <input id="source_url" name="source_url" type="text" autocomplete="off" required placeholder="{{ t_primary("source_url") }}{% if ui_bilingual and t_secondary("source_url") %} / {{ t_secondary("source_url") }}{% endif %}" />
+          <label for="source_url">Source URL <span class="muted t-secondary">/ Source URL</span> *</label>
+          <input id="source_url" name="source_url" type="text" autocomplete="off" required placeholder="Paste source URL (Douyin/XHS/TK/FB)" />
         </div>
 
         <div class="row">
           <div class="field">
-            <label for="platform">{{ bi(t_primary("platform"), t_secondary("platform")) }}</label>
+            <label for="platform">Platform <span class="muted t-secondary">/ Platform</span></label>
             <select id="platform" name="platform">
               <option value="douyin" selected>Douyin</option>
               <option value="xhs">XHS</option>
@@ -92,7 +94,7 @@
             </select>
           </div>
           <div class="field">
-            <label for="account_id">{{ bi(t_primary("account"), t_secondary("account")) }}</label>
+            <label for="account_id">Account <span class="muted t-secondary">/ Account</span></label>
             <select id="account_id" name="account_id">
               <option value="suitcase_mm_1">Suitcase MM #1</option>
             </select>
@@ -101,45 +103,45 @@
         </div>
 
         <div class="field">
-          <label>{{ bi(t_primary("video_type"), t_secondary("video_type")) }}</label>
-          <div class="muted t-secondary">{{ bi("选择视频类型", "ဗီဒီယိုအမျိုးအစား ရွေးပါ") }}</div>
+          <label>Video type <span class="muted t-secondary">/ Video type</span></label>
+          <div class="muted t-secondary">Choose the business intent. <span class="muted t-secondary">/ Pick intent</span></div>
           <div class="radio-group" style="margin-top:6px;">
-            <label class="radio"><input type="radio" name="video_type" value="review" checked /> {{ bi("口播/测评", "သုံးသပ်") }}</label>
-            <label class="radio"><input type="radio" name="video_type" value="scenario" /> {{ bi("情景/故事", "ဇာတ်လမ်း") }}</label>
+            <label class="radio"><input type="radio" name="video_type" value="review" checked /> Comparison Review</label>
+            <label class="radio"><input type="radio" name="video_type" value="scenario" /> Scenario Usage</label>
           </div>
         </div>
 
         <div class="field">
-          <label>{{ bi(t_primary("style_preset"), t_secondary("style_preset")) }}</label>
-          <div class="muted t-secondary">{{ bi("选择脚本风格", "စတိုင်ရွေးပါ") }}</div>
+          <label>Style preset <span class="muted t-secondary">/ Style preset</span></label>
+          <div class="muted t-secondary">Defines pacing and editing intent. <span class="muted t-secondary">/ Editing pace</span></div>
           <div class="radio-group" style="margin-top:6px;">
-            <label class="radio"><input type="radio" name="style_preset" value="review_brief" checked /> {{ bi("测评简版", "သုံးသပ် အတို") }}</label>
-            <label class="radio"><input type="radio" name="style_preset" value="scenario_story" /> {{ bi("情景故事", "ဇာတ်လမ်း") }}</label>
+            <label class="radio"><input type="radio" name="style_preset" value="review_brief" checked /> Short review, fast pace</label>
+            <label class="radio"><input type="radio" name="style_preset" value="scenario_story" /> Scenario story, normal pace</label>
           </div>
         </div>
 
         <div class="field">
-          <label for="title">{{ bi(t_primary("title_optional"), t_secondary("title_optional")) }}</label>
-          <input id="title" name="title" type="text" placeholder="{{ t_primary("title_optional") }}{% if ui_bilingual and t_secondary("title_optional") %} / {{ t_secondary("title_optional") }}{% endif %}" />
+          <label for="title">Title (optional) <span class="muted t-secondary">/ Title</span></label>
+          <input id="title" name="title" type="text" placeholder="Optional title" />
         </div>
 
         <div class="field">
-          <label for="note">{{ bi(t_primary("note_hint"), t_secondary("note_hint")) }}</label>
-          <textarea id="note" name="note" placeholder="{{ t_primary("note_hint") }}{% if ui_bilingual and t_secondary("note_hint") %} / {{ t_secondary("note_hint") }}{% endif %}"></textarea>
+          <label for="note">Note / Operator hint <span class="muted t-secondary">/ Notes</span></label>
+          <textarea id="note" name="note" placeholder="Optional note for operators"></textarea>
         </div>
 
         <div class="summary" id="summary-block">
           <div class="summary-grid">
-            <div class="summary-item"><strong>{{ bi(t_primary("platform"), t_secondary("platform")) }}</strong><span id="summary-platform">-</span></div>
-            <div class="summary-item"><strong>{{ bi(t_primary("account"), t_secondary("account")) }}</strong><span id="summary-account">-</span></div>
-            <div class="summary-item"><strong>{{ bi(t_primary("video_type"), t_secondary("video_type")) }}</strong><span id="summary-video">-</span></div>
-            <div class="summary-item"><strong>{{ bi(t_primary("style_preset"), t_secondary("style_preset")) }}</strong><span id="summary-style">-</span></div>
-            <div class="summary-item"><strong>{{ bi("语种", "ဘာသာ") }}</strong><span id="summary-lang">{{ bi("缅文 (MM)", "မြန်မာ (MM)") }}</span></div>
+            <div class="summary-item"><strong>Platform <span class="muted t-secondary">/ Platform</span></strong><span id="summary-platform">-</span></div>
+            <div class="summary-item"><strong>Account <span class="muted t-secondary">/ Account</span></strong><span id="summary-account">-</span></div>
+            <div class="summary-item"><strong>Video type <span class="muted t-secondary">/ Video type</span></strong><span id="summary-video">-</span></div>
+            <div class="summary-item"><strong>Style <span class="muted t-secondary">/ Style</span></strong><span id="summary-style">-</span></div>
+            <div class="summary-item"><strong>Language <span class="muted t-secondary">/ Language</span></strong><span id="summary-lang">Burmese (MM)</span></div>
           </div>
         </div>
 
-        <button class="btn-primary" type="submit">{{ bi(t_primary("create_and_run"), t_secondary("create_and_run")) }}</button>
-        <div class="muted t-secondary" style="margin-top: 6px;">{{ bi("默认分类：行李箱；语言：缅文；界面：中文", "မူလအမျိုးအစား：行李箱；ဘာသာ：မြန်မာ；UI：中文") }}</div>
+        <button class="btn-primary" type="submit">Create &amp; run pipeline <span class="muted t-secondary">/ Create</span></button>
+        <div class="muted t-secondary" style="margin-top: 6px;">Auto-category: Suitcase · Language: Burmese · UI: Chinese <span class="muted t-secondary">/ Auto category · Language · UI</span></div>
       </form>
 
       <div style="margin-top: 12px;">
@@ -169,11 +171,11 @@
 
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
-      resultEl.textContent = "{{ t_primary("submitting") }}{% if ui_bilingual and t_secondary("submitting") %} / {{ t_secondary("submitting") }}{% endif %}";
+      resultEl.textContent = "Submitting...";
 
       const rawSource = document.getElementById("source_url").value.trim();
       if (!rawSource) {
-        alert("{{ t_primary("source_url_required") }}{% if ui_bilingual and t_secondary("source_url_required") %} / {{ t_secondary("source_url_required") }}{% endif %}");
+        alert("Source URL is required.");
         resultEl.textContent = "";
         return;
       }
@@ -213,18 +215,17 @@
         try { data = JSON.parse(text); } catch (_) { /* noop */ }
 
         if (!res.ok) {
-          resultEl.textContent = `{{ t_primary("error_prefix") }} ${res.status}: ${text}`;
+          resultEl.textContent = `Error ${res.status}: ${text}`;
           resultEl.classList.add("error");
           return;
         }
 
         const taskId = data?.task_id || "(unknown)";
         resultEl.classList.remove("error");
-        const statusValue = data?.status || "pending";
-        resultEl.textContent = `{{ t_primary("created_task") }} ${taskId}，{{ t_primary("status") }}：${statusValue}{% if ui_bilingual and t_secondary("created_task") %} / {{ t_secondary("created_task") }} ${taskId}၊ {{ t_secondary("status") }}: ${statusValue}{% endif %}`;
+        resultEl.textContent = `Created task ${taskId}, status: ${data?.status || "pending"}`;
         setTimeout(() => { window.location.href = "/tasks"; }, 800);
       } catch (err) {
-        resultEl.textContent = "{{ t_primary("request_failed") }} " + err.message;
+        resultEl.textContent = "Request failed: " + err.message;
         resultEl.classList.add("error");
       }
     });
