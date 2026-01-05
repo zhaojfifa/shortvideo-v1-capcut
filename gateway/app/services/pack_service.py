@@ -130,6 +130,7 @@ def create_capcut_pack(
         shutil.copy(raw_path, raw_dir / "raw.mp4")
         shutil.copy(audio_path, audio_dir / audio_filename)
         shutil.copy(subs_path, subs_dir / "my.srt")
+        shutil.copy(subs_path, subs_dir / "mm.srt")
         txt_target = subs_dir / "mm.txt"
         if txt_path and txt_path.exists():
             shutil.copy(txt_path, txt_target)
@@ -177,6 +178,7 @@ def create_capcut_pack(
         f"deliver/packs/{task_id}/raw/raw.mp4",
         f"deliver/packs/{task_id}/audio/{audio_filename}",
         f"deliver/packs/{task_id}/subs/my.srt",
+        f"deliver/packs/{task_id}/subs/mm.srt",
         f"deliver/packs/{task_id}/subs/mm.txt",
         f"deliver/packs/{task_id}/scenes/.keep",
         f"deliver/packs/{task_id}/manifest.json",
