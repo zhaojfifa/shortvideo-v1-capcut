@@ -203,3 +203,46 @@ def test_pack_step_downloads_mm_audio_key(monkeypatch, tmp_path: Path) -> None:
     asyncio.run(steps_v1.run_pack_step(PackRequest(task_id=task_id)))
 
     assert dummy.download_key == f"deliver/tasks/{task_id}/audio_mm.mp3"
+
+
+def test_run_dub_step_overwrites_mm_txt_when_mm_edited_exists(
+    monkeypatch, tmp_path: Path
+) -> None:
+    task_id = "demo_mm_edit"
+    _ensure_task(task_id)
+
+    monkeypatch.setattr(workspace_module, "workspace_root", lambda: tmp_path)
+    ws = workspace_module.Workspace(task_id)
+    ws.write_mm_srt("1\n00:00:00,000 --> 00:00:01,000\noriginal\n")
+    (workspace_module.task_base_dir(task_id) / "mm_edited.txt").write_text(
+        "edited text",
+        encoding="utf-8",
+    )
+
+    audio_path = tmp_path / "audio.mp3"
+    audio_path.write_bytes(b"audio")
+
+    async def fake_synthesize_voice(**_kwargs):
+        return {"audio_path": str(audio_path)}
+
+    class DummyStorage:
+        def __init__(self):
+            self.uploaded_key = None
+
+        def upload_file(self, _local, key, content_type=None):
+            self.uploaded_key = key
+            return key
+
+    dummy = DummyStorage()
+    monkeypatch.setattr(steps_v1, "synthesize_voice", fake_synthesize_voice)
+    monkeypatch.setattr(steps_v1, "get_storage_service", lambda: dummy)
+    monkeypatch.setattr(steps_v1, "_upload_artifact", lambda *_a, **_k: "subs/mm.txt")
+
+    asyncio.run(
+        steps_v1.run_dub_step(
+            DubRequest(task_id=task_id, target_lang="my", voice_id="mm_male_1")
+        )
+    )
+
+    assert ws.mm_txt_path.read_text(encoding="utf-8") == "edited text"
+    assert ws.mm_srt_path.read_text(encoding="utf-8").strip().endswith("original")

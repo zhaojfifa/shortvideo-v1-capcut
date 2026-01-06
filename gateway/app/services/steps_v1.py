@@ -338,6 +338,13 @@ async def run_dub_step(req: DubRequest):
             last_step="dub",
         )
 
+    edited_text = workspace.read_mm_edited_text()
+    if edited_text and edited_text.strip():
+        mm_txt_path = workspace.mm_txt_path
+        mm_txt_path.parent.mkdir(parents=True, exist_ok=True)
+        mm_txt_path.write_text(edited_text, encoding="utf-8")
+        _upload_artifact(req.task_id, mm_txt_path, MM_TXT_ARTIFACT)
+
     try:
         audio_url = f"/v1/tasks/{req.task_id}/audio_mm"
         resp = {

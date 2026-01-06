@@ -86,6 +86,10 @@ class Workspace:
         alternate = translated_srt_path(self.task_id, "my")
         return primary.exists() or alternate.exists()
 
+    @property
+    def mm_txt_path(self) -> Path:
+        return self.mm_srt_path.with_suffix(".txt")
+
     def read_mm_srt_text(self) -> str | None:
         path = self.mm_srt_path
         if not path.exists():
@@ -120,6 +124,12 @@ class Workspace:
         path = translated_srt_path(self.task_id, "mm")
         path.write_text(text, encoding="utf-8")
         return path
+
+    def read_mm_edited_text(self) -> str | None:
+        path = self.base_dir / "mm_edited.txt"
+        if not path.exists():
+            return None
+        return path.read_text(encoding="utf-8")
 
     # Audio helpers
     @property
