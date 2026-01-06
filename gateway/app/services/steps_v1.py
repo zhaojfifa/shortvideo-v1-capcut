@@ -26,7 +26,7 @@ from gateway.app.db import SessionLocal
 from gateway.app import models
 from gateway.app.services.artifact_storage import upload_task_artifact
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
-from gateway.app.services.parse import detect_platform, parse_douyin_video
+from gateway.app.services.parse import detect_platform, parse_video
 from gateway.app.services.subtitles import generate_subtitles
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
 from gateway.app.utils.timing import log_step_timing
@@ -158,13 +158,8 @@ async def run_parse_step(req: ParseRequest):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    if platform != "douyin":
-        raise HTTPException(
-            status_code=400, detail=f"Unsupported platform for V1 parse: {platform}"
-        )
-
     try:
-        result = await parse_douyin_video(req.task_id, req.link)
+        result = await parse_video(req.task_id, req.link, platform_hint=platform)
 
         raw_file = raw_path(req.task_id)
         raw_key = None
@@ -174,6 +169,7 @@ async def run_parse_step(req: ParseRequest):
         _update_task(
             req.task_id,
             raw_path=raw_key,
+            platform=(result.get("platform") or platform),
             last_step="parse",
         )
         return result
