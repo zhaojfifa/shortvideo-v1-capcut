@@ -1104,7 +1104,7 @@ def get_task_text(
 
 
 @api_router.post("/tasks/{task_id}/mm_edited")
-def save_mm_edited(task_id: str, payload: EditedTextRequest):
+def save_mm_edited(task_id: str, payload: EditedTextRequest, repo=Depends(get_task_repository)):
     text = (payload.text or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="text is empty")
@@ -1112,6 +1112,29 @@ def save_mm_edited(task_id: str, payload: EditedTextRequest):
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         path.write_text(text + "\n", encoding="utf-8")
+        task = repo.get(task_id) if repo else None
+        if task:
+            workspace = Workspace(task_id)
+            mm_txt_path = workspace.mm_txt_path
+            mm_txt_path.parent.mkdir(parents=True, exist_ok=True)
+            mm_txt_path.write_text(text + "\n", encoding="utf-8")
+            mm_srt_key = _task_value(task, "mm_srt_path")
+            artifact_name = "mm.txt"
+            if isinstance(mm_srt_key, str):
+                normalized_key = mm_srt_key.replace("\\", "/")
+                if "subs/" in normalized_key:
+                    artifact_name = "subs/mm.txt"
+            mm_txt_key = upload_task_artifact(
+                task,
+                mm_txt_path,
+                artifact_name,
+                task_id=task_id,
+            )
+            if mm_txt_key and (
+                (isinstance(task, dict) and "mm_txt_path" in task)
+                or hasattr(task, "mm_txt_path")
+            ):
+                repo.upsert(task_id, {"mm_txt_path": mm_txt_key})
         return JSONResponse(
             {
                 "ok": True,
