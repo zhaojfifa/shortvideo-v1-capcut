@@ -1,5 +1,6 @@
 """Reusable pipeline step functions shared by /v1 routes and background tasks."""
 
+import asyncio
 import json
 import logging
 import os
@@ -32,6 +33,16 @@ from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, Subtitles
 from gateway.app.utils.timing import log_step_timing
 
 logger = logging.getLogger(__name__)
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
 
 # -------------------------
 # Artifact name conventions
@@ -193,20 +204,38 @@ async def run_subtitles_step(req: SubtitlesRequest):
     """Run the subtitles step for the given request."""
 
     start_time = time.perf_counter()
+    asr_backend = os.getenv("ASR_BACKEND") or "whisper"
+    subtitles_backend = os.getenv("SUBTITLES_BACKEND") or "gemini"
+    logger.info(
+        "SUB2_START",
+        extra={
+            "task_id": req.task_id,
+            "step": "subtitles",
+            "stage": "SUB2_START",
+            "asr_backend": asr_backend,
+            "subtitles_backend": subtitles_backend,
+            "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+        },
+    )
     try:
         _update_task(req.task_id, subtitles_status="running", subtitles_error=None)
-        result = await generate_subtitles(
-            task_id=req.task_id,
-            target_lang=req.target_lang,
-            force=req.force,
-            translate_enabled=req.translate,
-            use_ffmpeg_extract=True,
+        step_timeout_sec = _env_int("SUBTITLES_STEP_TIMEOUT_SEC", 1800)
+        result = await asyncio.wait_for(
+            generate_subtitles(
+                task_id=req.task_id,
+                target_lang=req.target_lang,
+                force=req.force,
+                translate_enabled=req.translate,
+                use_ffmpeg_extract=True,
+            ),
+            timeout=step_timeout_sec,
         )
 
         workspace = Workspace(req.task_id)
 
         origin_key = None
         mm_key = None
+        mm_txt_key = None
 
         if workspace.origin_srt_path.exists():
             origin_key = _upload_artifact(req.task_id, workspace.origin_srt_path, ORIGIN_SRT_ARTIFACT)
@@ -217,7 +246,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
 
             mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
             if mm_txt_path.exists():
-                _upload_artifact(req.task_id, mm_txt_path, MM_TXT_ARTIFACT)
+                mm_txt_key = _upload_artifact(req.task_id, mm_txt_path, MM_TXT_ARTIFACT)
 
         subtitles_dir = deliver_dir() / "subtitles" / req.task_id
         subtitles_dir.mkdir(parents=True, exist_ok=True)
@@ -239,8 +268,29 @@ async def run_subtitles_step(req: SubtitlesRequest):
             subtitle_structure_path=subtitles_key,
             subtitles_error=None,
         )
+        logger.info(
+            "SUB2_DONE",
+            extra={
+                "task_id": req.task_id,
+                "step": "subtitles",
+                "stage": "SUB2_DONE",
+                "asr_backend": asr_backend,
+                "subtitles_backend": subtitles_backend,
+                "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                "origin_srt_key": origin_key,
+                "mm_srt_key": mm_key,
+                "mm_txt_key": mm_txt_key,
+                "subtitles_key": subtitles_key,
+            },
+        )
         return result
 
+    except asyncio.TimeoutError:
+        _update_task(req.task_id, subtitles_status="error", subtitles_error="timeout")
+        raise HTTPException(status_code=504, detail="subtitles timeout")
+    except asyncio.CancelledError:
+        _update_task(req.task_id, subtitles_status="error", subtitles_error="cancelled")
+        raise
     except HTTPException:
         _update_task(req.task_id, subtitles_status="error", subtitles_error="http_error")
         raise
@@ -277,6 +327,17 @@ async def run_dub_step(req: DubRequest):
             "mm_srt_path": str(workspace.mm_srt_path),
         },
     )
+    logger.info(
+        "DUB3_START",
+        extra={
+            "task_id": req.task_id,
+            "step": "dub",
+            "stage": "DUB3_START",
+            "dub_provider": provider,
+            "voice_id": req.voice_id,
+            "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+        },
+    )
 
     if not mm_exists:
         raise HTTPException(
@@ -286,6 +347,19 @@ async def run_dub_step(req: DubRequest):
 
     override_text = (req.mm_text or "").strip()
     mm_text = override_text or (workspace.read_mm_srt_text() or "")
+    logger.info(
+        "DUB3_TEXT_SOURCE",
+        extra={
+            "task_id": req.task_id,
+            "step": "dub",
+            "stage": "DUB3_TEXT_SOURCE",
+            "dub_provider": provider,
+            "voice_id": req.voice_id,
+            "text_source": "override" if override_text else "mm_srt",
+            "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+            "text_len": len(mm_text or ""),
+        },
+    )
     if not mm_text.strip():
         raise HTTPException(
             status_code=400,
@@ -293,14 +367,24 @@ async def run_dub_step(req: DubRequest):
         )
 
     try:
-        result = await synthesize_voice(
-            task_id=req.task_id,
-            target_lang=req.target_lang,
-            voice_id=req.voice_id,
-            force=req.force,
-            mm_srt_text=mm_text,
-            workspace=workspace,
+        step_timeout_sec = _env_int("DUB_STEP_TIMEOUT_SEC", 900)
+        result = await asyncio.wait_for(
+            synthesize_voice(
+                task_id=req.task_id,
+                target_lang=req.target_lang,
+                voice_id=req.voice_id,
+                force=req.force,
+                mm_srt_text=mm_text,
+                workspace=workspace,
+            ),
+            timeout=step_timeout_sec,
         )
+    except asyncio.TimeoutError:
+        _update_task(req.task_id, dub_status="error", dub_error="timeout")
+        raise HTTPException(status_code=504, detail="dub timeout")
+    except asyncio.CancelledError:
+        _update_task(req.task_id, dub_status="error", dub_error="cancelled")
+        raise
     except DubbingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -329,6 +413,19 @@ async def run_dub_step(req: DubRequest):
                     detail="Audio upload failed; no storage key returned",
                 )
             audio_key = uploaded_key
+            logger.info(
+                "DUB3_UPLOAD_DONE",
+                extra={
+                    "task_id": req.task_id,
+                    "step": "dub",
+                    "stage": "DUB3_UPLOAD_DONE",
+                    "dub_provider": provider,
+                    "voice_id": req.voice_id,
+                    "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                    "output_path": str(mp3_path),
+                    "output_size": mp3_path.stat().st_size if mp3_path.exists() else None,
+                },
+            )
 
     if audio_key:
         _update_task(
@@ -354,6 +451,18 @@ async def run_dub_step(req: DubRequest):
             "duration_sec": result.get("duration_sec") if isinstance(result, dict) else None,
             "audio_path": (result.get("audio_path") or result.get("path")) if isinstance(result, dict) else None,
         }
+        logger.info(
+            "DUB3_DONE",
+            extra={
+                "task_id": req.task_id,
+                "step": "dub",
+                "stage": "DUB3_DONE",
+                "dub_provider": provider,
+                "voice_id": req.voice_id,
+                "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                "audio_key": audio_key,
+            },
+        )
         return resp
     finally:
         log_step_timing(

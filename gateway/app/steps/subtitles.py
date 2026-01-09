@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import logging
 import re
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -31,6 +33,16 @@ logger = logging.getLogger(__name__)
 _SRT_TIME_RE = re.compile(
     r"\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}"
 )
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
 
 
 def _srt_to_txt(srt_text: str) -> str:
@@ -154,8 +166,26 @@ async def generate_subtitles(
 ) -> dict:
     """Unified subtitles entry point used by the FastAPI route."""
 
+    start_time = time.perf_counter()
     settings = get_settings()
     backend = (settings.subtitles_backend or "").lower()
+    asr_backend = settings.asr_backend
+
+    def log_stage(stage: str, **fields) -> None:
+        logger.info(
+            stage,
+            extra={
+                "task_id": task_id,
+                "step": "subtitles",
+                "stage": stage,
+                "asr_backend": asr_backend,
+                "subtitles_backend": backend,
+                "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                **fields,
+            },
+        )
+
+    log_stage("SUB2_START")
     logger.info(
         "Subtitles request started",
         extra={
@@ -180,8 +210,53 @@ async def generate_subtitles(
         segments: list[dict] = []
         if workspace.raw_video_exists():
             wav_path = audio_wav_path(task_id)
-            _extract_audio(workspace.raw_video_path, wav_path)
-            segments = _transcribe_with_faster_whisper(wav_path)
+            raw_path = workspace.raw_video_path
+            raw_size = raw_path.stat().st_size if raw_path.exists() else None
+            log_stage(
+                "SUB2_WAV_EXTRACT_START",
+                raw_path=str(raw_path),
+                raw_size=raw_size,
+                wav_path=str(wav_path),
+            )
+            wav_start = time.perf_counter()
+            _extract_audio(raw_path, wav_path)
+            log_stage(
+                "SUB2_WAV_EXTRACT_DONE",
+                wav_path=str(wav_path),
+                wav_size=wav_path.stat().st_size if wav_path.exists() else None,
+                duration_ms=int((time.perf_counter() - wav_start) * 1000),
+            )
+            asr_start = time.perf_counter()
+            log_stage(
+                "SUB2_ASR_START",
+                wav_path=str(wav_path),
+                wav_size=wav_path.stat().st_size if wav_path.exists() else None,
+            )
+            asr_timeout_sec = _env_int("SUBTITLES_ASR_TIMEOUT_SEC", 600)
+            try:
+                segments = await asyncio.wait_for(
+                    asyncio.to_thread(_transcribe_with_faster_whisper, wav_path),
+                    timeout=asr_timeout_sec,
+                )
+                log_stage(
+                    "SUB2_ASR_DONE",
+                    segments_count=len(segments),
+                    duration_ms=int((time.perf_counter() - asr_start) * 1000),
+                )
+            except asyncio.TimeoutError:
+                log_stage(
+                    "SUB2_ASR_FAIL",
+                    error="timeout",
+                    duration_ms=int((time.perf_counter() - asr_start) * 1000),
+                )
+                raise HTTPException(status_code=504, detail="ASR timeout")
+            except Exception as exc:
+                log_stage(
+                    "SUB2_ASR_FAIL",
+                    error=str(exc),
+                    duration_ms=int((time.perf_counter() - asr_start) * 1000),
+                )
+                raise
         else:
             origin_srt_text = workspace.read_origin_srt_text()
             if not origin_srt_text:
@@ -198,14 +273,65 @@ async def generate_subtitles(
         translations: dict[int, str] = {}
 
         if translate_enabled:
-            try:
-                translations = translate_segments_with_gemini(
-                    segments=segments,
-                    target_lang=target_lang,
-                    debug_dir=subs_dir(task_id),
+            tr_timeout_sec = _env_int("SUBTITLES_TR_TIMEOUT_SEC", 120)
+            tr_retries = _env_int("SUBTITLES_TR_RETRIES", 1)
+            for attempt in range(tr_retries + 1):
+                tr_start = time.perf_counter()
+                log_stage(
+                    "SUB2_TR_START",
+                    attempt=attempt + 1,
                 )
-            except (GeminiSubtitlesError, ValueError) as exc:
-                logger.warning("Gemini translation failed; fallback to origin only: %s", exc)
+                try:
+                    translations = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            translate_segments_with_gemini,
+                            segments=segments,
+                            target_lang=target_lang,
+                            debug_dir=subs_dir(task_id),
+                        ),
+                        timeout=tr_timeout_sec,
+                    )
+                    log_stage(
+                        "SUB2_TR_DONE",
+                        attempt=attempt + 1,
+                        translations_count=len(translations),
+                        duration_ms=int((time.perf_counter() - tr_start) * 1000),
+                    )
+                    break
+                except asyncio.TimeoutError:
+                    log_stage(
+                        "SUB2_TR_FAIL",
+                        attempt=attempt + 1,
+                        error="timeout",
+                        duration_ms=int((time.perf_counter() - tr_start) * 1000),
+                    )
+                    if attempt < tr_retries:
+                        continue
+                    translations = {}
+                except GeminiSubtitlesError as exc:
+                    status = getattr(exc, "status_code", None) or getattr(exc, "status", None)
+                    retryable = status in (429,) or (isinstance(status, int) and status >= 500)
+                    log_stage(
+                        "SUB2_TR_FAIL",
+                        attempt=attempt + 1,
+                        error=str(exc),
+                        status_code=status,
+                        duration_ms=int((time.perf_counter() - tr_start) * 1000),
+                    )
+                    if retryable and attempt < tr_retries:
+                        continue
+                    translations = {}
+                except ValueError as exc:
+                    log_stage(
+                        "SUB2_TR_FAIL",
+                        attempt=attempt + 1,
+                        error=str(exc),
+                        duration_ms=int((time.perf_counter() - tr_start) * 1000),
+                    )
+                    translations = {}
+                break
+            if not translations:
+                logger.warning("Gemini translation failed; fallback to origin only.")
 
         for seg in segments:
             idx = int(seg.get("index", 0))
@@ -238,6 +364,15 @@ async def generate_subtitles(
         mm_txt_path = mm_srt_path.with_suffix(".txt")
         _write_txt_from_srt(origin_txt_path, origin_text)
         _write_txt_from_srt(mm_txt_path, mm_text)
+        log_stage(
+            "SUB2_WRITE_DONE",
+            origin_srt_path=str(origin_srt_path),
+            origin_srt_size=origin_srt_path.stat().st_size if origin_srt_path.exists() else None,
+            mm_srt_path=str(mm_srt_path),
+            mm_srt_size=mm_srt_path.stat().st_size if mm_srt_path.exists() else None,
+            mm_txt_path=str(mm_txt_path),
+            mm_txt_size=mm_txt_path.stat().st_size if mm_txt_path.exists() else None,
+        )
 
         logger.info(
             "Subtitles summary",
@@ -247,6 +382,12 @@ async def generate_subtitles(
                 "mm_srt_len": len(mm_text or ""),
                 "segments_count": len(segments),
             },
+        )
+        log_stage(
+            "SUB2_DONE",
+            origin_srt_len=len(origin_text or ""),
+            mm_srt_len=len(mm_text or ""),
+            segments_count=len(segments),
         )
         return {
             "task_id": task_id,
