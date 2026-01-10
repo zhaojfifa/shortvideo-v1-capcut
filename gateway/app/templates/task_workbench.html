@@ -566,6 +566,7 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
     let dubPoller = null;
     let subsPollInFlight = false;
     let dubPollInFlight = false;
+    let lastSubsError = null;
 
     function startScenesPolling() {
       if (document.hidden) return;
@@ -724,6 +725,10 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
         }
         if (data.error_message) {
           appendLog(`Last error: ${data.error_message}`);
+        }
+        if (data.subtitles_status === "error" && data.subtitles_error && data.subtitles_error !== lastSubsError) {
+          lastSubsError = data.subtitles_error;
+          appendLog(`Subtitles failed: ${data.subtitles_error}`);
         }
       } finally {
         taskRefreshInFlight = false;

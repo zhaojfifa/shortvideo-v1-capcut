@@ -114,6 +114,62 @@ def coerce_datetime_or_epoch(v: Any) -> datetime:
     """
     return coerce_datetime(v) or datetime(1970, 1, 1, tzinfo=timezone.utc)
 
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+def _now_iso() -> str:
+    return datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
+
+
+def _touch_subtitles_heartbeat(repo, task_id: str, phase: str | None = None) -> None:
+    patch = {
+        "subtitles_status": "running",
+        "subtitles_error": None,
+        "subtitles_updated_at": _now_iso(),
+    }
+    if phase:
+        patch["subtitles_phase"] = phase
+    repo.upsert(task_id, patch)
+
+
+def _maybe_mark_subtitles_stale(task: dict, repo) -> dict:
+    status = task.get("subtitles_status")
+    if status != "running":
+        return task
+    timeout_sec = _env_int("SUBTITLES_STEP_TIMEOUT_SEC", 1800)
+    last_beat = coerce_datetime(task.get("subtitles_updated_at")) or coerce_datetime(
+        task.get("updated_at") or task.get("updatedAt") or task.get("created_at") or task.get("created")
+    )
+    if not last_beat:
+        return task
+    age_sec = (datetime.now(timezone.utc) - last_beat).total_seconds()
+    if age_sec <= timeout_sec:
+        return task
+    error = "Timed out: no heartbeat; possible worker restart"
+    repo.upsert(
+        task.get("task_id") or task.get("id"),
+        {
+            "subtitles_status": "error",
+            "subtitles_error": error,
+            "subtitles_updated_at": _now_iso(),
+            "subtitles_phase": "watchdog_timeout",
+        },
+    )
+    task = dict(task)
+    task["subtitles_status"] = "error"
+    task["subtitles_error"] = error
+    task["subtitles_updated_at"] = _now_iso()
+    task["subtitles_phase"] = "watchdog_timeout"
+    return task
+
 # Artifact storage helpers（只 import 一次，禁止在文件底部重定义同名函数）
 from gateway.app.services.artifact_storage import (
     upload_task_artifact,
@@ -467,6 +523,8 @@ def task_status(task_id: str, repo=Depends(get_task_repository)):
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    if isinstance(task, dict):
+        task = _maybe_mark_subtitles_stale(task, repo)
 
     raw_key = _task_key(task, "raw_path")
     origin_key = _task_key(task, "origin_srt_path")
@@ -1014,6 +1072,8 @@ def list_tasks(
 
     summaries: list[TaskSummary] = []
     for t in items:
+        if isinstance(t, dict):
+            t = _maybe_mark_subtitles_stale(t, repo)
         download_paths = _resolve_download_urls(t)
         pack_path = download_paths.get("pack_path")
         scenes_path = download_paths.get("scenes_path")
@@ -1157,6 +1217,8 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
     t = repo.get(task_id)
     if not t:
         raise HTTPException(status_code=404, detail="Task not found")
+    if isinstance(t, dict):
+        t = _maybe_mark_subtitles_stale(t, repo)
 
     return _task_to_detail(t)
 
@@ -1214,18 +1276,19 @@ def build_parse(
     return _task_to_detail(stored)
 
 
-def _run_subtitles_job(
+async def _run_subtitles_job(
     *,
     task_id: str,
     target_lang: str,
     force: bool,
     translate: bool,
     repo,
-):
+) -> None:
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    _touch_subtitles_heartbeat(repo, task_id, "running")
     subs_req = SubtitlesRequest(
         task_id=task_id,
         target_lang=target_lang,
@@ -1233,8 +1296,13 @@ def _run_subtitles_job(
         translate=translate,
         with_scenes=True,
     )
-    asyncio.run(run_subtitles_step_v1(subs_req))
+    await run_subtitles_step_v1(subs_req)
 
+    logger.info(
+        "SUB2_PERSIST_START",
+        extra={"task_id": task_id, "step": "subtitles", "phase": "persist_start"},
+    )
+    _touch_subtitles_heartbeat(repo, task_id, "persist")
     workspace = Workspace(task_id)
     origin_key = (
         upload_task_artifact(task, workspace.origin_srt_path, "origin.srt", task_id=task_id)
@@ -1263,41 +1331,89 @@ def _run_subtitles_job(
             "subtitles_key": subtitles_key,
             "subtitle_structure_path": subtitles_key,
             "subtitles_error": None,
+            "subtitles_updated_at": _now_iso(),
+            "subtitles_phase": "done",
+        },
+    )
+    logger.info(
+        "SUB2_PERSIST_DONE",
+        extra={
+            "task_id": task_id,
+            "step": "subtitles",
+            "phase": "persist_done",
+            "origin_key": origin_key,
+            "mm_key": mm_key,
+            "subtitles_key": subtitles_key,
         },
     )
 
-    stored = repo.get(task_id)
-    return _task_to_detail(stored)
 
-
-def _run_subtitles_background(
+async def _run_subtitles_background(
     task_id: str,
     target_lang: str,
     force: bool,
     translate: bool,
     repo,
 ) -> None:
+    heartbeat_sec = max(5, _env_int("SUBTITLES_HEARTBEAT_SEC", 30))
+    heartbeat_stop = asyncio.Event()
+
+    async def _heartbeat_loop() -> None:
+        while not heartbeat_stop.is_set():
+            _touch_subtitles_heartbeat(repo, task_id, "running")
+            try:
+                await asyncio.wait_for(heartbeat_stop.wait(), timeout=heartbeat_sec)
+            except asyncio.TimeoutError:
+                continue
+
+    heartbeat_task = asyncio.create_task(_heartbeat_loop())
     try:
-        _run_subtitles_job(
+        logger.info(
+            "SUB2_START",
+            extra={"task_id": task_id, "step": "subtitles", "phase": "start"},
+        )
+        await _run_subtitles_job(
             task_id=task_id,
             target_lang=target_lang,
             force=force,
             translate=translate,
             repo=repo,
         )
+        logger.info(
+            "SUB2_DONE",
+            extra={"task_id": task_id, "step": "subtitles", "phase": "done"},
+        )
     except HTTPException as exc:
         repo.upsert(
             task_id,
-            {"subtitles_status": "error", "subtitles_error": f"{exc.status_code}: {exc.detail}"},
+            {
+                "subtitles_status": "error",
+                "subtitles_error": f"{exc.status_code}: {exc.detail}",
+                "subtitles_updated_at": _now_iso(),
+                "subtitles_phase": "failed",
+            },
         )
         logger.exception(
             "SUB2_FAIL",
-            extra={
-                "task_id": task_id,
-                "step": "subtitles",
-                "phase": "exception",
+            extra={"task_id": task_id, "step": "subtitles", "phase": "exception"},
+        )
+    except Exception as exc:
+        repo.upsert(
+            task_id,
+            {
+                "subtitles_status": "error",
+                "subtitles_error": f"SUB2_FAIL: {exc}",
+                "subtitles_updated_at": _now_iso(),
+                "subtitles_phase": "failed",
             },
         )
+        logger.exception(
+            "SUB2_FAIL",
+            extra={"task_id": task_id, "step": "subtitles", "phase": "exception"},
+        )
+    finally:
+        heartbeat_stop.set()
+        heartbeat_task.cancel()
 
 
 async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRepository) -> DubResponse:
@@ -1573,9 +1689,8 @@ def publish_task(
 
 
 @api_router.post("/tasks/{task_id}/subtitles")
-def build_subtitles(
+async def build_subtitles(
     task_id: str,
-    background_tasks: BackgroundTasks,
     payload: SubtitlesTaskRequest | None = None,
     repo=Depends(get_task_repository),
 ):
@@ -1586,46 +1701,36 @@ def build_subtitles(
             raise HTTPException(status_code=404, detail="Task not found")
 
         if task.get("subtitles_status") == "ready" and task.get("subtitles_key"):
-            return {
-                "task_id": task_id,
-                "status": "already_ready",
-                "subtitles_key": task.get("subtitles_key"),
-                "message": "Subtitles already ready",
-                "error": None,
-            }
+            return JSONResponse(
+                status_code=202,
+                content={"queued": True, "task_id": task_id, "status": "already_ready"},
+            )
 
         target_lang = (payload.target_lang if payload else None) or task.get("content_lang") or "my"
         force = payload.force if payload else False
         translate = payload.translate if payload else True
 
-        run_async = os.getenv("RUN_STEPS_ASYNC", "1").strip().lower() not in ("0", "false", "no")
         repo.upsert(
             task_id,
             {
-                "subtitles_status": "running",
+                "subtitles_status": "queued",
                 "subtitles_error": None,
+                "subtitles_updated_at": _now_iso(),
+                "subtitles_phase": "queued",
                 "last_step": "subtitles",
             },
         )
 
-        if run_async:
-            background_tasks.add_task(
-                _run_subtitles_background,
+        asyncio.create_task(
+            _run_subtitles_background(
                 task_id,
                 target_lang,
                 force,
                 translate,
                 repo,
             )
-            return JSONResponse(status_code=202, content={"queued": True, "task_id": task_id})
-
-        return _run_subtitles_job(
-            task_id=task_id,
-            target_lang=target_lang,
-            force=force,
-            translate=translate,
-            repo=repo,
         )
+        return JSONResponse(status_code=202, content={"queued": True, "task_id": task_id})
     finally:
         logger.info(
             "subtitles request finished",
