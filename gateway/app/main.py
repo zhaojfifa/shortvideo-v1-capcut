@@ -67,6 +67,16 @@ app.include_router(admin_publish.router, tags=["admin"])
 app.include_router(v17_pack_router)
 
 
+@app.get("/", include_in_schema=False)
+def root() -> Dict[str, Any]:
+    return {"ok": True}
+
+
+@app.head("/", include_in_schema=False)
+def root_head() -> Response:
+    return Response(status_code=200)
+
+
 @app.get("/healthz/build", tags=["health"])
 def healthz_build(response: Response) -> Dict[str, Any]:
     """
