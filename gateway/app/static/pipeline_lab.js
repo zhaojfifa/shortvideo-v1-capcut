@@ -29,7 +29,7 @@
     return document.getElementById(id);
   }
 
-  // ---- TaskId helpers (UI-only; do not touch backend) ----
+  // ---- TaskId helpers (UI-only; V1-only endpoints) ----
   let currentTaskId = null;
 
   function getTaskIdFromPath() {
@@ -44,13 +44,36 @@
     const qid = (qs.get("task_id") || qs.get("taskId") || "").trim();
     if (qid) return qid;
 
-    const candidates = ["task-id", "task_id", "taskId", "taskIdInput", "taskIdDisplay"];
+    const candidates = ["task-id", "task_id", "taskId"];
     for (const id of candidates) {
       const el = document.getElementById(id);
       if (el && typeof el.value === "string" && el.value.trim()) return el.value.trim();
       if (el && typeof el.textContent === "string" && el.textContent.trim()) return el.textContent.trim();
     }
     return "";
+  }
+
+  function makeTaskIdFromLink(rawLink) {
+    let safe = rawLink;
+    if (safe.startsWith("https://")) safe = safe.slice(8);
+    if (safe.startsWith("http://")) safe = safe.slice(7);
+    safe = safe.split(/[/?#]/)[0];
+    return `task_${safe.slice(0, 16)}`;
+  }
+
+  function setTaskIdValue(value) {
+    const el = getEl("taskId");
+    if (el) {
+      el.value = value;
+    }
+    currentTaskId = value;
+    updateDownloadLinks(value);
+  }
+
+  function isInvalidLink(value) {
+    const v = (value || "").trim();
+    if (!v) return true;
+    return v.includes("example.com");
   }
 
   async function ensureTaskId({ allowCreate = false } = {}) {
@@ -70,51 +93,14 @@
       throw new Error("Missing task id; please generate or enter a task id first.");
     }
 
-    const sourceEl = getEl("link") || getEl("input-link") || getEl("source") || getEl("source-url");
-    const source = (sourceEl && sourceEl.value ? sourceEl.value : "").trim();
-    if (!source || source.includes("example.com")) {
-      throw new Error("Missing or invalid source link; please enter a real link first.");
+    const rawLink = link();
+    if (isInvalidLink(rawLink)) {
+      throw new Error("Missing or invalid link; please enter a real link first.");
     }
 
-    const platformEl = getEl("platform");
-    const platformValue = (platformEl && platformEl.value ? platformEl.value : "douyin").trim();
-
-    const languageEl = getEl("language");
-    const languageValue = (languageEl && languageEl.value ? languageEl.value : "my").trim();
-
-    const payload = {
-      source_url: source,
-      platform: platformValue,
-      title: source ? source.slice(0, 80) : "PipelineLab",
-      category_key: "beauty",
-      content_lang: languageValue,
-      ui_lang: "en",
-    };
-
-    const resp = await fetch("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!resp.ok) {
-      const t = await resp.text().catch(() => "");
-      throw new Error(`Create task failed: HTTP ${resp.status} ${t}`);
-    }
-
-    const data = await resp.json();
-    const newId = (data && (data.task_id || data.id || (data.task && data.task.id))) || "";
-    if (!newId) throw new Error("Create task succeeded but no task id in response");
-
-    currentTaskId = newId;
-
-    const taskIdEl = getEl("task-id") || getEl("task_id") || getEl("taskId");
-    if (taskIdEl) {
-      if ("value" in taskIdEl) taskIdEl.value = newId;
-      else taskIdEl.textContent = newId;
-    }
-
-    return currentTaskId;
+    const generated = makeTaskIdFromLink(rawLink);
+    setTaskIdValue(generated);
+    return generated;
   }
 
   function log(message) {
@@ -289,8 +275,10 @@
     if (el) {
       el.value = `task_${compact}`;
     }
-    currentTaskId = el && el.value ? el.value : currentTaskId;
-    if (currentTaskId) updateDownloadLinks(currentTaskId);
+    if (el && el.value) {
+      currentTaskId = el.value;
+      updateDownloadLinks(el.value);
+    }
     log("Task ID updated.");
   }
 
@@ -308,8 +296,10 @@
     if (el) {
       el.value = `task_${safe.slice(0, 16)}`;
     }
-    currentTaskId = el && el.value ? el.value : currentTaskId;
-    if (currentTaskId) updateDownloadLinks(currentTaskId);
+    if (el && el.value) {
+      currentTaskId = el.value;
+      updateDownloadLinks(el.value);
+    }
     log("Task ID generated.");
   }
 
@@ -333,7 +323,7 @@
     setButtonsDisabled("parse", true);
     setButtonsDisabled("all", true);
     const rawLink = link();
-    if (!rawLink || rawLink.includes("example.com")) {
+    if (isInvalidLink(rawLink)) {
       log("Parse failed: please enter a valid link.");
       inFlight.parse = false;
       setButtonsDisabled("parse", false);
@@ -341,7 +331,7 @@
       return;
     }
     const id = await ensureTaskId({ allowCreate: true });
-    const body = { task_id: id, platform: platform(), link: link() };
+    const body = { task_id: id, platform: platform(), link: rawLink };
     log(`Calling /v1/parse for ${body.task_id}.`);
     try {
       const json = await fetchJson("/v1/parse", {
@@ -476,7 +466,15 @@
     if (inFlight.status) return;
     inFlight.status = true;
     setButtonsDisabled("status", true);
-    const id = await ensureTaskId({ allowCreate: false });
+    let id = "";
+    try {
+      id = await ensureTaskId({ allowCreate: false });
+    } catch (err) {
+      log(`Status refresh skipped: ${err.message || err}`);
+      inFlight.status = false;
+      setButtonsDisabled("status", false);
+      return;
+    }
     log(`Calling /v1/tasks/${id}/status.`);
     try {
       const json = await fetchJson(`/v1/tasks/${id}/status`, { method: "GET" });

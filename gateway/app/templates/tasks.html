@@ -162,8 +162,11 @@
                 {% endif %}
               </span>
             </span>
-          </div>
         </div>
+        <div>
+          <button id="refresh-btn" class="btn-primary" type="button">Refresh</button>
+        </div>
+      </div>
         <a class="btn-primary" href="/tasks/new">
           {{ t_primary("new_suitcase_task") }}
           {% if ui_show_secondary %}
@@ -603,8 +606,10 @@
 
     let tasksPollTimer = null;
     let tasksInFlight = false;
-    const TASKS_POLL_MS = 10000;
+    const TASKS_POLL_MS = 30000;
+    const IDLE_STOP_MS = 5 * 60 * 1000;
     let currentPollMs = TASKS_POLL_MS;
+    let lastInteraction = Date.now();
 
     function stopTasksPolling() {
       if (!tasksPollTimer) return;
@@ -614,6 +619,7 @@
 
     function startTasksPolling() {
       if (tasksPollTimer) return;
+      if (Date.now() - lastInteraction > IDLE_STOP_MS) return;
       fetchTasksOnce();
       tasksPollTimer = setInterval(fetchTasksOnce, currentPollMs);
     }
@@ -626,11 +632,15 @@
 
     async function fetchTasksOnce() {
       if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastInteraction > IDLE_STOP_MS) {
+        stopTasksPolling();
+        return;
+      }
       if (tasksInFlight) return;
 
       tasksInFlight = true;
       if (countPrimaryEl) {
-        countPrimaryEl.textContent = "Loading tasks…";
+        countPrimaryEl.textContent = "Loading tasks...";
       }
       if (countSecondaryEl) {
         countSecondaryEl.textContent = "";
@@ -674,10 +684,31 @@
       }
     });
 
+    function markInteraction() {
+      const now = Date.now();
+      if (now - lastInteraction < 1000) return;
+      lastInteraction = now;
+      if (document.visibilityState === "visible" && !tasksPollTimer) {
+        startTasksPolling();
+      }
+    }
+
+    ["click", "keydown", "mousemove", "touchstart"].forEach((eventName) => {
+      document.addEventListener(eventName, markInteraction, { passive: true });
+    });
+
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", startTasksPolling, { once: true });
     } else {
       startTasksPolling();
+    }
+
+    const refreshBtn = document.getElementById("refresh-btn");
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", () => {
+        lastInteraction = Date.now();
+        fetchTasksOnce();
+      });
     }
 
     async function handleDeleteClick(event) {
