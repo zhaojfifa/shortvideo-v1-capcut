@@ -29,6 +29,87 @@
     return document.getElementById(id);
   }
 
+  // ---- TaskId helpers (UI-only; do not touch backend) ----
+  let currentTaskId = null;
+
+  function getTaskIdFromPath() {
+    const p = window.location.pathname || "";
+    const m = p.match(/^\/tasks\/([a-z0-9]+)$/i);
+    if (m && m[1] && m[1].toLowerCase() !== "new") return m[1];
+    return null;
+  }
+
+  function getTaskIdFromUI() {
+    const qs = new URLSearchParams(window.location.search || "");
+    const qid = (qs.get("task_id") || qs.get("taskId") || "").trim();
+    if (qid) return qid;
+
+    const candidates = ["task-id", "task_id", "taskId", "taskIdInput", "taskIdDisplay"];
+    for (const id of candidates) {
+      const el = document.getElementById(id);
+      if (el && typeof el.value === "string" && el.value.trim()) return el.value.trim();
+      if (el && typeof el.textContent === "string" && el.textContent.trim()) return el.textContent.trim();
+    }
+    return "";
+  }
+
+  async function ensureTaskId() {
+    const pathId = getTaskIdFromPath();
+    if (pathId) {
+      currentTaskId = pathId;
+      return currentTaskId;
+    }
+
+    const uiId = currentTaskId || getTaskIdFromUI() || "";
+    if (uiId && uiId !== "demo_v1") {
+      currentTaskId = uiId;
+      return currentTaskId;
+    }
+
+    const sourceEl = getEl("link") || getEl("input-link") || getEl("source") || getEl("source-url");
+    const source = (sourceEl && sourceEl.value ? sourceEl.value : "").trim();
+
+    const platformEl = getEl("platform");
+    const platformValue = (platformEl && platformEl.value ? platformEl.value : "douyin").trim();
+
+    const languageEl = getEl("language");
+    const languageValue = (languageEl && languageEl.value ? languageEl.value : "my").trim();
+
+    const payload = {
+      source_url: source || "https://example.com",
+      platform: platformValue,
+      title: source ? source.slice(0, 80) : "PipelineLab",
+      category_key: "beauty",
+      content_lang: languageValue,
+      ui_lang: "en",
+    };
+
+    const resp = await fetch("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) {
+      const t = await resp.text().catch(() => "");
+      throw new Error(`Create task failed: HTTP ${resp.status} ${t}`);
+    }
+
+    const data = await resp.json();
+    const newId = (data && (data.task_id || data.id || (data.task && data.task.id))) || "";
+    if (!newId) throw new Error("Create task succeeded but no task id in response");
+
+    currentTaskId = newId;
+
+    const taskIdEl = getEl("task-id") || getEl("task_id") || getEl("taskId");
+    if (taskIdEl) {
+      if ("value" in taskIdEl) taskIdEl.value = newId;
+      else taskIdEl.textContent = newId;
+    }
+
+    return currentTaskId;
+  }
+
   function log(message) {
     if (!logEl) return;
     const now = new Date().toISOString();
@@ -201,6 +282,8 @@
     if (el) {
       el.value = `task_${compact}`;
     }
+    currentTaskId = el && el.value ? el.value : currentTaskId;
+    if (currentTaskId) updateDownloadLinks(currentTaskId);
     log("Task ID updated.");
   }
 
@@ -218,6 +301,8 @@
     if (el) {
       el.value = `task_${safe.slice(0, 16)}`;
     }
+    currentTaskId = el && el.value ? el.value : currentTaskId;
+    if (currentTaskId) updateDownloadLinks(currentTaskId);
     log("Task ID generated.");
   }
 
@@ -230,6 +315,7 @@
     if (platformEl) platformEl.value = "douyin";
     if (linkEl) linkEl.value = "";
     if (voiceEl) voiceEl.value = "mm_female_1";
+    currentTaskId = "demo_v1";
     updateDownloadLinks("demo_v1");
     log("Form reset.");
   }
@@ -239,7 +325,8 @@
     inFlight.parse = true;
     setButtonsDisabled("parse", true);
     setButtonsDisabled("all", true);
-    const body = { task_id: taskId(), platform: platform(), link: link() };
+    const id = await ensureTaskId();
+    const body = { task_id: id, platform: platform(), link: link() };
     log(`Calling /v1/parse for ${body.task_id}.`);
     try {
       const json = await fetchJson("/v1/parse", {
@@ -249,7 +336,7 @@
       });
       const output = getEl("parseOutput");
       if (output) output.textContent = JSON.stringify(json, null, 2);
-      updateDownloadLinks(body.task_id);
+      updateDownloadLinks(id);
       log("Parse done.");
       return json;
     } catch (err) {
@@ -267,7 +354,8 @@
     inFlight.subtitles = true;
     setButtonsDisabled("subtitles", true);
     setButtonsDisabled("all", true);
-    const body = { task_id: taskId(), target_lang: "my", force: false, translate: true, with_scenes: true };
+    const id = await ensureTaskId();
+    const body = { task_id: id, target_lang: "my", force: false, translate: true, with_scenes: true };
     log("Calling /v1/subtitles.");
     try {
       const { status, json } = await fetchJsonWithStatus("/v1/subtitles", {
@@ -277,7 +365,7 @@
       });
       if (status === 202 || json.queued) {
         log("Subtitles queued; polling status...");
-        startSubtitlesPolling(body.task_id);
+        startSubtitlesPolling(id);
         return json;
       }
       const output = getEl("subsOutput");
@@ -306,7 +394,8 @@
     inFlight.dub = true;
     setButtonsDisabled("dub", true);
     setButtonsDisabled("all", true);
-    const body = { task_id: taskId(), voice_id: voiceId(), force: false, target_lang: "my" };
+    const id = await ensureTaskId();
+    const body = { task_id: id, voice_id: voiceId(), force: false, target_lang: "my" };
     log(`Calling /v1/dub for ${body.task_id}.`);
     try {
       const { status, json } = await fetchJsonWithStatus("/v1/dub", {
@@ -316,17 +405,17 @@
       });
       if (status === 202 || json.queued) {
         log("Dub queued; polling status...");
-        startDubPolling(body.task_id);
+        startDubPolling(id);
         return json;
       }
       const output = getEl("dubOutput");
       if (output) output.textContent = JSON.stringify(json, null, 2);
       const player = getEl("audioPlayer");
       if (player) {
-        player.src = `/v1/tasks/${body.task_id}/audio_mm`;
+        player.src = `/v1/tasks/${id}/audio_mm`;
         player.style.display = "block";
       }
-      updateDownloadLinks(body.task_id);
+      updateDownloadLinks(id);
       log("Dub audio ready.");
       return json;
     } catch (err) {
@@ -344,7 +433,8 @@
     inFlight.pack = true;
     setButtonsDisabled("pack", true);
     setButtonsDisabled("all", true);
-    const body = { task_id: taskId() };
+    const id = await ensureTaskId();
+    const body = { task_id: id };
     log(`Calling /v1/pack for ${body.task_id}.`);
     try {
       const json = await fetchJson("/v1/pack", {
@@ -354,7 +444,7 @@
       });
       const output = getEl("packOutput");
       if (output) output.textContent = JSON.stringify(json, null, 2);
-      updateDownloadLinks(body.task_id);
+      updateDownloadLinks(id);
       log("Pack ready.");
       return json;
     } catch (err) {
@@ -371,7 +461,7 @@
     if (inFlight.status) return;
     inFlight.status = true;
     setButtonsDisabled("status", true);
-    const id = taskId();
+    const id = await ensureTaskId();
     log(`Calling /v1/tasks/${id}/status.`);
     try {
       const json = await fetchJson(`/v1/tasks/${id}/status`, { method: "GET" });
@@ -391,7 +481,7 @@
 
   async function runFullPipeline() {
     try {
-      const id = taskId();
+      const id = await ensureTaskId();
       await runParse();
       const subsResult = await runSubtitles();
       if (subsResult && subsResult.queued) {
@@ -418,7 +508,11 @@
   });
 
   document.addEventListener("DOMContentLoaded", () => {
-    updateDownloadLinks(taskId());
+    ensureTaskId()
+      .then((id) => {
+        if (id) updateDownloadLinks(id);
+      })
+      .catch(() => {});
     const map = [
       ["btn-generate-task", generateTaskId],
       ["btn-generate-from-link", generateFromLink],
