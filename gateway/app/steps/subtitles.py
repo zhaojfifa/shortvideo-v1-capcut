@@ -81,7 +81,7 @@ def _ffmpeg_path() -> str:
     return ffmpeg
 
 
-def _extract_audio(video_path: Path, wav_path: Path) -> None:
+def _extract_audio(video_path: Path, wav_path: Path, timeout_sec: int | None = None) -> None:
     ffmpeg = _ffmpeg_path()
     wav_path.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
@@ -98,7 +98,16 @@ def _extract_audio(video_path: Path, wav_path: Path) -> None:
         "1",
         str(wav_path),
     ]
-    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        p = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout_sec,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("ffmpeg audio extract timeout") from exc
     if p.returncode != 0 or not wav_path.exists():
         raise RuntimeError(f"ffmpeg audio extract failed: {p.stderr[-800:]}")
 
@@ -218,8 +227,10 @@ async def generate_subtitles(
                 raw_size=raw_size,
                 wav_path=str(wav_path),
             )
+            asr_timeout_sec = _env_int("SUBTITLES_ASR_TIMEOUT_SEC", 600)
+            ffmpeg_timeout_sec = _env_int("SUBTITLES_FFMPEG_TIMEOUT_SEC", asr_timeout_sec)
             wav_start = time.perf_counter()
-            _extract_audio(raw_path, wav_path)
+            _extract_audio(raw_path, wav_path, timeout_sec=ffmpeg_timeout_sec)
             log_stage(
                 "SUB2_WAV_EXTRACT_DONE",
                 wav_path=str(wav_path),
@@ -232,7 +243,6 @@ async def generate_subtitles(
                 wav_path=str(wav_path),
                 wav_size=wav_path.stat().st_size if wav_path.exists() else None,
             )
-            asr_timeout_sec = _env_int("SUBTITLES_ASR_TIMEOUT_SEC", 600)
             try:
                 segments = await asyncio.wait_for(
                     asyncio.to_thread(_transcribe_with_faster_whisper, wav_path),

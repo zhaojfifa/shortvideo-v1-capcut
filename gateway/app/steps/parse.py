@@ -21,6 +21,10 @@ from gateway.app.services.download import DownloadError, download_raw_video
 logger = logging.getLogger(__name__)
 
 _URL_RE = re.compile(r"(https?://[^\s]+)")
+_IESDOUYIN_RE = re.compile(
+    r"https?://(?:www\.)?iesdouyin\.com/share/video/(\d+)",
+    re.IGNORECASE,
+)
 
 
 def _validate_url(url: str) -> str:
@@ -30,6 +34,9 @@ def _validate_url(url: str) -> str:
     match = _URL_RE.search(text)
     candidate = match.group(1) if match else text
     candidate = candidate.rstrip(",.\"\'] ")
+    ies_match = _IESDOUYIN_RE.search(candidate)
+    if ies_match:
+        candidate = f"https://www.douyin.com/video/{ies_match.group(1)}"
     parsed = urlparse(candidate)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError(f"Invalid video URL: {url}")
