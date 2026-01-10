@@ -27,6 +27,7 @@ from gateway.app.providers.gemini_subtitles import (
     GeminiSubtitlesError,
     translate_segments_with_gemini,
 )
+from gateway.app.providers.whisper_singleton import get_whisper_model
 from gateway.app.services import subtitles_openai
 
 logger = logging.getLogger(__name__)
@@ -147,10 +148,7 @@ def _transcribe_with_faster_whisper(
     audio_path: Path,
     language_hint: str | None = None,
 ) -> tuple[list[dict], str | None]:
-    model_name = os.getenv("FASTER_WHISPER_MODEL", "base")
-    from faster_whisper import WhisperModel  # type: ignore
-
-    model = WhisperModel(model_name, device="cpu", compute_type="int8")
+    model = get_whisper_model()
     kwargs = {}
     if language_hint:
         kwargs["language"] = language_hint
