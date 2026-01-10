@@ -53,7 +53,7 @@
     return "";
   }
 
-  async function ensureTaskId({ allowCreate } = {}) {
+  async function ensureTaskId({ allowCreate = false } = {}) {
     const pathId = getTaskIdFromPath();
     if (pathId) {
       currentTaskId = pathId;
