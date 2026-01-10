@@ -294,7 +294,21 @@ async def run_subtitles_step(req: SubtitlesRequest):
         _update_task(req.task_id, subtitles_status="error", subtitles_error="cancelled")
         raise
     except HTTPException as exc:
-        _update_task(req.task_id, subtitles_status="error", subtitles_error=str(exc.detail))
+        _update_task(
+            req.task_id,
+            subtitles_status="error",
+            subtitles_error=f"{exc.status_code}: {exc.detail}",
+        )
+        logger.error(
+            "Subtitles failed",
+            extra={
+                "task_id": req.task_id,
+                "step": "subtitles",
+                "phase": "exception",
+                "provider": subtitles_backend,
+            },
+            exc_info=True,
+        )
         raise
     except Exception as exc:  # pragma: no cover
         logger.exception("Unexpected error in subtitles step for task %s", req.task_id)
@@ -341,32 +355,32 @@ async def run_dub_step(req: DubRequest):
         },
     )
 
-    if not mm_exists:
-        detail = "translated subtitles not found; run /api/tasks/{task_id}/subtitles first"
-        _update_task(req.task_id, dub_status="error", dub_error=detail)
-        raise HTTPException(status_code=400, detail=detail)
-
-    override_text = (req.mm_text or "").strip()
-    mm_text = override_text or (workspace.read_mm_srt_text() or "")
-    logger.info(
-        "DUB3_TEXT_SOURCE",
-        extra={
-            "task_id": req.task_id,
-            "step": "dub",
-            "stage": "DUB3_TEXT_SOURCE",
-            "dub_provider": provider,
-            "voice_id": req.voice_id,
-            "text_source": "override" if override_text else "mm_srt",
-            "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
-            "text_len": len(mm_text or ""),
-        },
-    )
-    if not mm_text.strip():
-        detail = "translated subtitles file is empty; please rerun /api/tasks/{task_id}/subtitles"
-        _update_task(req.task_id, dub_status="error", dub_error=detail)
-        raise HTTPException(status_code=400, detail=detail)
-
     try:
+        if not mm_exists:
+            detail = "translated subtitles not found; run /api/tasks/{task_id}/subtitles first"
+            _update_task(req.task_id, dub_status="error", dub_error=detail)
+            raise HTTPException(status_code=400, detail=detail)
+
+        override_text = (req.mm_text or "").strip()
+        mm_text = override_text or (workspace.read_mm_srt_text() or "")
+        logger.info(
+            "DUB3_TEXT_SOURCE",
+            extra={
+                "task_id": req.task_id,
+                "step": "dub",
+                "stage": "DUB3_TEXT_SOURCE",
+                "dub_provider": provider,
+                "voice_id": req.voice_id,
+                "text_source": "override" if override_text else "mm_srt",
+                "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                "text_len": len(mm_text or ""),
+            },
+        )
+        if not mm_text.strip():
+            detail = "translated subtitles file is empty; please rerun /api/tasks/{task_id}/subtitles"
+            _update_task(req.task_id, dub_status="error", dub_error=detail)
+            raise HTTPException(status_code=400, detail=detail)
+
         step_timeout_sec = _env_int("DUB_STEP_TIMEOUT_SEC", 900)
         result = await asyncio.wait_for(
             synthesize_voice(
@@ -388,6 +402,23 @@ async def run_dub_step(req: DubRequest):
     except DubbingError as exc:
         _update_task(req.task_id, dub_status="error", dub_error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException as exc:
+        _update_task(
+            req.task_id,
+            dub_status="error",
+            dub_error=f"{exc.status_code}: {exc.detail}",
+        )
+        logger.error(
+            "Dubbing failed",
+            extra={
+                "task_id": req.task_id,
+                "step": "dub",
+                "phase": "exception",
+                "provider": provider,
+            },
+            exc_info=True,
+        )
+        raise
 
     # synthesize_voice 可能返回 dict 或其他对象，这里做防御性解析
     audio_path_value = result.get("audio_path") if isinstance(result, dict) else None

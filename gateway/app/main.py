@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from gateway.app.config import create_storage_service, get_settings
+from gateway.app.core.logging_config import configure_logging
 from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
 from gateway.app import models
 from gateway.app.ports.storage_provider import get_storage_service, set_storage_service
@@ -29,6 +30,8 @@ WORKSPACE_ROOT = Path(
     os.environ.get("VIDEO_WORKSPACE", "/opt/render/project/src/video_workspace")
 ).resolve()
 ALLOWED_TOP_DIRS = {"raw", "tasks", "audio", "pack", "published"}
+
+configure_logging()
 
 app = FastAPI(title="ShortVideo Gateway", version="v1")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
