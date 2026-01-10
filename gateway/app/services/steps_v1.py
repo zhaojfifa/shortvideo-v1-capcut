@@ -185,10 +185,12 @@ async def run_parse_step(req: ParseRequest):
         )
         return result
 
-    except HTTPException:
+    except HTTPException as exc:
+        _update_task(req.task_id, parse_status="error", parse_error=str(exc.detail))
         raise
     except Exception as exc:  # pragma: no cover
         logger.exception("Unexpected error in parse step for task %s", req.task_id)
+        _update_task(req.task_id, parse_status="error", parse_error=str(exc))
         raise HTTPException(status_code=500, detail=f"Unexpected server error: {exc}") from exc
     finally:
         log_step_timing(
@@ -291,8 +293,8 @@ async def run_subtitles_step(req: SubtitlesRequest):
     except asyncio.CancelledError:
         _update_task(req.task_id, subtitles_status="error", subtitles_error="cancelled")
         raise
-    except HTTPException:
-        _update_task(req.task_id, subtitles_status="error", subtitles_error="http_error")
+    except HTTPException as exc:
+        _update_task(req.task_id, subtitles_status="error", subtitles_error=str(exc.detail))
         raise
     except Exception as exc:  # pragma: no cover
         logger.exception("Unexpected error in subtitles step for task %s", req.task_id)
@@ -340,10 +342,9 @@ async def run_dub_step(req: DubRequest):
     )
 
     if not mm_exists:
-        raise HTTPException(
-            status_code=400,
-            detail="translated subtitles not found; run /api/tasks/{task_id}/subtitles first",
-        )
+        detail = "translated subtitles not found; run /api/tasks/{task_id}/subtitles first"
+        _update_task(req.task_id, dub_status="error", dub_error=detail)
+        raise HTTPException(status_code=400, detail=detail)
 
     override_text = (req.mm_text or "").strip()
     mm_text = override_text or (workspace.read_mm_srt_text() or "")
@@ -361,10 +362,9 @@ async def run_dub_step(req: DubRequest):
         },
     )
     if not mm_text.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="translated subtitles file is empty; please rerun /api/tasks/{task_id}/subtitles",
-        )
+        detail = "translated subtitles file is empty; please rerun /api/tasks/{task_id}/subtitles"
+        _update_task(req.task_id, dub_status="error", dub_error=detail)
+        raise HTTPException(status_code=400, detail=detail)
 
     try:
         step_timeout_sec = _env_int("DUB_STEP_TIMEOUT_SEC", 900)
@@ -386,6 +386,7 @@ async def run_dub_step(req: DubRequest):
         _update_task(req.task_id, dub_status="error", dub_error="cancelled")
         raise
     except DubbingError as exc:
+        _update_task(req.task_id, dub_status="error", dub_error=str(exc))
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # synthesize_voice 可能返回 dict 或其他对象，这里做防御性解析
@@ -408,10 +409,9 @@ async def run_dub_step(req: DubRequest):
                 content_type="audio/mpeg",
             )
             if not uploaded_key:
-                raise HTTPException(
-                    status_code=500,
-                    detail="Audio upload failed; no storage key returned",
-                )
+                detail = "Audio upload failed; no storage key returned"
+                _update_task(req.task_id, dub_status="error", dub_error=detail)
+                raise HTTPException(status_code=500, detail=detail)
             audio_key = uploaded_key
             logger.info(
                 "DUB3_UPLOAD_DONE",
