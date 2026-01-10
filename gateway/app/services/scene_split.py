@@ -5,6 +5,7 @@ import logging
 import re
 import shutil
 import subprocess
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +16,7 @@ from fastapi import HTTPException
 
 from gateway.app.core.workspace import raw_path, workspace_root
 from gateway.app.ports.storage_provider import get_storage_service
+from gateway.app.utils.timing import log_step_timing
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,9 @@ DEFAULT_MAX_LINES = 5
 
 SRT_TIME_RE = re.compile(
     r"(?P<start>\d{2}:\d{2}:\d{2}[,\.]\d{3})\s*-->\s*(?P<end>\d{2}:\d{2}:\d{2}[,\.]\d{3})"
+)
+SRT_LINE_TIME_RE = re.compile(
+    r"^\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}"
 )
 
 
@@ -66,7 +71,12 @@ def _slice_video(src: Path, dst: Path, start: float, end: float) -> None:
         f"{end:.3f}",
         "-i",
         str(src),
-        "-c",
+        "-map",
+        "0:v:0",
+        "-an",
+        "-sn",
+        "-dn",
+        "-c:v",
         "copy",
         str(dst),
     ]
@@ -184,6 +194,29 @@ def _parse_srt(text: str) -> list[SrtEntry]:
         text_lines = lines[2:] if lines[0].strip().isdigit() else lines[1:]
         entries.append(SrtEntry(start=start, end=end, text="\n".join(text_lines)))
     return entries
+
+
+def _srt_to_plain_text(srt_text: str) -> str:
+    lines: list[str] = []
+    for raw in srt_text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.isdigit():
+            continue
+        if SRT_LINE_TIME_RE.match(line):
+            continue
+        lines.append(line)
+    return "\n".join(lines).strip() + ("\n" if lines else "")
+
+
+def _write_scene_subtitles(scene_dir: Path, srt_content: str) -> None:
+    scene_dir.mkdir(parents=True, exist_ok=True)
+    (scene_dir / "subs.srt").write_text(srt_content, encoding="utf-8")
+    (scene_dir / "subs.txt").write_text(
+        _srt_to_plain_text(srt_content),
+        encoding="utf-8",
+    )
 
 
 def _parse_srt_time(value: str) -> float:
@@ -366,14 +399,13 @@ def generate_scenes_package(
 
         video_path = scene_dir / "video.mp4"
         audio_path = scene_dir / "audio.wav"
-        subs_path = scene_dir / "subs.srt"
         scene_json_path = scene_dir / "scene.json"
 
         _slice_video(raw, video_path, scene.start, scene.end)
         _slice_audio(raw, audio_path, scene.start, scene.end)
 
         clipped_srt = _clip_srt(srt_entries, scene.start, scene.end)
-        subs_path.write_text(clipped_srt, encoding="utf-8")
+        _write_scene_subtitles(scene_dir, clipped_srt)
 
         preview = ""
         for entry in srt_entries:
@@ -473,6 +505,7 @@ def _task_value(task: object, field: str) -> str | None:
 
 
 def run_scenes_build(task_id: str, update_task) -> dict:
+    start_time = time.perf_counter()
     update_task(task_id, {"scenes_status": "running", "scenes_error": None})
     try:
         result = generate_scenes_package(task_id)
@@ -489,6 +522,13 @@ def run_scenes_build(task_id: str, update_task) -> dict:
     except Exception as exc:  # pragma: no cover - defensive logging
         update_task(task_id, {"scenes_status": "error", "scenes_error": str(exc)})
         raise
+    finally:
+        log_step_timing(
+            logger,
+            task_id=task_id,
+            step="scenes",
+            start_time=start_time,
+        )
 
 
 def enqueue_scenes_build(

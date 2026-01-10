@@ -8,8 +8,11 @@ IMPORTANT:
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 import re
+import time
 from typing import Any
 
 from gateway.app.config import get_settings
@@ -18,6 +21,16 @@ from gateway.app.providers.edge_tts import EdgeTTSError, generate_audio_edge_tts
 from gateway.app.providers import lovo_tts
 
 logger = logging.getLogger(__name__)
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
 
 
 class DubbingError(RuntimeError):
@@ -53,6 +66,11 @@ def _normalize_text(mm_srt_text: str) -> str:
     return mm_srt_text.strip()
 
 
+def _map_edge_voice_id(voice_id: str | None, settings) -> str:
+    voice_key = voice_id or "mm_female_1"
+    return settings.edge_tts_voice_map.get(voice_key, voice_key)
+
+
 async def _synthesize_from_text(
     *,
     task_id: str,
@@ -66,6 +84,7 @@ async def _synthesize_from_text(
     if ws.mm_audio_exists() and not force:
         return {"audio_path": str(ws.mm_audio_path), "duration_sec": None}
 
+    start_time = time.perf_counter()
     text = _normalize_text(mm_srt_text)
     if not text:
         raise DubbingError("Empty text for dubbing")
@@ -75,30 +94,154 @@ async def _synthesize_from_text(
     if provider == "edge":
         provider = "edge-tts"
 
+    tts_timeout_sec = _env_int("DUB_TTS_TIMEOUT_SEC", 300)
+
     if provider == "edge-tts":
-        voice_key = voice_id or "mm_female_1"
-        voice = settings.edge_tts_voice_map.get(voice_key, voice_key)
+        voice = _map_edge_voice_id(voice_id, settings)
         output_path = ws.mm_audio_mp3_path
+        logger.info(
+            "DUB3_TTS_START",
+            extra={
+                "task_id": task_id,
+                "step": "dub",
+                "stage": "DUB3_TTS_START",
+                "dub_provider": provider,
+                "voice_id": voice_id,
+                "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                "output_path": str(output_path),
+                "text_len": len(text),
+                "timeout_sec": tts_timeout_sec,
+            },
+        )
         try:
-            await generate_audio_edge_tts(text, voice, str(output_path))
+            await asyncio.wait_for(
+                generate_audio_edge_tts(text, voice, str(output_path)),
+                timeout=tts_timeout_sec,
+            )
         except EdgeTTSError as exc:
+            logger.info(
+                "DUB3_TTS_FAIL",
+                extra={
+                    "task_id": task_id,
+                    "step": "dub",
+                    "stage": "DUB3_TTS_FAIL",
+                    "dub_provider": provider,
+                    "voice_id": voice_id,
+                    "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                    "error": str(exc),
+                },
+            )
             raise DubbingError(str(exc)) from exc
+        except asyncio.TimeoutError:
+            logger.info(
+                "DUB3_TTS_FAIL",
+                extra={
+                    "task_id": task_id,
+                    "step": "dub",
+                    "stage": "DUB3_TTS_FAIL",
+                    "dub_provider": provider,
+                    "voice_id": voice_id,
+                    "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                    "error": "timeout",
+                },
+            )
+            raise DubbingError("Edge-TTS timeout")
         except Exception as exc:
+            logger.info(
+                "DUB3_TTS_FAIL",
+                extra={
+                    "task_id": task_id,
+                    "step": "dub",
+                    "stage": "DUB3_TTS_FAIL",
+                    "dub_provider": provider,
+                    "voice_id": voice_id,
+                    "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                    "error": str(exc),
+                },
+            )
             raise DubbingError(f"Edge-TTS failed: {exc}") from exc
         if not output_path.exists():
+            logger.info(
+                "DUB3_TTS_FAIL",
+                extra={
+                    "task_id": task_id,
+                    "step": "dub",
+                    "stage": "DUB3_TTS_FAIL",
+                    "dub_provider": provider,
+                    "voice_id": voice_id,
+                    "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                    "error": "output_missing",
+                },
+            )
             raise DubbingError("Edge-TTS did not produce audio output")
+        logger.info(
+            "DUB3_TTS_DONE",
+            extra={
+                "task_id": task_id,
+                "step": "dub",
+                "stage": "DUB3_TTS_DONE",
+                "dub_provider": provider,
+                "voice_id": voice_id,
+                "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                "output_path": str(output_path),
+                "output_size": output_path.stat().st_size if output_path.exists() else None,
+            },
+        )
         return {"audio_path": str(output_path), "duration_sec": None}
 
     if provider == "lovo":
+        logger.info(
+            "DUB3_TTS_START",
+            extra={
+                "task_id": task_id,
+                "step": "dub",
+                "stage": "DUB3_TTS_START",
+                "dub_provider": provider,
+                "voice_id": voice_id,
+                "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                "text_len": len(text),
+                "timeout_sec": tts_timeout_sec,
+            },
+        )
         try:
-            content, ext, _ = lovo_tts.synthesize_sync(
-                text=text,
-                voice_id=voice_id or settings.lovo_voice_id_mm,
+            content, ext, _ = await asyncio.wait_for(
+                asyncio.to_thread(
+                    lovo_tts.synthesize_sync,
+                    text=text,
+                    voice_id=voice_id or settings.lovo_voice_id_mm,
+                ),
+                timeout=tts_timeout_sec,
             )
         except Exception as exc:
-            raise DubbingError(str(exc)) from exc
+            error_text = "timeout" if isinstance(exc, asyncio.TimeoutError) else str(exc)
+            logger.info(
+                "DUB3_TTS_FAIL",
+                extra={
+                    "task_id": task_id,
+                    "step": "dub",
+                    "stage": "DUB3_TTS_FAIL",
+                    "dub_provider": provider,
+                    "voice_id": voice_id,
+                    "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                    "error": error_text,
+                },
+            )
+            raise DubbingError("LOVO timeout" if error_text == "timeout" else str(exc)) from exc
         suffix = ext or "wav"
         path = ws.write_mm_audio(content, suffix=suffix)
+        logger.info(
+            "DUB3_TTS_DONE",
+            extra={
+                "task_id": task_id,
+                "step": "dub",
+                "stage": "DUB3_TTS_DONE",
+                "dub_provider": provider,
+                "voice_id": voice_id,
+                "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                "output_path": str(path),
+                "output_size": path.stat().st_size if path.exists() else None,
+            },
+        )
         return {"audio_path": str(path), "duration_sec": None}
 
     raise DubbingError(f"Unsupported dub provider: {settings.dub_provider}")

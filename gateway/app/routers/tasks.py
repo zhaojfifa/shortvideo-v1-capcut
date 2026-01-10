@@ -1,9 +1,13 @@
 """Task API and HTML routers for the gateway application."""
 
 import asyncio
+import hashlib
 import logging
 import os
 import re
+import shutil
+import subprocess
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -18,6 +22,7 @@ from ..config import get_settings
 from ..core.features import get_features
 from ..schemas import (
     DubRequest,
+    DubResponse,
     PackRequest,
     ParseRequest,
     SubtitlesRequest,
@@ -28,7 +33,8 @@ from ..schemas import (
 )
 
 from gateway.app.web.templates import get_templates
-from gateway.app.deps import get_task_repository  # 只保留这一处依赖注入入口
+from gateway.app.deps import get_task_repository
+from gateway.app.ports.storage_provider import get_storage_service  # 只保留这一处依赖注入入口
 
 # Ports / typing
 from gateway.ports.repository import ITaskRepository  # 如路径不对，按你们 ports 实际文件修
@@ -108,6 +114,62 @@ def coerce_datetime_or_epoch(v: Any) -> datetime:
     """
     return coerce_datetime(v) or datetime(1970, 1, 1, tzinfo=timezone.utc)
 
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+def _now_iso() -> str:
+    return datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
+
+
+def _touch_subtitles_heartbeat(repo, task_id: str, phase: str | None = None) -> None:
+    patch = {
+        "subtitles_status": "running",
+        "subtitles_error": None,
+        "subtitles_updated_at": _now_iso(),
+    }
+    if phase:
+        patch["subtitles_phase"] = phase
+    repo.upsert(task_id, patch)
+
+
+def _maybe_mark_subtitles_stale(task: dict, repo) -> dict:
+    status = task.get("subtitles_status")
+    if status != "running":
+        return task
+    timeout_sec = _env_int("SUBTITLES_STEP_TIMEOUT_SEC", 1800)
+    last_beat = coerce_datetime(task.get("subtitles_updated_at")) or coerce_datetime(
+        task.get("updated_at") or task.get("updatedAt") or task.get("created_at") or task.get("created")
+    )
+    if not last_beat:
+        return task
+    age_sec = (datetime.now(timezone.utc) - last_beat).total_seconds()
+    if age_sec <= timeout_sec:
+        return task
+    error = "Timed out: no heartbeat; possible worker restart"
+    repo.upsert(
+        task.get("task_id") or task.get("id"),
+        {
+            "subtitles_status": "error",
+            "subtitles_error": error,
+            "subtitles_updated_at": _now_iso(),
+            "subtitles_phase": "watchdog_timeout",
+        },
+    )
+    task = dict(task)
+    task["subtitles_status"] = "error"
+    task["subtitles_error"] = error
+    task["subtitles_updated_at"] = _now_iso()
+    task["subtitles_phase"] = "watchdog_timeout"
+    return task
+
 # Artifact storage helpers（只 import 一次，禁止在文件底部重定义同名函数）
 from gateway.app.services.artifact_storage import (
     upload_task_artifact,
@@ -115,6 +177,7 @@ from gateway.app.services.artifact_storage import (
     get_object_bytes,
     object_exists,
 )
+from gateway.app.ports.storage_provider import get_storage_service
 from gateway.app.services.scene_split import enqueue_scenes_build
 from gateway.app.services.publish_service import publish_task_pack, resolve_download_url
 from gateway.app.db import SessionLocal
@@ -133,11 +196,13 @@ from ..core.workspace import (
 
 logger = logging.getLogger(__name__)
 
+AUDIO_MM_KEY_TEMPLATE = "deliver/tasks/{task_id}/audio_mm.mp3"
 
 
 class DubProviderRequest(BaseModel):
     provider: str | None = None
     voice_id: str | None = None
+    mm_text: str | None = None
 
 
 class EditedTextRequest(BaseModel):
@@ -417,8 +482,11 @@ def download_audio_mm(task_id: str, repo=Depends(get_task_repository)):
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="dubbed audio not found")
-    key = _require_storage_key(task, "mm_audio_path", "dubbed audio not found")
-    return RedirectResponse(url=get_download_url(key), status_code=302)
+    key = _task_value(task, "mm_audio_key")
+    if not key:
+        raise HTTPException(status_code=404, detail="dubbed audio not found")
+    logger.info("audio_mm download: task_id=%s key=%s", task_id, key)
+    return RedirectResponse(url=get_download_url(str(key)), status_code=302)
 
 
 @pages_router.get("/v1/tasks/{task_id}/pack")
@@ -485,7 +553,7 @@ def task_status(task_id: str, repo=Depends(get_task_repository)):
     mm_txt_key = None
     if mm_key and mm_key.endswith(".srt"):
         mm_txt_key = f"{mm_key[:-4]}.txt"
-    audio_key = _task_key(task, "mm_audio_path")
+    audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
     pack_key = _task_key(task, "pack_key") or _task_key(task, "pack_path")
     scenes_key = _task_key(task, "scenes_key")
 
@@ -559,6 +627,33 @@ def _text_or_redirect(key: str, inline: bool) -> Response:
     return RedirectResponse(url=get_download_url(key), status_code=302)
 
 
+def _ensure_mp3_audio(src_path: Path, dst_path: Path) -> Path:
+    if src_path.suffix.lower() == ".mp3":
+        return src_path
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise HTTPException(status_code=500, detail="ffmpeg not found for mp3 conversion")
+
+    dst_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-i",
+        str(src_path),
+        "-codec:a",
+        "libmp3lame",
+        str(dst_path),
+    ]
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if p.returncode != 0 or not dst_path.exists() or dst_path.stat().st_size == 0:
+        raise HTTPException(
+            status_code=500,
+            detail=f"ffmpeg mp3 conversion failed: {p.stderr[-800:]}",
+        )
+    return dst_path
+
+
 def _resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
     task_id = str(task.get("task_id") or task.get("id"))
     raw_url = _task_endpoint(task_id, "raw") if task.get("raw_path") else None
@@ -574,7 +669,7 @@ def _resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
     )
     audio_url = (
         _task_endpoint(task_id, "audio")
-        if task.get("mm_audio_path")
+        if task.get("mm_audio_key") or task.get("mm_audio_path")
         else None
     )
     mm_txt_url = _task_endpoint(task_id, "mm_txt") if mm_url else None
@@ -635,6 +730,7 @@ def _task_to_detail(task: dict) -> TaskDetail:
         "origin_srt_path": paths.get("origin_srt_path"),
         "mm_srt_path": paths.get("mm_srt_path"),
         "mm_audio_path": paths.get("mm_audio_path"),
+        "mm_audio_key": task.get("mm_audio_key"),
         "pack_path": paths.get("pack_path"),
         "scenes_path": paths.get("scenes_path"),
         "scenes_status": task.get("scenes_status"),
@@ -675,6 +771,16 @@ def _extract_first_http_url(text: str | None) -> str | None:
         return None
     match = re.search(r"https?://\S+", text)
     return match.group(0) if match else None
+
+
+def _sha256_file(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(8192), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 def _repo_upsert(repo, task_id: str, patch: dict) -> None:
@@ -783,7 +889,17 @@ def _run_pipeline_background(task_id: str, repo) -> None:
         audio_key = None
         if workspace.mm_audio_exists():
             audio_path = workspace.mm_audio_path
-            audio_key = upload_task_artifact(task, audio_path, "mm_audio.mp3", task_id=task_id)
+            mp3_path = _ensure_mp3_audio(audio_path, workspace.mm_audio_mp3_path)
+            audio_key = AUDIO_MM_KEY_TEMPLATE.format(task_id=task_id)
+            storage = get_storage_service()
+            uploaded_key = storage.upload_file(
+                str(mp3_path), audio_key, content_type="audio/mpeg"
+            )
+            if not uploaded_key:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Audio upload failed; no storage key returned",
+                )
         _repo_upsert(
             repo,
             task_id,
@@ -791,6 +907,7 @@ def _run_pipeline_background(task_id: str, repo) -> None:
                 **status_update,
                 "last_step": current_step,
                 "mm_audio_path": audio_key,
+                "mm_audio_key": audio_key,
             },
         )
 
@@ -976,6 +1093,8 @@ def list_tasks(
 
     summaries: list[TaskSummary] = []
     for t in items:
+        if isinstance(t, dict):
+            t = _maybe_mark_subtitles_stale(t, repo)
         download_paths = _resolve_download_urls(t)
         pack_path = download_paths.get("pack_path")
         scenes_path = download_paths.get("scenes_path")
@@ -1067,7 +1186,7 @@ def get_task_text(
 
 
 @api_router.post("/tasks/{task_id}/mm_edited")
-def save_mm_edited(task_id: str, payload: EditedTextRequest):
+def save_mm_edited(task_id: str, payload: EditedTextRequest, repo=Depends(get_task_repository)):
     text = (payload.text or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="text is empty")
@@ -1075,6 +1194,29 @@ def save_mm_edited(task_id: str, payload: EditedTextRequest):
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         path.write_text(text + "\n", encoding="utf-8")
+        task = repo.get(task_id) if repo else None
+        if task:
+            workspace = Workspace(task_id)
+            mm_txt_path = workspace.mm_txt_path
+            mm_txt_path.parent.mkdir(parents=True, exist_ok=True)
+            mm_txt_path.write_text(text + "\n", encoding="utf-8")
+            mm_srt_key = _task_value(task, "mm_srt_path")
+            artifact_name = "mm.txt"
+            if isinstance(mm_srt_key, str):
+                normalized_key = mm_srt_key.replace("\\", "/")
+                if "subs/" in normalized_key:
+                    artifact_name = "subs/mm.txt"
+            mm_txt_key = upload_task_artifact(
+                task,
+                mm_txt_path,
+                artifact_name,
+                task_id=task_id,
+            )
+            if mm_txt_key and (
+                (isinstance(task, dict) and "mm_txt_path" in task)
+                or hasattr(task, "mm_txt_path")
+            ):
+                repo.upsert(task_id, {"mm_txt_path": mm_txt_key})
         return JSONResponse(
             {
                 "ok": True,
@@ -1096,6 +1238,8 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
     t = repo.get(task_id)
     if not t:
         raise HTTPException(status_code=404, detail="Task not found")
+    if isinstance(t, dict):
+        t = _maybe_mark_subtitles_stale(t, repo)
 
     return _task_to_detail(t)
 
@@ -1276,20 +1420,16 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
     )
 
     try:
-        class TaskAdapter:
-            def __init__(self, t: dict, voice_override: str | None, provider: str):
-                self.task_id = t.get("task_id") or t.get("id")
-                self.id = self.task_id
-                self.tenant_id = t.get("tenant_id") or t.get("tenant") or "default"
-                self.project_id = t.get("project_id") or t.get("project") or "default"
-                self.target_lang = t.get("target_lang") or t.get("content_lang") or "my"
-                self.voice_id = voice_override or t.get("voice_id")
-                self.dub_provider = provider
+        task = repo.get(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
 
-        task_adapter = TaskAdapter(task, voice_override=payload.voice_id, provider=provider)
+        run_async = os.getenv("RUN_STEPS_ASYNC", "1").strip().lower() not in ("0", "false", "no")
+        repo.upsert(task_id, {"dub_status": "running", "dub_error": None, "last_step": "dub"})
 
-        # 核心：SSOT dubbing
-        await run_dub_step_ssot(task_adapter)
+        if run_async:
+            asyncio.create_task(_run_dub_background(task_id, payload, repo))
+            return JSONResponse(status_code=202, content={"queued": True, "task_id": task_id})
 
         from gateway.app.utils.keys import KeyBuilder
 

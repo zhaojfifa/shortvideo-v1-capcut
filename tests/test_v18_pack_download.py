@@ -69,7 +69,8 @@ def test_create_capcut_pack_zip_structure(tmp_path, monkeypatch) -> None:
     expected = [
         f"{prefix}raw/raw.mp4",
         f"{prefix}audio/voice_my.wav",
-        f"{prefix}subs/my.srt",
+        f"{prefix}subs/mm.srt",
+        f"{prefix}subs/mm.txt",
         f"{prefix}scenes/.keep",
         f"{prefix}manifest.json",
         f"{prefix}README.md",
@@ -88,7 +89,7 @@ def test_create_capcut_pack_zip_structure(tmp_path, monkeypatch) -> None:
         "assets": {
             "raw_video": "raw/raw.mp4",
             "voice": "audio/voice_my.wav",
-            "subtitle": "subs/my.srt",
+            "subtitle": "subs/mm.srt",
             "scenes_dir": "scenes/",
         },
     }

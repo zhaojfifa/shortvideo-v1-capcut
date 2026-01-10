@@ -1,9 +1,22 @@
 import json
 import logging
+import os
+from pathlib import Path
+
 import google.generativeai as genai
 from gateway.app.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+
+def _load_review_brief_prompt() -> str:
+    base_dir = Path(__file__).resolve().parents[1] / "prompts"
+    version = os.getenv("REVIEW_BRIEF_PROMPT_VERSION", "v1").strip() or "v1"
+    candidate = base_dir / f"review_brief_{version}.txt"
+    if not candidate.exists():
+        candidate = base_dir / "review_brief_v1.txt"
+    return candidate.read_text(encoding="utf-8")
+
 
 def generate_brief(transcript_text: str, target_lang: str) -> dict:
     """
@@ -20,20 +33,11 @@ def generate_brief(transcript_text: str, target_lang: str) -> dict:
     
     model = genai.GenerativeModel("gemini-1.5-flash") # 使用 Flash 降低成本
 
-    prompt = f"""
-    You are a professional video editor and content strategist.
-    Analyze the following video transcript (in target language code: {target_lang}).
-    
-    Output a JSON object with the following fields:
-    1. "summary": A 1-sentence summary of the video.
-    2. "hook": What is the "Golden 3 Seconds" hook content?
-    3. "selling_points": A list of 3 key selling points or interesting facts.
-    4. "editing_suggestions": A list of specific advice for editing this into a viral TikTok.
-    5. "risk_score": An integer 0-10 (0 = safe, 10 = copyright/policy violation).
-
-    Transcript:
-    {transcript_text[:10000]}
-    """
+    prompt_template = _load_review_brief_prompt()
+    prompt = prompt_template.format(
+        target_lang=target_lang,
+        transcript=transcript_text[:10000],
+    )
 
     try:
         response = model.generate_content(prompt)

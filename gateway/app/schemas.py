@@ -47,6 +47,7 @@ class DubRequest(BaseModel):
     voice_id: str | None = None
     target_lang: str = "my"
     force: bool = False
+    mm_text: Optional[str] = None
 
 
 class PackRequest(BaseModel):
@@ -138,8 +139,16 @@ class TaskDetail(TaskSummary):
     origin_srt_path: Optional[str] = None
     mm_srt_path: Optional[str] = None
     mm_audio_path: Optional[str] = None
+    mm_audio_key: Optional[str] = None
     pack_path: Optional[str] = None
     scenes_path: Optional[str] = None
+
+
+class DubResponse(TaskDetail):
+    resolved_voice_id: Optional[str] = None
+    resolved_edge_voice: Optional[str] = None
+    audio_sha256: Optional[str] = None
+    mm_audio_key: Optional[str] = None
 
 
 class TaskListResponse(BaseModel):

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import logging
 import re
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -31,6 +33,16 @@ logger = logging.getLogger(__name__)
 _SRT_TIME_RE = re.compile(
     r"\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}"
 )
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
 
 
 def _srt_to_txt(srt_text: str) -> str:
@@ -69,7 +81,7 @@ def _ffmpeg_path() -> str:
     return ffmpeg
 
 
-def _extract_audio(video_path: Path, wav_path: Path) -> None:
+def _extract_audio(video_path: Path, wav_path: Path, timeout_sec: int | None = None) -> None:
     ffmpeg = _ffmpeg_path()
     wav_path.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
@@ -86,17 +98,32 @@ def _extract_audio(video_path: Path, wav_path: Path) -> None:
         "1",
         str(wav_path),
     ]
-    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        p = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout_sec,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("ffmpeg audio extract timeout") from exc
     if p.returncode != 0 or not wav_path.exists():
         raise RuntimeError(f"ffmpeg audio extract failed: {p.stderr[-800:]}")
 
 
-def _transcribe_with_faster_whisper(audio_path: Path) -> list[dict]:
+def _transcribe_with_faster_whisper(
+    audio_path: Path,
+    language_hint: str | None = None,
+) -> tuple[list[dict], str | None]:
     model_name = os.getenv("FASTER_WHISPER_MODEL", "base")
     from faster_whisper import WhisperModel  # type: ignore
 
     model = WhisperModel(model_name, device="cpu", compute_type="int8")
-    segments_iter, _info = model.transcribe(str(audio_path))
+    kwargs = {}
+    if language_hint:
+        kwargs["language"] = language_hint
+    segments_iter, info = model.transcribe(str(audio_path), **kwargs)
     segments = []
     for idx, seg in enumerate(segments_iter, start=1):
         text = (seg.text or "").strip()
@@ -108,7 +135,8 @@ def _transcribe_with_faster_whisper(audio_path: Path) -> list[dict]:
                 "origin": text,
             }
         )
-    return segments
+    detected_lang = getattr(info, "language", None)
+    return segments, detected_lang
 
 
 def _parse_srt_to_segments(srt_text: str) -> list[dict]:
@@ -154,8 +182,27 @@ async def generate_subtitles(
 ) -> dict:
     """Unified subtitles entry point used by the FastAPI route."""
 
+    start_time = time.perf_counter()
     settings = get_settings()
     backend = (settings.subtitles_backend or "").lower()
+    asr_backend = settings.asr_backend
+    asr_lang_hint = (os.getenv("SUBTITLES_ASR_LANG_HINT") or "").strip() or None
+
+    def log_stage(stage: str, **fields) -> None:
+        logger.info(
+            stage,
+            extra={
+                "task_id": task_id,
+                "step": "subtitles",
+                "stage": stage,
+                "asr_backend": asr_backend,
+                "subtitles_backend": backend,
+                "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                **fields,
+            },
+        )
+
+    log_stage("SUB2_START")
     logger.info(
         "Subtitles request started",
         extra={
@@ -169,94 +216,240 @@ async def generate_subtitles(
     target_lang = target_lang or "my"
 
     if backend == "gemini":
-        logger.info(
-            "Using Gemini subtitles backend",
-            extra={
-                "task_id": task_id,
-                "raw_exists": workspace.raw_video_exists(),
-            },
-        )
+        try:
+            logger.info(
+                "Using Gemini subtitles backend",
+                extra={
+                    "task_id": task_id,
+                    "raw_exists": workspace.raw_video_exists(),
+                },
+            )
 
-        segments: list[dict] = []
-        if workspace.raw_video_exists():
-            wav_path = audio_wav_path(task_id)
-            _extract_audio(workspace.raw_video_path, wav_path)
-            segments = _transcribe_with_faster_whisper(wav_path)
-        else:
-            origin_srt_text = workspace.read_origin_srt_text()
-            if not origin_srt_text:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Neither origin.srt nor raw video found, please run /v1/parse first",
+            segments: list[dict] = []
+            detected_lang = None
+            if workspace.raw_video_exists():
+                wav_path = audio_wav_path(task_id)
+                raw_path = workspace.raw_video_path
+                raw_size = raw_path.stat().st_size if raw_path.exists() else None
+                log_stage(
+                    "SUB2_WAV_EXTRACT_START",
+                    raw_path=str(raw_path),
+                    raw_size=raw_size,
+                    wav_path=str(wav_path),
                 )
-            segments = _parse_srt_to_segments(origin_srt_text)
+                asr_timeout_sec = _env_int("SUBTITLES_ASR_TIMEOUT_SEC", 600)
+                ffmpeg_timeout_sec = _env_int("SUBTITLES_FFMPEG_TIMEOUT_SEC", asr_timeout_sec)
+                wav_start = time.perf_counter()
+                _extract_audio(raw_path, wav_path, timeout_sec=ffmpeg_timeout_sec)
+                log_stage(
+                    "SUB2_WAV_EXTRACT_DONE",
+                    wav_path=str(wav_path),
+                    wav_size=wav_path.stat().st_size if wav_path.exists() else None,
+                    duration_ms=int((time.perf_counter() - wav_start) * 1000),
+                )
+                asr_start = time.perf_counter()
+                log_stage(
+                    "SUB2_ASR_START",
+                    wav_path=str(wav_path),
+                    wav_size=wav_path.stat().st_size if wav_path.exists() else None,
+                    asr_lang_hint=asr_lang_hint,
+                )
+                try:
+                    segments, detected_lang = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            _transcribe_with_faster_whisper,
+                            wav_path,
+                            asr_lang_hint,
+                        ),
+                        timeout=asr_timeout_sec,
+                    )
+                    log_stage(
+                        "SUB2_ASR_DONE",
+                        segments_count=len(segments),
+                        detected_lang=detected_lang,
+                        duration_ms=int((time.perf_counter() - asr_start) * 1000),
+                    )
+                except asyncio.TimeoutError:
+                    log_stage(
+                        "SUB2_ASR_FAIL",
+                        error="timeout",
+                        duration_ms=int((time.perf_counter() - asr_start) * 1000),
+                    )
+                    raise HTTPException(status_code=504, detail="ASR timeout")
+                except Exception as exc:
+                    log_stage(
+                        "SUB2_ASR_FAIL",
+                        error=str(exc),
+                        duration_ms=int((time.perf_counter() - asr_start) * 1000),
+                    )
+                    raise
+            else:
+                origin_srt_text = workspace.read_origin_srt_text()
+                if not origin_srt_text:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Neither origin.srt nor raw video found, please run /v1/parse first",
+                    )
+                segments = _parse_srt_to_segments(origin_srt_text)
 
-        if not segments:
-            raise HTTPException(status_code=502, detail="Whisper transcription returned empty segments")
+            if not segments:
+                raise HTTPException(status_code=502, detail="Whisper transcription returned empty segments")
 
-        origin_text = segments_to_srt(segments, "origin")
-        translations: dict[int, str] = {}
-
-        if translate_enabled:
-            try:
-                translations = translate_segments_with_gemini(
-                    segments=segments,
+            origin_text = segments_to_srt(segments, "origin")
+            translations: dict[int, str] = {}
+            translate_enabled_local = translate_enabled
+            if (
+                translate_enabled_local
+                and detected_lang
+                and target_lang
+                and detected_lang.lower() == target_lang.lower()
+            ):
+                translate_enabled_local = False
+                log_stage(
+                    "SUB2_TR_SKIPPED_SAME_LANG",
+                    detected_lang=detected_lang,
                     target_lang=target_lang,
-                    debug_dir=subs_dir(task_id),
                 )
-            except (GeminiSubtitlesError, ValueError) as exc:
-                logger.warning("Gemini translation failed; fallback to origin only: %s", exc)
 
-        for seg in segments:
-            idx = int(seg.get("index", 0))
-            if idx in translations:
-                seg["mm"] = translations[idx]
+            if translate_enabled_local:
+                tr_timeout_sec = _env_int("SUBTITLES_TR_TIMEOUT_SEC", 120)
+                tr_retries = _env_int("SUBTITLES_TR_RETRIES", 1)
+                for attempt in range(tr_retries + 1):
+                    tr_start = time.perf_counter()
+                    log_stage(
+                        "SUB2_TR_START",
+                        attempt=attempt + 1,
+                    )
+                    try:
+                        translations = await asyncio.wait_for(
+                            asyncio.to_thread(
+                                translate_segments_with_gemini,
+                                segments=segments,
+                                target_lang=target_lang,
+                                debug_dir=subs_dir(task_id),
+                            ),
+                            timeout=tr_timeout_sec,
+                        )
+                        log_stage(
+                            "SUB2_TR_DONE",
+                            attempt=attempt + 1,
+                            translations_count=len(translations),
+                            duration_ms=int((time.perf_counter() - tr_start) * 1000),
+                        )
+                        break
+                    except asyncio.TimeoutError:
+                        log_stage(
+                            "SUB2_TR_FAIL",
+                            attempt=attempt + 1,
+                            error="timeout",
+                            duration_ms=int((time.perf_counter() - tr_start) * 1000),
+                        )
+                        if attempt < tr_retries:
+                            continue
+                        translations = {}
+                    except GeminiSubtitlesError as exc:
+                        status = getattr(exc, "status_code", None) or getattr(exc, "status", None)
+                        retryable = status in (429,) or (isinstance(status, int) and status >= 500)
+                        log_stage(
+                            "SUB2_TR_FAIL",
+                            attempt=attempt + 1,
+                            error=str(exc),
+                            status_code=status,
+                            duration_ms=int((time.perf_counter() - tr_start) * 1000),
+                        )
+                        if retryable and attempt < tr_retries:
+                            continue
+                        translations = {}
+                    except ValueError as exc:
+                        log_stage(
+                            "SUB2_TR_FAIL",
+                            attempt=attempt + 1,
+                            error=str(exc),
+                            duration_ms=int((time.perf_counter() - tr_start) * 1000),
+                        )
+                        translations = {}
+                    break
+                if not translations:
+                    logger.warning("Gemini translation failed; fallback to origin only.")
 
-        mm_text = segments_to_srt(segments, "mm") if translations else ""
-        if not mm_text.strip():
-            mm_text = origin_text
+            for seg in segments:
+                idx = int(seg.get("index", 0))
+                if idx in translations:
+                    seg["mm"] = translations[idx]
 
-        scenes_payload = {
-            "version": "1.8",
-            "language": "origin",
-            "segments": segments,
-            "scenes": [
-                {
-                    "scene_id": 1,
-                    "start": segments[0]["start"],
-                    "end": segments[-1]["end"],
-                    "title": "",
-                    "mm_title": "",
-                }
-            ],
-        }
-        workspace.write_segments_json(scenes_payload)
+            mm_text = segments_to_srt(segments, "mm") if translations else ""
+            if not mm_text.strip():
+                mm_text = origin_text
 
-        origin_srt_path = workspace.write_origin_srt(origin_text)
-        mm_srt_path = workspace.write_mm_srt(mm_text)
-        origin_txt_path = origin_srt_path.with_suffix(".txt")
-        mm_txt_path = mm_srt_path.with_suffix(".txt")
-        _write_txt_from_srt(origin_txt_path, origin_text)
-        _write_txt_from_srt(mm_txt_path, mm_text)
+            scenes_payload = {
+                "version": "1.8",
+                "language": "origin",
+                "segments": segments,
+                "scenes": [
+                    {
+                        "scene_id": 1,
+                        "start": segments[0]["start"],
+                        "end": segments[-1]["end"],
+                        "title": "",
+                        "mm_title": "",
+                    }
+                ],
+            }
+            workspace.write_segments_json(scenes_payload)
 
-        logger.info(
-            "Subtitles summary",
-            extra={
+            origin_srt_path = workspace.write_origin_srt(origin_text)
+            mm_srt_path = workspace.write_mm_srt(mm_text)
+            origin_txt_path = origin_srt_path.with_suffix(".txt")
+            mm_txt_path = mm_srt_path.with_suffix(".txt")
+            _write_txt_from_srt(origin_txt_path, origin_text)
+            _write_txt_from_srt(mm_txt_path, mm_text)
+            log_stage(
+                "SUB2_WRITE_DONE",
+                origin_srt_path=str(origin_srt_path),
+                origin_srt_size=origin_srt_path.stat().st_size if origin_srt_path.exists() else None,
+                mm_srt_path=str(mm_srt_path),
+                mm_srt_size=mm_srt_path.stat().st_size if mm_srt_path.exists() else None,
+                mm_txt_path=str(mm_txt_path),
+                mm_txt_size=mm_txt_path.stat().st_size if mm_txt_path.exists() else None,
+            )
+
+            logger.info(
+                "Subtitles summary",
+                extra={
+                    "task_id": task_id,
+                    "origin_srt_len": len(origin_text or ""),
+                    "mm_srt_len": len(mm_text or ""),
+                    "segments_count": len(segments),
+                },
+            )
+            log_stage(
+                "SUB2_DONE",
+                origin_srt_len=len(origin_text or ""),
+                mm_srt_len=len(mm_text or ""),
+                segments_count=len(segments),
+            )
+            return {
                 "task_id": task_id,
-                "origin_srt_len": len(origin_text or ""),
-                "mm_srt_len": len(mm_text or ""),
-                "segments_count": len(segments),
-            },
-        )
-        return {
-            "task_id": task_id,
-            "origin_srt": origin_text,
-            "mm_srt": mm_text,
-            "mm_txt_path": relative_to_workspace(mm_txt_path),
-            "segments_json": scenes_payload,
-            "origin_preview": build_preview(origin_text),
-            "mm_preview": build_preview(mm_text),
-        }
+                "origin_srt": origin_text,
+                "mm_srt": mm_text,
+                "mm_txt_path": relative_to_workspace(mm_txt_path),
+                "segments_json": scenes_payload,
+                "origin_preview": build_preview(origin_text),
+                "mm_preview": build_preview(mm_text),
+            }
+        except Exception as exc:
+            log_stage("SUB2_FAIL", error=str(exc))
+            logger.exception(
+                "SUB2_FAIL",
+                extra={
+                    "task_id": task_id,
+                    "step": "subtitles",
+                    "stage": "SUB2_FAIL",
+                    "asr_backend": asr_backend,
+                    "subtitles_backend": backend,
+                },
+            )
+            raise
 
     if backend == "openai":
         if not settings.openai_api_key:

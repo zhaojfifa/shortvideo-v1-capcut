@@ -8,6 +8,12 @@
     status: false,
   };
 
+  const POLL_INTERVAL_MS = 3000;
+  let subsPoller = null;
+  let dubPoller = null;
+  let subsPollInFlight = false;
+  let dubPollInFlight = false;
+
   const buttons = {
     parse: ["btn-step1", "btn-parse"],
     subtitles: ["btn-step2", "btn-subtitles"],
@@ -156,6 +162,82 @@
     if (scenesLink) scenesLink.href = `/v1/tasks/${id}/scenes`;
   }
 
+  function startSubtitlesPolling(id) {
+    if (subsPoller) stopSubtitlesPolling();
+    subsPoller = setInterval(async () => {
+      if (subsPollInFlight) return;
+      subsPollInFlight = true;
+      try {
+        const status = await fetchJson(`/v1/tasks/${id}/status`, { method: "GET" });
+        if (status.subtitles_status === "ready") {
+          log("Subtitles ready.");
+          stopSubtitlesPolling();
+          updateDownloadLinks(id);
+        } else if (status.subtitles_status === "error") {
+          log(`Subtitles failed: ${status.subtitles_error || "unknown"}`);
+          stopSubtitlesPolling();
+        }
+      } catch (err) {
+        log(`Subtitles status poll failed: ${err}`);
+        stopSubtitlesPolling();
+      } finally {
+        subsPollInFlight = false;
+      }
+    }, POLL_INTERVAL_MS);
+  }
+
+  function stopSubtitlesPolling() {
+    if (!subsPoller) return;
+    clearInterval(subsPoller);
+    subsPoller = null;
+  }
+
+  function startDubPolling(id) {
+    if (dubPoller) stopDubPolling();
+    dubPoller = setInterval(async () => {
+      if (dubPollInFlight) return;
+      dubPollInFlight = true;
+      try {
+        const status = await fetchJson(`/v1/tasks/${id}/status`, { method: "GET" });
+        if (status.dub_status === "ready") {
+          log("Dub audio ready.");
+          stopDubPolling();
+          updateDownloadLinks(id);
+        } else if (status.dub_status === "error") {
+          log(`Dub failed: ${status.dub_error || "unknown"}`);
+          stopDubPolling();
+        }
+      } catch (err) {
+        log(`Dub status poll failed: ${err}`);
+        stopDubPolling();
+      } finally {
+        dubPollInFlight = false;
+      }
+    }, POLL_INTERVAL_MS);
+  }
+
+  function stopDubPolling() {
+    if (!dubPoller) return;
+    clearInterval(dubPoller);
+    dubPoller = null;
+  }
+
+  async function waitForStepReady(id, stepKey) {
+    const statusKey = stepKey === "dub" ? "dub_status" : "subtitles_status";
+    const errorKey = stepKey === "dub" ? "dub_error" : "subtitles_error";
+    while (true) {
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      const status = await fetchJson(`/v1/tasks/${id}/status`, { method: "GET" });
+      const state = status[statusKey];
+      if (state === "ready") {
+        return status;
+      }
+      if (state === "error") {
+        throw new Error(`${stepKey} failed: ${status[errorKey] || "unknown"}`);
+      }
+    }
+  }
+
   async function fetchJson(url, opts) {
     const res = await fetch(url, opts);
     const contentType = (res.headers.get("content-type") || "").toLowerCase();
@@ -169,6 +251,21 @@
     }
     const body = await res.text();
     throw new Error(`Expected JSON but got ${contentType || "unknown"}: ${body.slice(0, 120)}`);
+  }
+
+  async function fetchJsonWithStatus(url, opts) {
+    const res = await fetch(url, opts);
+    const contentType = (res.headers.get("content-type") || "").toLowerCase();
+    if (!res.ok) {
+      const text = await res.text();
+      const snippet = text.length > 300 ? `${text.slice(0, 300)}...` : text;
+      throw new Error(`HTTP ${res.status}: ${snippet}`);
+    }
+    if (!contentType.includes("application/json")) {
+      const body = await res.text();
+      throw new Error(`Expected JSON but got ${contentType || "unknown"}: ${body.slice(0, 120)}`);
+    }
+    return { status: res.status, json: await res.json() };
   }
 
   function generateTaskId() {
@@ -266,11 +363,16 @@
     const body = { task_id: id, target_lang: "my", force: false, translate: true, with_scenes: true };
     log("Calling /v1/subtitles.");
     try {
-      const json = await fetchJson("/v1/subtitles", {
+      const { status, json } = await fetchJsonWithStatus("/v1/subtitles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      if (status === 202 || json.queued) {
+        log("Subtitles queued; polling status...");
+        startSubtitlesPolling(id);
+        return json;
+      }
       const output = getEl("subsOutput");
       if (output) output.textContent = JSON.stringify(json, null, 2);
       const originPreview = getEl("originPreview");
@@ -301,11 +403,16 @@
     const body = { task_id: id, voice_id: voiceId(), force: false, target_lang: "my" };
     log(`Calling /v1/dub for ${body.task_id}.`);
     try {
-      const json = await fetchJson("/v1/dub", {
+      const { status, json } = await fetchJsonWithStatus("/v1/dub", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      if (status === 202 || json.queued) {
+        log("Dub queued; polling status...");
+        startDubPolling(id);
+        return json;
+      }
       const output = getEl("dubOutput");
       if (output) output.textContent = JSON.stringify(json, null, 2);
       const player = getEl("audioPlayer");
@@ -387,9 +494,18 @@
 
   async function runFullPipeline() {
     try {
+      const id = await ensureTaskId({ allowCreate: true });
       await runParse();
-      await runSubtitles();
-      await runDub();
+      const subsResult = await runSubtitles();
+      if (subsResult && subsResult.queued) {
+        log("Waiting for subtitles to finish...");
+        await waitForStepReady(id, "subtitles");
+      }
+      const dubResult = await runDub();
+      if (dubResult && dubResult.queued) {
+        log("Waiting for dub to finish...");
+        await waitForStepReady(id, "dub");
+      }
       await runPack();
     } catch (err) {
       log(`Pipeline stopped: ${err}`);

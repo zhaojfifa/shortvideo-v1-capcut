@@ -2,6 +2,12 @@
 
 This repo runs the ShortVideo pipeline (parse -> subtitles -> dub -> pack) and serves operator-facing APIs and pages for generating and downloading CapCut/YouCut-ready packs. v1.7 remains supported as a compatibility path; v1.8 is the active ops baseline.
 
+
+## Ops Quick Links (v1.8)
+
+- Ops handoff contract: docs/ops/v1.8_ops_handoff.md
+- YouCut SOP (?? + ??????): docs/ops/youcut_sop_zh_mm.md
+- Scenes spec: docs/v1.8/scenes_spec.md
 ## Ops baseline (v1.8)
 
 Flow: Task -> Pack -> Download URL
