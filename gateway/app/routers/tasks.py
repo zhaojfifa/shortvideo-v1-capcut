@@ -1158,7 +1158,67 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
     if not t:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    return _task_to_detail(t)
+    detail = _task_to_detail(t)
+    updated_at = getattr(detail, "updated_at", None)
+    updated_ts = None
+    if updated_at:
+        try:
+            updated_ts = (
+                updated_at.replace(tzinfo=timezone.utc).timestamp()
+                if updated_at.tzinfo is None
+                else updated_at.timestamp()
+            )
+        except Exception:
+            updated_ts = None
+    now_ts = datetime.now(timezone.utc).timestamp()
+    running = any(
+        getattr(detail, key, None) == "running"
+        for key in ("subtitles_status", "dub_status", "scenes_status", "pack_status")
+    )
+    stale_for = int(max(0, now_ts - updated_ts)) if updated_ts and running else 0
+    stale = bool(running and updated_ts and stale_for > 1800)
+
+    payload = detail.dict()
+    for key in (
+        "status",
+        "last_step",
+        "subtitles_status",
+        "dub_status",
+        "scenes_status",
+        "pack_status",
+        "subtitles_error",
+        "dub_error",
+        "scenes_error",
+        "pack_error",
+        "raw_path",
+        "origin_srt_path",
+        "mm_srt_path",
+        "mm_txt_path",
+        "mm_audio_path",
+        "pack_path",
+        "scenes_path",
+        "updated_at",
+    ):
+        payload.setdefault(key, None)
+
+    payload["stale"] = stale
+    payload["stale_reason"] = "running_but_not_updated" if stale else None
+    payload["stale_for_seconds"] = stale_for
+    logger.info(
+        "task_status_shape",
+        extra={
+            "task_id": task_id,
+            "status": payload.get("status"),
+            "last_step": payload.get("last_step"),
+            "subtitles_status": payload.get("subtitles_status"),
+            "dub_status": payload.get("dub_status"),
+            "scenes_status": payload.get("scenes_status"),
+            "pack_status": payload.get("pack_status"),
+            "stale": payload.get("stale"),
+        },
+    )
+
+    return payload
 
 
 @api_router.post("/tasks/{task_id}/parse")

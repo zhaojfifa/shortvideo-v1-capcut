@@ -148,6 +148,7 @@
     <div class="card header-card">
       <div class="header-row">
         <a class="back-link back-button btn-secondary" href="/tasks">Back to Task Board <span class="muted">/ 返回任务看板</span></a>
+        <button id="btn-refresh-status" class="btn-secondary" type="button">Refresh status <span class="muted">/ 刷新</span></button>
         <div id="status-badge" class="status-pill">{{ task.status }}</div>
       </div>
       <div class="header-row">
@@ -728,6 +729,13 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
       } finally {
         taskRefreshInFlight = false;
       }
+    }
+
+    const refreshStatusBtn = document.getElementById("btn-refresh-status");
+    if (refreshStatusBtn) {
+      refreshStatusBtn.addEventListener("click", async () => {
+        await refreshTaskState();
+      });
     }
 
     document.getElementById("btn-parse").addEventListener("click", async () => {
