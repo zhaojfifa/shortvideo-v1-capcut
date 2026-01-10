@@ -464,6 +464,8 @@ async def run_dub_step(req: DubRequest):
             mm_audio_path=audio_key,
             mm_audio_key=audio_key,
             last_step="dub",
+            dub_status="ready",
+            dub_error=None,
         )
 
     edited_text = workspace.read_mm_edited_text()

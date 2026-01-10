@@ -1214,6 +1214,232 @@ def build_parse(
     return _task_to_detail(stored)
 
 
+def _run_subtitles_job(
+    *,
+    task_id: str,
+    target_lang: str,
+    force: bool,
+    translate: bool,
+    repo,
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    subs_req = SubtitlesRequest(
+        task_id=task_id,
+        target_lang=target_lang,
+        force=force,
+        translate=translate,
+        with_scenes=True,
+    )
+    asyncio.run(run_subtitles_step_v1(subs_req))
+
+    workspace = Workspace(task_id)
+    origin_key = (
+        upload_task_artifact(task, workspace.origin_srt_path, "origin.srt", task_id=task_id)
+        if workspace.origin_srt_path.exists()
+        else None
+    )
+    mm_key = (
+        upload_task_artifact(task, workspace.mm_srt_path, "mm.srt", task_id=task_id)
+        if workspace.mm_srt_path.exists()
+        else None
+    )
+    mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
+    if mm_txt_path.exists():
+        upload_task_artifact(task, mm_txt_path, "mm.txt", task_id=task_id)
+
+    subtitles_dir = Path("deliver") / "subtitles" / task_id
+    subtitles_key = str(subtitles_dir / "subtitles.json")
+
+    repo.upsert(
+        task_id,
+        {
+            "origin_srt_path": origin_key,
+            "mm_srt_path": mm_key,
+            "last_step": "subtitles",
+            "subtitles_status": "ready",
+            "subtitles_key": subtitles_key,
+            "subtitle_structure_path": subtitles_key,
+            "subtitles_error": None,
+        },
+    )
+
+    stored = repo.get(task_id)
+    return _task_to_detail(stored)
+
+
+def _run_subtitles_background(
+    task_id: str,
+    target_lang: str,
+    force: bool,
+    translate: bool,
+    repo,
+) -> None:
+    try:
+        _run_subtitles_job(
+            task_id=task_id,
+            target_lang=target_lang,
+            force=force,
+            translate=translate,
+            repo=repo,
+        )
+    except HTTPException as exc:
+        repo.upsert(
+            task_id,
+            {"subtitles_status": "error", "subtitles_error": f"{exc.status_code}: {exc.detail}"},
+        )
+        logger.exception(
+            "SUB2_FAIL",
+            extra={
+                "task_id": task_id,
+                "step": "subtitles",
+                "phase": "exception",
+            },
+        )
+
+
+async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRepository) -> DubResponse:
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    provider_raw = payload.provider or "edge-tts"
+    provider_norm = provider_raw.lower().replace("-", "_")
+    if provider_norm == "edge":
+        provider_norm = "edge_tts"
+    if provider_norm not in {"edge_tts", "lovo"}:
+        raise HTTPException(status_code=400, detail="Unsupported dub provider")
+    provider = "edge-tts" if provider_norm == "edge_tts" else "lovo"
+
+    settings = get_settings()
+    if provider == "lovo" and not getattr(settings, "lovo_api_key", None):
+        raise HTTPException(status_code=400, detail="LOVO_API_KEY is not configured")
+
+    req_voice_id = payload.voice_id or None
+    prev_voice_id = task.get("voice_id") if isinstance(task, dict) else getattr(task, "voice_id", None)
+    final_voice_id = req_voice_id or prev_voice_id or "mm_female_1"
+    mm_text_override = (payload.mm_text or "").strip() or None
+    workspace = Workspace(task_id)
+    audio_present = False
+    if isinstance(task, dict):
+        audio_present = bool(task.get("mm_audio_key") or task.get("mm_audio_path"))
+    else:
+        audio_present = bool(
+            getattr(task, "mm_audio_key", None) or getattr(task, "mm_audio_path", None)
+        )
+    audio_present = audio_present or workspace.mm_audio_exists()
+    voice_changed = bool(req_voice_id and req_voice_id != prev_voice_id)
+    force_dub = bool(audio_present and voice_changed)
+
+    edge_voice = None
+    if provider == "edge-tts":
+        edge_voice = settings.edge_tts_voice_map.get(final_voice_id, final_voice_id)
+
+    logger.info(
+        "dub: task=%s req_voice_id=%s prev_voice_id=%s final_voice_id=%s edge_voice=%s",
+        task_id,
+        req_voice_id,
+        prev_voice_id,
+        final_voice_id,
+        edge_voice,
+    )
+
+    try:
+        class TaskAdapter:
+            def __init__(
+                self,
+                t: dict,
+                voice_override: str | None,
+                provider: str,
+                force_dub: bool,
+                mm_text: str | None,
+            ):
+                self.task_id = t.get("task_id") or t.get("id")
+                self.id = self.task_id
+                self.tenant_id = t.get("tenant_id") or t.get("tenant") or "default"
+                self.project_id = t.get("project_id") or t.get("project") or "default"
+                self.target_lang = t.get("target_lang") or t.get("content_lang") or "my"
+                self.voice_id = voice_override or t.get("voice_id")
+                self.dub_provider = provider
+                self.force_dub = force_dub
+                self.mm_text = mm_text
+
+        task_adapter = TaskAdapter(
+            task,
+            voice_override=final_voice_id,
+            provider=provider,
+            force_dub=force_dub,
+            mm_text=mm_text_override,
+        )
+
+        # 核心：SSOT dubbing
+        await run_dub_step_ssot(task_adapter)
+
+        audio_path = (
+            workspace.mm_audio_mp3_path
+            if workspace.mm_audio_mp3_path.exists()
+            else workspace.mm_audio_path
+        )
+        if not audio_path.exists():
+            raise HTTPException(status_code=500, detail="Dubbing output missing")
+
+        audio_key = AUDIO_MM_KEY_TEMPLATE.format(task_id=task_id)
+        storage = get_storage_service()
+        storage.upload_file(str(audio_path), audio_key, content_type="audio/mpeg")
+        audio_sha256 = _sha256_file(audio_path)
+
+    except HTTPException as exc:
+        repo.upsert(task_id, {"dub_status": "error", "dub_error": f"{exc.status_code}: {exc.detail}"})
+        raise
+    except Exception as exc:
+        repo.upsert(task_id, {"dub_status": "error", "dub_error": str(exc)})
+        logger.exception("DUB3_FAIL", extra={"task_id": task_id, "step": "dub", "phase": "exception"})
+        raise HTTPException(status_code=500, detail=f"Dubbing step failed: {exc}")
+
+    # repo.update 未必存在；用 upsert 更稳
+    repo.upsert(
+        task_id,
+        {
+            "mm_audio_path": audio_key,
+            "mm_audio_key": audio_key,
+            "dub_provider": provider,
+            "last_step": "dubbing",
+            "voice_id": final_voice_id,
+            "dub_status": "ready",
+            "dub_error": None,
+        },
+    )
+
+    stored = repo.get(task_id)
+    detail = _task_to_detail(stored)
+    return DubResponse(
+        **detail.dict(exclude={"mm_audio_key"}),
+        resolved_voice_id=final_voice_id,
+        resolved_edge_voice=edge_voice,
+        audio_sha256=audio_sha256,
+        mm_audio_key=audio_key,
+    )
+
+
+def _run_dub_background(task_id: str, payload: DubProviderRequest, repo: ITaskRepository) -> None:
+    try:
+        asyncio.run(_run_dub_job(task_id, payload, repo))
+    except Exception:
+        logger.exception("DUB3_FAIL", extra={"task_id": task_id, "step": "dub", "phase": "exception"})
+    except Exception as exc:
+        repo.upsert(task_id, {"subtitles_status": "error", "subtitles_error": str(exc)})
+        logger.exception(
+            "SUB2_FAIL",
+            extra={
+                "task_id": task_id,
+                "step": "subtitles",
+                "phase": "exception",
+            },
+        )
+
+
 @api_router.post("/tasks/{task_id}/scenes")
 def build_scenes(
     task_id: str,
@@ -1284,6 +1510,7 @@ def build_pack(
 async def rerun_dub(
     task_id: str,
     payload: DubProviderRequest,
+    background_tasks: BackgroundTasks,
     repo: ITaskRepository = Depends(get_task_repository),
 ):
     """Re-run dubbing for a task (SSOT: reads artifacts/subtitles.json)."""
@@ -1294,118 +1521,14 @@ async def rerun_dub(
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
 
-        provider_raw = payload.provider or "edge-tts"
-        provider_norm = provider_raw.lower().replace("-", "_")
-        if provider_norm == "edge":
-            provider_norm = "edge_tts"
-        if provider_norm not in {"edge_tts", "lovo"}:
-            raise HTTPException(status_code=400, detail="Unsupported dub provider")
-        provider = "edge-tts" if provider_norm == "edge_tts" else "lovo"
+        run_async = os.getenv("RUN_STEPS_ASYNC", "1").strip().lower() not in ("0", "false", "no")
+        repo.upsert(task_id, {"dub_status": "running", "dub_error": None, "last_step": "dub"})
 
-        settings = get_settings()
-        if provider == "lovo" and not getattr(settings, "lovo_api_key", None):
-            raise HTTPException(status_code=400, detail="LOVO_API_KEY is not configured")
+        if run_async:
+            background_tasks.add_task(_run_dub_background, task_id, payload, repo)
+            return JSONResponse(status_code=202, content={"queued": True, "task_id": task_id})
 
-        req_voice_id = payload.voice_id or None
-        prev_voice_id = task.get("voice_id") if isinstance(task, dict) else getattr(task, "voice_id", None)
-        final_voice_id = req_voice_id or prev_voice_id or "mm_female_1"
-        mm_text_override = (payload.mm_text or "").strip() or None
-        workspace = Workspace(task_id)
-        audio_present = False
-        if isinstance(task, dict):
-            audio_present = bool(task.get("mm_audio_key") or task.get("mm_audio_path"))
-        else:
-            audio_present = bool(
-                getattr(task, "mm_audio_key", None) or getattr(task, "mm_audio_path", None)
-            )
-        audio_present = audio_present or workspace.mm_audio_exists()
-        voice_changed = bool(req_voice_id and req_voice_id != prev_voice_id)
-        force_dub = bool(audio_present and voice_changed)
-
-        edge_voice = None
-        if provider == "edge-tts":
-            edge_voice = settings.edge_tts_voice_map.get(final_voice_id, final_voice_id)
-
-        logger.info(
-            "dub: task=%s req_voice_id=%s prev_voice_id=%s final_voice_id=%s edge_voice=%s",
-            task_id,
-            req_voice_id,
-            prev_voice_id,
-            final_voice_id,
-            edge_voice,
-        )
-
-        try:
-            class TaskAdapter:
-                def __init__(
-                    self,
-                    t: dict,
-                    voice_override: str | None,
-                    provider: str,
-                    force_dub: bool,
-                    mm_text: str | None,
-                ):
-                    self.task_id = t.get("task_id") or t.get("id")
-                    self.id = self.task_id
-                    self.tenant_id = t.get("tenant_id") or t.get("tenant") or "default"
-                    self.project_id = t.get("project_id") or t.get("project") or "default"
-                    self.target_lang = t.get("target_lang") or t.get("content_lang") or "my"
-                    self.voice_id = voice_override or t.get("voice_id")
-                    self.dub_provider = provider
-                    self.force_dub = force_dub
-                    self.mm_text = mm_text
-
-            task_adapter = TaskAdapter(
-                task,
-                voice_override=final_voice_id,
-                provider=provider,
-                force_dub=force_dub,
-                mm_text=mm_text_override,
-            )
-
-            # 核心：SSOT dubbing
-            await run_dub_step_ssot(task_adapter)
-
-            audio_path = (
-                workspace.mm_audio_mp3_path
-                if workspace.mm_audio_mp3_path.exists()
-                else workspace.mm_audio_path
-            )
-            if not audio_path.exists():
-                raise HTTPException(status_code=500, detail="Dubbing output missing")
-
-            audio_key = AUDIO_MM_KEY_TEMPLATE.format(task_id=task_id)
-            storage = get_storage_service()
-            storage.upload_file(str(audio_path), audio_key, content_type="audio/mpeg")
-            audio_sha256 = _sha256_file(audio_path)
-
-        except HTTPException:
-            raise
-        except Exception as exc:
-            logger.exception("Dubbing step failed for task_id=%s", task_id)
-            raise HTTPException(status_code=500, detail=f"Dubbing step failed: {exc}")
-
-        # repo.update 未必存在；用 upsert 更稳
-        repo.upsert(
-            task_id,
-            {
-                "mm_audio_path": audio_key,
-                "mm_audio_key": audio_key,
-                "dub_provider": provider,
-                "last_step": "dubbing",
-                "voice_id": final_voice_id,
-            },
-        )
-
-        stored = repo.get(task_id)
-        detail = _task_to_detail(stored)
-        return DubResponse(
-            **detail.dict(exclude={"mm_audio_key"}),
-            resolved_voice_id=final_voice_id,
-            resolved_edge_voice=edge_voice,
-            audio_sha256=audio_sha256,
-            mm_audio_key=audio_key,
-        )
+        return await _run_dub_job(task_id, payload, repo)
     finally:
         logger.info(
             "dub request finished",
@@ -1459,6 +1582,7 @@ def publish_task(
 @api_router.post("/tasks/{task_id}/subtitles")
 def build_subtitles(
     task_id: str,
+    background_tasks: BackgroundTasks,
     payload: SubtitlesTaskRequest | None = None,
     repo=Depends(get_task_repository),
 ):
@@ -1481,53 +1605,34 @@ def build_subtitles(
         force = payload.force if payload else False
         translate = payload.translate if payload else True
 
-        repo.upsert(task_id, {"subtitles_status": "running", "subtitles_error": None})
-        subs_req = SubtitlesRequest(
+        run_async = os.getenv("RUN_STEPS_ASYNC", "1").strip().lower() not in ("0", "false", "no")
+        repo.upsert(
+            task_id,
+            {
+                "subtitles_status": "running",
+                "subtitles_error": None,
+                "last_step": "subtitles",
+            },
+        )
+
+        if run_async:
+            background_tasks.add_task(
+                _run_subtitles_background,
+                task_id,
+                target_lang,
+                force,
+                translate,
+                repo,
+            )
+            return JSONResponse(status_code=202, content={"queued": True, "task_id": task_id})
+
+        return _run_subtitles_job(
             task_id=task_id,
             target_lang=target_lang,
             force=force,
             translate=translate,
-            with_scenes=True,
+            repo=repo,
         )
-        try:
-            asyncio.run(run_subtitles_step_v1(subs_req))
-        except HTTPException as exc:
-            repo.upsert(task_id, {"subtitles_status": "error", "subtitles_error": str(exc.detail)})
-            raise
-
-        workspace = Workspace(task_id)
-        origin_key = (
-            upload_task_artifact(task, workspace.origin_srt_path, "origin.srt", task_id=task_id)
-            if workspace.origin_srt_path.exists()
-            else None
-        )
-        mm_key = (
-            upload_task_artifact(task, workspace.mm_srt_path, "mm.srt", task_id=task_id)
-            if workspace.mm_srt_path.exists()
-            else None
-        )
-        mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
-        if mm_txt_path.exists():
-            upload_task_artifact(task, mm_txt_path, "mm.txt", task_id=task_id)
-
-        subtitles_dir = Path("deliver") / "subtitles" / task_id
-        subtitles_key = str(subtitles_dir / "subtitles.json")
-
-        repo.upsert(
-            task_id,
-            {
-                "origin_srt_path": origin_key,
-                "mm_srt_path": mm_key,
-                "last_step": "subtitles",
-                "subtitles_status": "ready",
-                "subtitles_key": subtitles_key,
-                "subtitle_structure_path": subtitles_key,
-                "subtitles_error": None,
-            },
-        )
-
-        stored = repo.get(task_id)
-        return _task_to_detail(stored)
     finally:
         logger.info(
             "subtitles request finished",

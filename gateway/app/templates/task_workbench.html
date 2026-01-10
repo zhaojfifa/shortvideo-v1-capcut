@@ -560,6 +560,13 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
     let scenesPoller = null;
     let scenesPollInFlight = false;
 
+    const SUBS_POLL_INTERVAL_MS = 3000;
+    const DUB_POLL_INTERVAL_MS = 3000;
+    let subsPoller = null;
+    let dubPoller = null;
+    let subsPollInFlight = false;
+    let dubPollInFlight = false;
+
     function startScenesPolling() {
       if (document.hidden) return;
       if (scenesPoller) {
@@ -580,6 +587,50 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
       if (!scenesPoller) return;
       clearInterval(scenesPoller);
       scenesPoller = null;
+    }
+
+    function startSubtitlesPolling() {
+      if (document.hidden) return;
+      if (subsPoller) {
+        stopSubtitlesPolling();
+      }
+      subsPoller = setInterval(() => {
+        if (subsPollInFlight || document.hidden) return;
+        subsPollInFlight = true;
+        refreshTaskState()
+          .catch(() => {})
+          .finally(() => {
+            subsPollInFlight = false;
+          });
+      }, SUBS_POLL_INTERVAL_MS);
+    }
+
+    function stopSubtitlesPolling() {
+      if (!subsPoller) return;
+      clearInterval(subsPoller);
+      subsPoller = null;
+    }
+
+    function startDubPolling() {
+      if (document.hidden) return;
+      if (dubPoller) {
+        stopDubPolling();
+      }
+      dubPoller = setInterval(() => {
+        if (dubPollInFlight || document.hidden) return;
+        dubPollInFlight = true;
+        refreshTaskState()
+          .catch(() => {})
+          .finally(() => {
+            dubPollInFlight = false;
+          });
+      }, DUB_POLL_INTERVAL_MS);
+    }
+
+    function stopDubPolling() {
+      if (!dubPoller) return;
+      clearInterval(dubPoller);
+      dubPoller = null;
     }
 
     function refreshPublishInfo(data) {
@@ -659,6 +710,18 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
         updateStepStatuses(data);
         refreshPublishInfo(data);
         renderScenesStatus(data);
+        const subsStatus = data.subtitles_status;
+        if (subsStatus === "queued" || subsStatus === "running") {
+          startSubtitlesPolling();
+        } else {
+          stopSubtitlesPolling();
+        }
+        const dubStatus = data.dub_status;
+        if (dubStatus === "queued" || dubStatus === "running") {
+          startDubPolling();
+        } else {
+          stopDubPolling();
+        }
         if (data.error_message) {
           appendLog(`Last error: ${data.error_message}`);
         }
@@ -706,6 +769,12 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
+      if (resp.status === 202) {
+        appendLog("Subtitles queued; polling status... / 已排队，轮询状态... / စောင့်ဆိုင်းနေသည်၊ အခြေအနေစစ်ဆေးနေသည်...");
+        startSubtitlesPolling();
+        await refreshTaskState();
+        return;
+      }
       if (!resp.ok) {
         appendLog(`Subtitles failed: HTTP ${resp.status}`);
         return;
@@ -735,6 +804,12 @@ Scenes ကို စာတန်းထိုးအချိန်အလိုက
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      if (resp.status === 202) {
+        appendLog("Dub queued; polling status... / 已排队，轮询状态... / စောင့်ဆိုင်းနေသည်၊ အခြေအနေစစ်ဆေးနေသည်...");
+        startDubPolling();
+        await refreshTaskState();
+        return;
+      }
       if (!resp.ok) {
         const detail = await resp.text();
         appendLog(`Dub failed: HTTP ${resp.status} ${detail}`);
