@@ -221,7 +221,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
     )
     try:
         _update_task(req.task_id, subtitles_status="running", subtitles_error=None)
-        step_timeout_sec = _env_int("SUBTITLES_STEP_TIMEOUT_SEC", 1800)
+        step_timeout_sec = _env_int("SUBTITLES_STEP_TIMEOUT_SEC", 7200)
         result = await asyncio.wait_for(
             generate_subtitles(
                 task_id=req.task_id,
