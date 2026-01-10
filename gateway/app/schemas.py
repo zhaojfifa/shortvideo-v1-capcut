@@ -112,6 +112,10 @@ class TaskSummary(BaseModel):
     subtitles_status: Optional[str] = None
     subtitles_key: Optional[str] = None
     subtitles_error: Optional[str] = None
+    dub_status: Optional[str] = None
+    dub_error: Optional[str] = None
+    pack_status: Optional[str] = None
+    pack_error: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     error_reason: Optional[str] = None
@@ -138,10 +142,14 @@ class TaskDetail(TaskSummary):
     raw_path: Optional[str] = None
     origin_srt_path: Optional[str] = None
     mm_srt_path: Optional[str] = None
+    mm_txt_path: Optional[str] = None
     mm_audio_path: Optional[str] = None
     mm_audio_key: Optional[str] = None
     pack_path: Optional[str] = None
     scenes_path: Optional[str] = None
+    stale: Optional[bool] = None
+    stale_reason: Optional[str] = None
+    stale_for_seconds: Optional[int] = None
 
 
 class DubResponse(TaskDetail):

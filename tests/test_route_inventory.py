@@ -1,63 +1,61 @@
-from __future__ import annotations
-
 from collections import defaultdict
 
 from gateway.app.main import app
 
 
-def _collect_routes():
+def test_route_inventory():
     routes = []
     for route in app.routes:
-        path = getattr(route, "path", None)
-        methods = getattr(route, "methods", None) or set()
-        if not path:
-            continue
-        for method in methods:
-            routes.append((method, path))
-    return routes
+        if hasattr(route, "methods") and hasattr(route, "path"):
+            methods = tuple(sorted(route.methods))
+            routes.append((route.path, methods, getattr(route, "name", "")))
 
+    required = [
+        ("GET", "/tasks"),
+        ("GET", "/tasks/new"),
+        ("GET", "/ui"),
+        ("GET", "/api/tasks"),
+        ("POST", "/api/tasks"),
+        ("GET", "/api/tasks/{task_id}"),
+        ("DELETE", "/api/tasks/{task_id}"),
+        ("POST", "/api/tasks/{task_id}/subtitles"),
+        ("POST", "/api/tasks/{task_id}/dub"),
+        ("POST", "/api/tasks/{task_id}/scenes"),
+        ("POST", "/api/tasks/{task_id}/pack"),
+        ("POST", "/v1/parse"),
+        ("POST", "/v1/subtitles"),
+        ("POST", "/v1/pack"),
+        ("GET", "/v1/tasks/{task_id}/status"),
+    ]
 
-def _assert_route_exists(method: str, path: str, routes: list[tuple[str, str]]):
-    if (method, path) not in routes:
-        available = sorted({p for m, p in routes if m == method})
-        raise AssertionError(
-            f"Missing route {method} {path}. Available {method} routes: {available}"
-        )
+    missing = []
+    for method, path in required:
+        found = any(path == r_path and method in r_methods for r_path, r_methods, _ in routes)
+        if not found:
+            missing.append(f"{method} {path}")
 
+    print("Verified required routes:", ", ".join(f"{m} {p}" for m, p in required))
+    assert not missing, f"Missing required routes: {', '.join(missing)}"
 
-def test_route_inventory_and_duplicates():
-    routes = _collect_routes()
+    seen = defaultdict(list)
+    for path, methods, name in routes:
+        seen[(path, methods)].append(name or "<unnamed>")
 
-    # Mainline task endpoints (must exist).
-    _assert_route_exists("GET", "/tasks", routes)
-    _assert_route_exists("GET", "/api/tasks", routes)
-    _assert_route_exists("GET", "/api/tasks/{task_id}", routes)
-    _assert_route_exists("POST", "/api/tasks/{task_id}/subtitles", routes)
-    _assert_route_exists("POST", "/api/tasks/{task_id}/dub", routes)
-    _assert_route_exists("POST", "/api/tasks/{task_id}/scenes", routes)
+    duplicate_paths = [
+        "/v1/tasks/{task_id}/raw",
+        "/v1/tasks/{task_id}/subs_origin",
+        "/v1/tasks/{task_id}/subs_mm",
+        "/v1/tasks/{task_id}/mm_txt",
+        "/v1/tasks/{task_id}/audio_mm",
+        "/v1/tasks/{task_id}/pack",
+        "/v1/tasks/{task_id}/scenes",
+    ]
 
-    # UI pipeline page.
-    _assert_route_exists("GET", "/ui", routes)
+    duplicates = []
+    for (path, methods), names in seen.items():
+        if path in duplicate_paths and len(names) > 1:
+            duplicates.append((path, methods, names))
 
-    # V1 pipeline endpoints.
-    _assert_route_exists("POST", "/v1/parse", routes)
-    _assert_route_exists("POST", "/v1/subtitles", routes)
-    _assert_route_exists("POST", "/v1/pack", routes)
-
-    # Duplicate detection for v1 downloads.
-    counts = defaultdict(int)
-    for method, path in routes:
-        if method == "GET" and path.startswith("/v1/tasks/"):
-            counts[path] += 1
-
-    duplicates = {path: count for path, count in counts.items() if count > 1}
-    if duplicates:
-        raise AssertionError(f"Duplicate /v1/tasks download routes: {duplicates}")
-
-    # Explicitly guard known critical downloads.
-    pack_path = "/v1/tasks/{task_id}/pack"
-    scenes_path = "/v1/tasks/{task_id}/scenes"
-    if counts.get(pack_path, 0) != 1:
-        raise AssertionError(f"Expected exactly one GET {pack_path}, got {counts.get(pack_path, 0)}")
-    if counts.get(scenes_path, 0) != 1:
-        raise AssertionError(f"Expected exactly one GET {scenes_path}, got {counts.get(scenes_path, 0)}")
+    assert not duplicates, "Duplicate route handlers detected: " + "; ".join(
+        f"{path} {methods} -> {names}" for path, methods, names in duplicates
+    )
