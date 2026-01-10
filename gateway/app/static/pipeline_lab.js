@@ -53,7 +53,7 @@
     return "";
   }
 
-  async function ensureTaskId() {
+  async function ensureTaskId({ allowCreate } = {}) {
     const pathId = getTaskIdFromPath();
     if (pathId) {
       currentTaskId = pathId;
@@ -66,8 +66,15 @@
       return currentTaskId;
     }
 
+    if (!allowCreate) {
+      throw new Error("Missing task id; please generate or enter a task id first.");
+    }
+
     const sourceEl = getEl("link") || getEl("input-link") || getEl("source") || getEl("source-url");
     const source = (sourceEl && sourceEl.value ? sourceEl.value : "").trim();
+    if (!source || source.includes("example.com")) {
+      throw new Error("Missing or invalid source link; please enter a real link first.");
+    }
 
     const platformEl = getEl("platform");
     const platformValue = (platformEl && platformEl.value ? platformEl.value : "douyin").trim();
@@ -76,7 +83,7 @@
     const languageValue = (languageEl && languageEl.value ? languageEl.value : "my").trim();
 
     const payload = {
-      source_url: source || "https://example.com",
+      source_url: source,
       platform: platformValue,
       title: source ? source.slice(0, 80) : "PipelineLab",
       category_key: "beauty",
@@ -325,7 +332,15 @@
     inFlight.parse = true;
     setButtonsDisabled("parse", true);
     setButtonsDisabled("all", true);
-    const id = await ensureTaskId();
+    const rawLink = link();
+    if (!rawLink || rawLink.includes("example.com")) {
+      log("Parse failed: please enter a valid link.");
+      inFlight.parse = false;
+      setButtonsDisabled("parse", false);
+      setButtonsDisabled("all", false);
+      return;
+    }
+    const id = await ensureTaskId({ allowCreate: true });
     const body = { task_id: id, platform: platform(), link: link() };
     log(`Calling /v1/parse for ${body.task_id}.`);
     try {
@@ -354,7 +369,7 @@
     inFlight.subtitles = true;
     setButtonsDisabled("subtitles", true);
     setButtonsDisabled("all", true);
-    const id = await ensureTaskId();
+    const id = await ensureTaskId({ allowCreate: true });
     const body = { task_id: id, target_lang: "my", force: false, translate: true, with_scenes: true };
     log("Calling /v1/subtitles.");
     try {
@@ -394,7 +409,7 @@
     inFlight.dub = true;
     setButtonsDisabled("dub", true);
     setButtonsDisabled("all", true);
-    const id = await ensureTaskId();
+    const id = await ensureTaskId({ allowCreate: true });
     const body = { task_id: id, voice_id: voiceId(), force: false, target_lang: "my" };
     log(`Calling /v1/dub for ${body.task_id}.`);
     try {
@@ -433,7 +448,7 @@
     inFlight.pack = true;
     setButtonsDisabled("pack", true);
     setButtonsDisabled("all", true);
-    const id = await ensureTaskId();
+    const id = await ensureTaskId({ allowCreate: true });
     const body = { task_id: id };
     log(`Calling /v1/pack for ${body.task_id}.`);
     try {
@@ -461,7 +476,7 @@
     if (inFlight.status) return;
     inFlight.status = true;
     setButtonsDisabled("status", true);
-    const id = await ensureTaskId();
+    const id = await ensureTaskId({ allowCreate: false });
     log(`Calling /v1/tasks/${id}/status.`);
     try {
       const json = await fetchJson(`/v1/tasks/${id}/status`, { method: "GET" });
@@ -481,7 +496,7 @@
 
   async function runFullPipeline() {
     try {
-      const id = await ensureTaskId();
+      const id = await ensureTaskId({ allowCreate: true });
       await runParse();
       const subsResult = await runSubtitles();
       if (subsResult && subsResult.queued) {
@@ -508,11 +523,8 @@
   });
 
   document.addEventListener("DOMContentLoaded", () => {
-    ensureTaskId()
-      .then((id) => {
-        if (id) updateDownloadLinks(id);
-      })
-      .catch(() => {});
+    const id = taskId() || getTaskIdFromUI();
+    if (id && id !== "demo_v1") updateDownloadLinks(id);
     const map = [
       ["btn-generate-task", generateTaskId],
       ["btn-generate-from-link", generateFromLink],
