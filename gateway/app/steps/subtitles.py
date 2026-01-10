@@ -9,6 +9,8 @@ import re
 import shutil
 import subprocess
 import time
+import wave
+from math import ceil
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -43,6 +45,35 @@ def _env_int(name: str, default: int) -> int:
         return int(value)
     except ValueError:
         return default
+
+
+def _wav_duration_seconds(wav_path: Path) -> float | None:
+    try:
+        with wave.open(str(wav_path), "rb") as wf:
+            frames = wf.getnframes()
+            rate = wf.getframerate()
+            if rate <= 0:
+                return None
+            return frames / float(rate)
+    except Exception:
+        return None
+
+
+def _compute_asr_timeout_sec(audio_sec: float | None) -> int:
+    fixed = _env_int("SUBTITLES_ASR_TIMEOUT_SEC", 600)
+    if not audio_sec or audio_sec <= 0:
+        return fixed
+
+    min_sec = _env_int("SUBTITLES_ASR_TIMEOUT_MIN_SEC", 600)
+    max_sec = _env_int("SUBTITLES_ASR_TIMEOUT_MAX_SEC", 7200)
+    slack = _env_int("SUBTITLES_ASR_TIMEOUT_SLACK_SEC", 120)
+    try:
+        rtf = float(os.getenv("SUBTITLES_ASR_TIMEOUT_RTF", "3.0"))
+    except ValueError:
+        rtf = 3.0
+
+    dynamic = int(ceil(audio_sec * rtf + slack))
+    return max(min_sec, min(dynamic, max_sec))
 
 
 def _srt_to_txt(srt_text: str) -> str:
@@ -237,8 +268,8 @@ async def generate_subtitles(
                     raw_size=raw_size,
                     wav_path=str(wav_path),
                 )
-                asr_timeout_sec = _env_int("SUBTITLES_ASR_TIMEOUT_SEC", 600)
-                ffmpeg_timeout_sec = _env_int("SUBTITLES_FFMPEG_TIMEOUT_SEC", asr_timeout_sec)
+                fixed_asr_timeout_sec = _env_int("SUBTITLES_ASR_TIMEOUT_SEC", 600)
+                ffmpeg_timeout_sec = _env_int("SUBTITLES_FFMPEG_TIMEOUT_SEC", fixed_asr_timeout_sec)
                 wav_start = time.perf_counter()
                 _extract_audio(raw_path, wav_path, timeout_sec=ffmpeg_timeout_sec)
                 log_stage(
@@ -246,6 +277,13 @@ async def generate_subtitles(
                     wav_path=str(wav_path),
                     wav_size=wav_path.stat().st_size if wav_path.exists() else None,
                     duration_ms=int((time.perf_counter() - wav_start) * 1000),
+                )
+                audio_sec = _wav_duration_seconds(wav_path)
+                asr_timeout_sec = _compute_asr_timeout_sec(audio_sec)
+                log_stage(
+                    "SUB2_ASR_TIMEOUT",
+                    audio_sec=audio_sec,
+                    asr_timeout_sec=asr_timeout_sec,
                 )
                 asr_start = time.perf_counter()
                 log_stage(
