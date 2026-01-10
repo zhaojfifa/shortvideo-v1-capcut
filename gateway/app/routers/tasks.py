@@ -1423,21 +1423,15 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
     )
 
 
-def _run_dub_background(task_id: str, payload: DubProviderRequest, repo: ITaskRepository) -> None:
+async def _run_dub_background(task_id: str, payload: DubProviderRequest, repo: ITaskRepository) -> None:
     try:
-        asyncio.run(_run_dub_job(task_id, payload, repo))
-    except Exception:
+        await _run_dub_job(task_id, payload, repo)
+    except HTTPException as exc:
+        repo.upsert(task_id, {"dub_status": "error", "dub_error": f"{exc.status_code}: {exc.detail}"})
         logger.exception("DUB3_FAIL", extra={"task_id": task_id, "step": "dub", "phase": "exception"})
     except Exception as exc:
-        repo.upsert(task_id, {"subtitles_status": "error", "subtitles_error": str(exc)})
-        logger.exception(
-            "SUB2_FAIL",
-            extra={
-                "task_id": task_id,
-                "step": "subtitles",
-                "phase": "exception",
-            },
-        )
+        repo.upsert(task_id, {"dub_status": "error", "dub_error": str(exc)})
+        logger.exception("DUB3_FAIL", extra={"task_id": task_id, "step": "dub", "phase": "exception"})
 
 
 @api_router.post("/tasks/{task_id}/scenes")
@@ -1510,7 +1504,6 @@ def build_pack(
 async def rerun_dub(
     task_id: str,
     payload: DubProviderRequest,
-    background_tasks: BackgroundTasks,
     repo: ITaskRepository = Depends(get_task_repository),
 ):
     """Re-run dubbing for a task (SSOT: reads artifacts/subtitles.json)."""
@@ -1525,7 +1518,7 @@ async def rerun_dub(
         repo.upsert(task_id, {"dub_status": "running", "dub_error": None, "last_step": "dub"})
 
         if run_async:
-            background_tasks.add_task(_run_dub_background, task_id, payload, repo)
+            asyncio.create_task(_run_dub_background(task_id, payload, repo))
             return JSONResponse(status_code=202, content={"queued": True, "task_id": task_id})
 
         return await _run_dub_job(task_id, payload, repo)
