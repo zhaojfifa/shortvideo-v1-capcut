@@ -23,6 +23,80 @@
     return document.getElementById(id);
   }
 
+  // ---- TaskId helpers (UI-only; V1-only endpoints) ----
+  let currentTaskId = null;
+
+  function getTaskIdFromPath() {
+    const p = window.location.pathname || "";
+    const m = p.match(/^\/tasks\/([a-z0-9]+)$/i);
+    if (m && m[1] && m[1].toLowerCase() !== "new") return m[1];
+    return null;
+  }
+
+  function getTaskIdFromUI() {
+    const qs = new URLSearchParams(window.location.search || "");
+    const qid = (qs.get("task_id") || qs.get("taskId") || "").trim();
+    if (qid) return qid;
+
+    const candidates = ["task-id", "task_id", "taskId"];
+    for (const id of candidates) {
+      const el = document.getElementById(id);
+      if (el && typeof el.value === "string" && el.value.trim()) return el.value.trim();
+      if (el && typeof el.textContent === "string" && el.textContent.trim()) return el.textContent.trim();
+    }
+    return "";
+  }
+
+  function makeTaskIdFromLink(rawLink) {
+    let safe = rawLink;
+    if (safe.startsWith("https://")) safe = safe.slice(8);
+    if (safe.startsWith("http://")) safe = safe.slice(7);
+    safe = safe.split(/[/?#]/)[0];
+    return `task_${safe.slice(0, 16)}`;
+  }
+
+  function setTaskIdValue(value) {
+    const el = getEl("taskId");
+    if (el) {
+      el.value = value;
+    }
+    currentTaskId = value;
+    updateDownloadLinks(value);
+  }
+
+  function isInvalidLink(value) {
+    const v = (value || "").trim();
+    if (!v) return true;
+    return v.includes("example.com");
+  }
+
+  async function ensureTaskId({ allowCreate = false } = {}) {
+    const pathId = getTaskIdFromPath();
+    if (pathId) {
+      currentTaskId = pathId;
+      return currentTaskId;
+    }
+
+    const uiId = currentTaskId || getTaskIdFromUI() || "";
+    if (uiId && uiId !== "demo_v1") {
+      currentTaskId = uiId;
+      return currentTaskId;
+    }
+
+    if (!allowCreate) {
+      throw new Error("Missing task id; please generate or enter a task id first.");
+    }
+
+    const rawLink = link();
+    if (isInvalidLink(rawLink)) {
+      throw new Error("Missing or invalid link; please enter a real link first.");
+    }
+
+    const generated = makeTaskIdFromLink(rawLink);
+    setTaskIdValue(generated);
+    return generated;
+  }
+
   function log(message) {
     if (!logEl) return;
     const now = new Date().toISOString();
@@ -104,6 +178,10 @@
     if (el) {
       el.value = `task_${compact}`;
     }
+    if (el && el.value) {
+      currentTaskId = el.value;
+      updateDownloadLinks(el.value);
+    }
     log("Task ID updated.");
   }
 
@@ -121,6 +199,10 @@
     if (el) {
       el.value = `task_${safe.slice(0, 16)}`;
     }
+    if (el && el.value) {
+      currentTaskId = el.value;
+      updateDownloadLinks(el.value);
+    }
     log("Task ID generated.");
   }
 
@@ -133,6 +215,7 @@
     if (platformEl) platformEl.value = "douyin";
     if (linkEl) linkEl.value = "";
     if (voiceEl) voiceEl.value = "mm_female_1";
+    currentTaskId = "demo_v1";
     updateDownloadLinks("demo_v1");
     log("Form reset.");
   }
@@ -142,7 +225,16 @@
     inFlight.parse = true;
     setButtonsDisabled("parse", true);
     setButtonsDisabled("all", true);
-    const body = { task_id: taskId(), platform: platform(), link: link() };
+    const rawLink = link();
+    if (isInvalidLink(rawLink)) {
+      log("Parse failed: please enter a valid link.");
+      inFlight.parse = false;
+      setButtonsDisabled("parse", false);
+      setButtonsDisabled("all", false);
+      return;
+    }
+    const id = await ensureTaskId({ allowCreate: true });
+    const body = { task_id: id, platform: platform(), link: rawLink };
     log(`Calling /v1/parse for ${body.task_id}.`);
     try {
       const json = await fetchJson("/v1/parse", {
@@ -152,7 +244,7 @@
       });
       const output = getEl("parseOutput");
       if (output) output.textContent = JSON.stringify(json, null, 2);
-      updateDownloadLinks(body.task_id);
+      updateDownloadLinks(id);
       log("Parse done.");
       return json;
     } catch (err) {
@@ -170,7 +262,8 @@
     inFlight.subtitles = true;
     setButtonsDisabled("subtitles", true);
     setButtonsDisabled("all", true);
-    const body = { task_id: taskId(), target_lang: "my", force: false, translate: true, with_scenes: true };
+    const id = await ensureTaskId({ allowCreate: true });
+    const body = { task_id: id, target_lang: "my", force: false, translate: true, with_scenes: true };
     log("Calling /v1/subtitles.");
     try {
       const json = await fetchJson("/v1/subtitles", {
@@ -204,7 +297,8 @@
     inFlight.dub = true;
     setButtonsDisabled("dub", true);
     setButtonsDisabled("all", true);
-    const body = { task_id: taskId(), voice_id: voiceId(), force: false, target_lang: "my" };
+    const id = await ensureTaskId({ allowCreate: true });
+    const body = { task_id: id, voice_id: voiceId(), force: false, target_lang: "my" };
     log(`Calling /v1/dub for ${body.task_id}.`);
     try {
       const json = await fetchJson("/v1/dub", {
@@ -216,10 +310,10 @@
       if (output) output.textContent = JSON.stringify(json, null, 2);
       const player = getEl("audioPlayer");
       if (player) {
-        player.src = `/v1/tasks/${body.task_id}/audio_mm`;
+        player.src = `/v1/tasks/${id}/audio_mm`;
         player.style.display = "block";
       }
-      updateDownloadLinks(body.task_id);
+      updateDownloadLinks(id);
       log("Dub audio ready.");
       return json;
     } catch (err) {
@@ -237,7 +331,8 @@
     inFlight.pack = true;
     setButtonsDisabled("pack", true);
     setButtonsDisabled("all", true);
-    const body = { task_id: taskId() };
+    const id = await ensureTaskId({ allowCreate: true });
+    const body = { task_id: id };
     log(`Calling /v1/pack for ${body.task_id}.`);
     try {
       const json = await fetchJson("/v1/pack", {
@@ -247,7 +342,7 @@
       });
       const output = getEl("packOutput");
       if (output) output.textContent = JSON.stringify(json, null, 2);
-      updateDownloadLinks(body.task_id);
+      updateDownloadLinks(id);
       log("Pack ready.");
       return json;
     } catch (err) {
@@ -264,7 +359,15 @@
     if (inFlight.status) return;
     inFlight.status = true;
     setButtonsDisabled("status", true);
-    const id = taskId();
+    let id = "";
+    try {
+      id = await ensureTaskId({ allowCreate: false });
+    } catch (err) {
+      log(`Status refresh skipped: ${err.message || err}`);
+      inFlight.status = false;
+      setButtonsDisabled("status", false);
+      return;
+    }
     log(`Calling /v1/tasks/${id}/status.`);
     try {
       const json = await fetchJson(`/v1/tasks/${id}/status`, { method: "GET" });
@@ -302,7 +405,8 @@
   });
 
   document.addEventListener("DOMContentLoaded", () => {
-    updateDownloadLinks(taskId());
+    const id = taskId() || getTaskIdFromUI();
+    if (id && id !== "demo_v1") updateDownloadLinks(id);
     const map = [
       ["btn-generate-task", generateTaskId],
       ["btn-generate-from-link", generateFromLink],
