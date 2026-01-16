@@ -941,6 +941,60 @@ async def task_workbench_page(
     )
 
 
+@pages_router.get("/tasks/{task_id}/publish", response_class=HTMLResponse)
+async def task_publish_hub_page(
+    request: Request, task_id: str, repo=Depends(get_task_repository)
+) -> HTMLResponse:
+    """Render the per-task publish hub page."""
+
+    task = repo.get(task_id)
+    if not task:
+        return templates.TemplateResponse(
+            "task_not_found.html",
+            {"request": request, "task_id": task_id},
+            status_code=404,
+        )
+
+    paths = _resolve_download_urls(task)
+    detail = _task_to_detail(task)
+    task_json = {
+        "task_id": detail.task_id,
+        "status": detail.status,
+        "platform": detail.platform,
+        "category_key": detail.category_key,
+        "content_lang": detail.content_lang,
+        "ui_lang": detail.ui_lang,
+        "source_url": detail.source_url,
+        "raw_path": detail.raw_path,
+        "origin_srt_path": detail.origin_srt_path,
+        "mm_srt_path": detail.mm_srt_path,
+        "mm_audio_path": detail.mm_audio_path,
+        "mm_txt_path": paths.get("mm_txt_path"),
+        "pack_path": detail.pack_path,
+        "scenes_path": detail.scenes_path,
+        "scenes_status": detail.scenes_status,
+        "scenes_key": detail.scenes_key,
+        "scenes_error": detail.scenes_error,
+        "subtitles_status": detail.subtitles_status,
+        "subtitles_key": detail.subtitles_key,
+        "subtitles_error": detail.subtitles_error,
+        "publish_status": detail.publish_status,
+        "publish_provider": detail.publish_provider,
+        "publish_key": detail.publish_key,
+        "publish_url": detail.publish_url,
+        "published_at": detail.published_at,
+    }
+
+    return templates.TemplateResponse(
+        "task_publish_hub.html",
+        {
+            "request": request,
+            "task": detail,
+            "task_json": task_json,
+        },
+    )
+
+
 @api_router.post("/tasks", response_model=TaskDetail)
 def create_task(
     payload: TaskCreate,

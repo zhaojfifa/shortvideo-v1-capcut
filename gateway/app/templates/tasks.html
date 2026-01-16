@@ -233,6 +233,12 @@
                 {% endif %}
               </th>
               <th class="bilingual">
+                <span>{{ t_primary("publish") }}</span>
+                {% if ui_show_secondary %}
+                  <span class="secondary">{{ t_secondary("publish") }}</span>
+                {% endif %}
+              </th>
+              <th class="bilingual">
                 <span>{{ t_primary("detail") }}</span>
                 {% if ui_show_secondary %}
                   <span class="secondary">{{ t_secondary("detail") }}</span>
@@ -295,13 +301,13 @@
               {% set platform_key = (t.platform or "") | lower %}
               {% if platform_key == "douyin" %}
                 {% set platform_label_primary = "抖音" %}
-                {% set platform_label_secondary = "ဒေါ်ယင်" %}
+                {% set platform_label_secondary = "ဒေါ်ယင�? %}
               {% elif platform_key in ["tk", "tiktok"] %}
                 {% set platform_label_primary = "TikTok" %}
                 {% set platform_label_secondary = "TikTok" %}
               {% elif platform_key == "xhs" %}
-                {% set platform_label_primary = "小红书" %}
-                {% set platform_label_secondary = "小红书" %}
+                {% set platform_label_primary = "小红�? %}
+                {% set platform_label_secondary = "小红�? %}
               {% elif platform_key in ["fb", "facebook"] %}
                 {% set platform_label_primary = "Facebook" %}
                 {% set platform_label_secondary = "Facebook" %}
@@ -358,8 +364,16 @@
                       {% endif %}
                     </div>
                   {% else %}
-                    –
+                    �?
                   {% endif %}
+                </td>
+                <td data-label="{{ t_primary('publish') }} / {{ t_secondary('publish') }}">
+                  <div class="action-item">
+                    <a href="/tasks/{{ t.task_id }}/publish">{{ t_primary("publish") }}</a>
+                    {% if ui_show_secondary %}
+                      <span class="secondary">{{ t_secondary("publish") }}</span>
+                    {% endif %}
+                  </div>
                 </td>
                 <td data-label="{{ t_primary('detail') }} / {{ t_secondary('detail') }}">
                   <div class="action-stack">
@@ -411,6 +425,7 @@
       status: "{{ t_primary('status') }} / {{ t_secondary('status') }}",
       created: "{{ t_primary('created') }} / {{ t_secondary('created') }}",
       pack: "{{ t_primary('pack') }} / {{ t_secondary('pack') }}",
+      publish: "{{ t_primary('publish') }} / {{ t_secondary('publish') }}",
       detail: "{{ t_primary('detail') }} / {{ t_secondary('detail') }}",
     };
     const STATUS_LABELS = {
@@ -426,10 +441,10 @@
       other: { primary: "{{ t_primary('category_other') }}", secondary: "{{ t_secondary('category_other') }}" },
     };
     const PLATFORM_LABELS = {
-      douyin: { primary: "抖音", secondary: "ဒေါ်ယင်" },
+      douyin: { primary: "抖音", secondary: "ဒေါ်ယင�? },
       tk: { primary: "TikTok", secondary: "TikTok" },
       tiktok: { primary: "TikTok", secondary: "TikTok" },
-      xhs: { primary: "小红书", secondary: "小红书" },
+      xhs: { primary: "小红�?, secondary: "小红�? },
       fb: { primary: "Facebook", secondary: "Facebook" },
       facebook: { primary: "Facebook", secondary: "Facebook" },
     };
@@ -508,7 +523,7 @@
       if (!tasks.length) {
         const emptyRow = document.createElement("tr");
         const emptyCell = document.createElement("td");
-        emptyCell.colSpan = 10;
+        emptyCell.colSpan = 11;
         emptyCell.className = "empty muted";
         emptyCell.innerHTML = `
           <div class="bilingual">
@@ -564,8 +579,14 @@
                     <a href="/v1/tasks/${t.task_id}/pack" target="_blank" rel="noopener">{{ t_primary("download") }}</a>
                     ${showSecondary ? `<span class="secondary">{{ t_secondary("download") }}</span>` : ""}
                   </div>`
-                : "–"
+                : "ÿ"
             }</td>
+            <td data-label="${LABELS.publish}">
+              <div class="action-item">
+                <a href="/tasks/${encodeURIComponent(t.task_id || "")}/publish">{{ t_primary("publish") }}</a>
+                ${showSecondary ? `<span class="secondary">{{ t_secondary("publish") }}</span>` : ""}
+              </div>
+            </td>
             <td data-label="${LABELS.detail}">
               <div class="action-stack">
                 <div class="action-item">
@@ -630,7 +651,7 @@
 
       tasksInFlight = true;
       if (countPrimaryEl) {
-        countPrimaryEl.textContent = "Loading tasks…";
+        countPrimaryEl.textContent = "Loading tasks�?;
       }
       if (countSecondaryEl) {
         countSecondaryEl.textContent = "";
@@ -723,3 +744,10 @@
   </script>
 </body>
 </html>
+
+
+
+
+
+
+
