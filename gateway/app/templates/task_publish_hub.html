@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Publish Hub - {{ task.task_id }}</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
+  <link rel="stylesheet" href="/static/pipeline_lab.css" />
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      background: #f3f4f6;
+    }
+    .page.publish {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 16px;
+    }
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    h1 { margin: 0; font-size: 1.6rem; font-weight: 800; }
+    .btn-primary {
+      background: #2563eb;
+      color: #ffffff;
+      border: 1px solid #2563eb;
+    }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111827;
+      border: 1px solid #d1d5db;
+    }
+    .btn-primary,
+    .btn-secondary {
+      padding: 8px 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 700;
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .btn-primary:hover { filter: brightness(.95); }
+    .btn-secondary:hover { filter: brightness(.98); }
+    .muted { color: #64748b; font-size: 0.85rem; }
+    .section-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+    }
+    .link-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .download-link {
+      color: #1d4ed8;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .download-link.disabled { color: #9ca3af; pointer-events: none; }
+    .info-row { display: flex; flex-wrap: wrap; gap: 12px; }
+    .info-pill {
+      background: #f1f5f9;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+    }
+    .copy-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .copy-btn {
+      background: #e2e8f0;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: #cbd5f5; }
+    .publish-textarea { width: 100%; min-height: 120px; }
+  </style>
+</head>
+<body>
+  <div class="page publish">
+    <div class="card">
+      <div class="header-row">
+        <div>
+          <h1>Publish Hub <span class="muted t-secondary">/ 发布中心</span></h1>
+          <div class="muted t-secondary">Task ID: {{ task.task_id }}</div>
+        </div>
+        <div class="copy-row">
+          <a class="btn-secondary" href="/tasks">Back to Task Board</a>
+          <a class="btn-primary" href="/tasks/{{ task.task_id }}">Back to Workbench</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-grid">
+      <div class="card">
+        <div class="section-title">
+          <h2>Deliverables <span class="muted t-secondary">/ 交付物</span></h2>
+          <div class="secondary">Links are rendered from /api/tasks/{{ task.task_id }} fields.</div>
+        </div>
+        <div class="copy-row" style="margin-top:12px;">
+          <div class="link-row" id="pack-row" {% if not task_json.pack_path %}style="display:none;"{% endif %}>
+            <a id="pack-link" class="download-link{% if not task_json.pack_path %} disabled{% endif %}" href="{{ task_json.pack_path or '#' }}" target="_blank" rel="noopener">Pack</a>
+          </div>
+          <div class="link-row" id="raw-row" {% if not task_json.raw_path %}style="display:none;"{% endif %}>
+            <a id="raw-link" class="download-link{% if not task_json.raw_path %} disabled{% endif %}" href="{{ task_json.raw_path or '#' }}" target="_blank" rel="noopener">raw.mp4</a>
+          </div>
+          <div class="link-row" id="origin-row" {% if not task_json.origin_srt_path %}style="display:none;"{% endif %}>
+            <a id="origin-link" class="download-link{% if not task_json.origin_srt_path %} disabled{% endif %}" href="{{ task_json.origin_srt_path or '#' }}" target="_blank" rel="noopener">origin.srt</a>
+          </div>
+          <div class="link-row" id="mm-row" {% if not task_json.mm_srt_path %}style="display:none;"{% endif %}>
+            <a id="mm-link" class="download-link{% if not task_json.mm_srt_path %} disabled{% endif %}" href="{{ task_json.mm_srt_path or '#' }}" target="_blank" rel="noopener">mm.srt</a>
+          </div>
+          <div class="link-row" id="mm-txt-row" {% if not task_json.mm_txt_path %}style="display:none;"{% endif %}>
+            <a id="mm-txt-link" class="download-link{% if not task_json.mm_txt_path %} disabled{% endif %}" href="{{ task_json.mm_txt_path or '#' }}" target="_blank" rel="noopener">mm.txt</a>
+          </div>
+          <div class="link-row" id="audio-row" {% if not task_json.mm_audio_path %}style="display:none;"{% endif %}>
+            <a id="audio-link" class="download-link{% if not task_json.mm_audio_path %} disabled{% endif %}" href="{{ task_json.mm_audio_path or '#' }}" target="_blank" rel="noopener">mm_audio</a>
+          </div>
+        </div>
+        <div class="muted t-secondary" style="margin-top:8px;">
+          Missing artifacts are hidden to avoid 404s.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <h2>发布信息 <span class="muted t-secondary">/ 发布信息</span></h2>
+          <div class="secondary">运营交付信息 / 运营交付信息</div>
+        </div>
+        <div class="info-row">
+          <div class="info-pill">引擎 / ပံ့ပိုးသူ: <span id="publish-provider">-</span></div>
+          <div class="info-pill">状态 / အခြေအနေ: <span id="publish-status">-</span></div>
+          <div class="info-pill">已发布 / ထုတ်ဝေပြီး: <span id="published-at">-</span></div>
+        </div>
+        <div class="section-grid" style="margin-top:12px;">
+          <div class="field">
+            <label>发布Key <span class="muted t-secondary">/ ထုတ်ဝေ Key</span></label>
+            <div class="copy-row">
+              <code id="publish-key">-</code>
+              <button type="button" class="copy-btn" data-copy-target="publish-key">复制 / ကူးယူ</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>发布链接 <span class="muted t-secondary">/ ထုတ်ဝေလင့်ခ်</span></label>
+            <div class="copy-row">
+              <a id="publish-url" href="#" target="_blank" rel="noopener">-</a>
+              <button type="button" class="copy-btn" data-copy-target="publish-url">复制 / ကူးယူ</button>
+            </div>
+          </div>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Publishing Text (မြန်မာ) <span class="muted t-secondary">/ 发布文案</span></label>
+          <div class="copy-row">
+            <button type="button" class="copy-btn" id="copy-publish-text">复制 / ကူးယူ</button>
+            <span class="muted t-secondary">来自缅文文本 / စာတန်းမှ</span>
+          </div>
+          <textarea id="publish-text" class="publish-textarea" readonly></textarea>
+        </div>
+        <div class="action-row" style="margin-top:12px;">
+          <button id="publish-btn" class="btn-success">立即发布 <span class="muted t-secondary">/ ယခုပဲထုတ်ဝေ</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.currentTask = {{ task_json | tojson | safe }};
+
+    function appendLog(line) {
+      console.info(line);
+    }
+
+    function setLink(id, href) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const row = el.closest(".link-row");
+      if (href) {
+        el.href = href;
+        el.classList.remove("disabled");
+        if (row) row.style.display = "";
+      } else {
+        el.href = "#";
+        el.classList.add("disabled");
+        if (row) row.style.display = "none";
+      }
+    }
+
+    function refreshDeliverables(data) {
+      setLink("pack-link", data.pack_path || null);
+      setLink("raw-link", data.raw_path || null);
+      setLink("origin-link", data.origin_srt_path || null);
+      setLink("mm-link", data.mm_srt_path || null);
+      setLink("mm-txt-link", data.mm_txt_path || null);
+      setLink("audio-link", data.mm_audio_path || null);
+    }
+
+    function refreshPublishInfo(data) {
+      const provider = data.publish_provider || "-";
+      const key = data.publish_key || "-";
+      const at = data.published_at || "-";
+      const status = data.publish_status || "-";
+      let url = data.publish_url || data.pack_path || "-";
+
+      const providerEl = document.getElementById("publish-provider");
+      const keyEl = document.getElementById("publish-key");
+      const atEl = document.getElementById("published-at");
+      const statusEl = document.getElementById("publish-status");
+      const urlEl = document.getElementById("publish-url");
+      if (providerEl) providerEl.textContent = provider;
+      if (keyEl) keyEl.textContent = key;
+      if (atEl) atEl.textContent = at;
+      if (statusEl) statusEl.textContent = status;
+      if (urlEl) {
+        urlEl.textContent = url;
+        urlEl.href = url === "-" ? "#" : url;
+      }
+    }
+
+    function copyTextFromElement(el) {
+      if (!el) return;
+      const text = el.tagName === "A" ? el.getAttribute("href") : el.textContent || "";
+      if (!text || text === "#") return;
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+
+    document.querySelectorAll("[data-copy-target]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetId = btn.getAttribute("data-copy-target");
+        const target = document.getElementById(targetId);
+        copyTextFromElement(target);
+        appendLog(`Copied ${targetId}.`);
+      });
+    });
+
+    const copyPublishTextBtn = document.getElementById("copy-publish-text");
+    if (copyPublishTextBtn) {
+      copyPublishTextBtn.addEventListener("click", async () => {
+        const text = (document.getElementById("publish-text") || {}).value || "";
+        if (text) {
+          await navigator.clipboard.writeText(text);
+          appendLog("Copied publish text.");
+        }
+      });
+    }
+
+    async function loadPublishText() {
+      const publishText = document.getElementById("publish-text");
+      if (!publishText || publishText.value) return;
+      const taskId = window.currentTask.task_id;
+      try {
+        const resp = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/text?kind=mm_txt`);
+        if (!resp.ok) return;
+        const text = await resp.text();
+        if (text) publishText.value = text;
+      } catch (err) {
+        appendLog(`Failed to load publish text: ${err}`);
+      }
+    }
+
+    async function refreshTaskState() {
+      const taskId = window.currentTask.task_id;
+      const resp = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`);
+      if (!resp.ok) {
+        appendLog(`Failed to refresh task: HTTP ${resp.status}`);
+        return;
+      }
+      const data = await resp.json();
+      window.currentTask = data;
+      refreshDeliverables(data);
+      refreshPublishInfo(data);
+    }
+
+    const publishBtn = document.getElementById("publish-btn");
+    if (publishBtn) {
+      publishBtn.addEventListener("click", async () => {
+        const taskId = window.currentTask.task_id;
+        const statusEl = document.getElementById("publish-status");
+        if (statusEl) statusEl.textContent = "Publishing...";
+        try {
+          const resp = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/publish`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ task_id: taskId, force: false }),
+          });
+          if (!resp.ok) {
+            const detail = await resp.text();
+            if (statusEl) statusEl.textContent = `Publish failed: ${resp.status} ${detail}`;
+            return;
+          }
+          if (statusEl) statusEl.textContent = "Published.";
+          await refreshTaskState();
+        } catch (err) {
+          if (statusEl) statusEl.textContent = `Publish error: ${err}`;
+        }
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      refreshDeliverables(window.currentTask);
+      refreshPublishInfo(window.currentTask);
+      loadPublishText();
+      refreshTaskState().catch(() => {});
+    });
+  </script>
+</body>
+</html>
