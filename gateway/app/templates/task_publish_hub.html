@@ -259,14 +259,17 @@
     }
 
     async function loadPublishText() {
-      const publishText = document.getElementById("publish-text");
-      if (!publishText || publishText.value) return;
-      const taskId = window.currentTask.task_id;
+      const el = document.getElementById("publish-text");
+      if (!el) return;
+
+      const taskId = window.currentTask?.task_id;
+      if (!taskId) return;
+
       try {
         const resp = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/text?kind=mm_txt`);
         if (!resp.ok) return;
         const text = await resp.text();
-        if (text) publishText.value = text;
+        if (text && !el.value) el.value = text;
       } catch (err) {
         appendLog(`Failed to load publish text: ${err}`);
       }
