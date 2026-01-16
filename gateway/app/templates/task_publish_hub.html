@@ -96,7 +96,7 @@
     <div class="card">
       <div class="header-row">
         <div>
-          <h1>Publish Hub <span class="muted t-secondary">/ 发布中心</span></h1>
+          <h1>Publish Hub <span class="muted t-secondary">/ </span></h1>
           <div class="muted t-secondary">Task ID: {{ task.task_id }}</div>
         </div>
         <div class="copy-row">
@@ -109,7 +109,7 @@
     <div class="section-grid">
       <div class="card">
         <div class="section-title">
-          <h2>Deliverables <span class="muted t-secondary">/ 交付物</span></h2>
+          <h2>Deliverables <span class="muted t-secondary">/ </span></h2>
           <div class="secondary">Links are rendered from /api/tasks/{{ task.task_id }} fields.</div>
         </div>
         <div class="copy-row" style="margin-top:12px;">
@@ -139,40 +139,40 @@
 
       <div class="card">
         <div class="section-title">
-          <h2>发布信息 <span class="muted t-secondary">/ 发布信息</span></h2>
-          <div class="secondary">运营交付信息 / 运营交付信息</div>
+          <h2> <span class="muted t-secondary">/ </span></h2>
+          <div class="secondary"> / </div>
         </div>
         <div class="info-row">
-          <div class="info-pill">引擎 / ပံ့ပိုးသူ: <span id="publish-provider">-</span></div>
-          <div class="info-pill">状态 / အခြေအနေ: <span id="publish-status">-</span></div>
-          <div class="info-pill">已发布 / ထုတ်ဝေပြီး: <span id="published-at">-</span></div>
+          <div class="info-pill"> / : <span id="publish-provider">-</span></div>
+          <div class="info-pill"> / : <span id="publish-status">-</span></div>
+          <div class="info-pill"> / : <span id="published-at">-</span></div>
         </div>
         <div class="section-grid" style="margin-top:12px;">
           <div class="field">
-            <label>发布Key <span class="muted t-secondary">/ ထုတ်ဝေ Key</span></label>
+            <label>Key <span class="muted t-secondary">/  Key</span></label>
             <div class="copy-row">
               <code id="publish-key">-</code>
-              <button type="button" class="copy-btn" data-copy-target="publish-key">复制 / ကူးယူ</button>
+              <button type="button" class="copy-btn" data-copy-target="publish-key"> / </button>
             </div>
           </div>
           <div class="field">
-            <label>发布链接 <span class="muted t-secondary">/ ထုတ်ဝေလင့်ခ်</span></label>
+            <label> <span class="muted t-secondary">/ </span></label>
             <div class="copy-row">
               <a id="publish-url" href="#" target="_blank" rel="noopener">-</a>
-              <button type="button" class="copy-btn" data-copy-target="publish-url">复制 / ကူးယူ</button>
+              <button type="button" class="copy-btn" data-copy-target="publish-url"> / </button>
             </div>
           </div>
         </div>
         <div class="field" style="margin-top:12px;">
-          <label>Publishing Text (မြန်မာ) <span class="muted t-secondary">/ 发布文案</span></label>
+          <label>Publishing Text () <span class="muted t-secondary">/ </span></label>
           <div class="copy-row">
-            <button type="button" class="copy-btn" id="copy-publish-text">复制 / ကူးယူ</button>
-            <span class="muted t-secondary">来自缅文文本 / စာတန်းမှ</span>
+            <button type="button" class="copy-btn" id="copy-publish-text"> / </button>
+            <span class="muted t-secondary"> / </span>
           </div>
           <textarea id="publish-text" class="publish-textarea" readonly></textarea>
         </div>
         <div class="action-row" style="margin-top:12px;">
-          <button id="publish-btn" class="btn-success">立即发布 <span class="muted t-secondary">/ ယခုပဲထုတ်ဝေ</span></button>
+          <button id="publish-btn" class="btn-success"> <span class="muted t-secondary">/ </span></button>
         </div>
       </div>
     </div>
@@ -267,6 +267,7 @@
 
       try {
         const resp = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/text?kind=mm_txt`);
+        if (resp.status === 404) return;
         if (!resp.ok) return;
         const text = await resp.text();
         if (text && !el.value) el.value = text;
