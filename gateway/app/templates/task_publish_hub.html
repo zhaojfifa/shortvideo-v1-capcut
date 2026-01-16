@@ -258,21 +258,26 @@
       });
     }
 
-    async function loadPublishText() {
-      const el = document.getElementById("publish-text");
-      if (!el) return;
-
+    async function loadPublishTextFromTaskFields() {
       const taskId = window.currentTask?.task_id;
-      if (!taskId) return;
+      const textarea = document.getElementById("publish-text");
+      if (!taskId || !textarea) return;
 
       try {
-        const resp = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/text?kind=mm_txt`);
-        if (resp.status === 404) return;
-        if (!resp.ok) return;
-        const text = await resp.text();
-        if (text && !el.value) el.value = text;
-      } catch (err) {
-        appendLog(`Failed to load publish text: ${err}`);
+        const r = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`, { cache: "no-store" });
+        if (!r.ok) return;
+        const data = await r.json();
+        window.currentTask = data;
+
+        const txtUrl = data.mm_txt_path || null;
+        if (!txtUrl) return;
+
+        const tr = await fetch(txtUrl, { cache: "no-store" });
+        if (!tr.ok) return;
+        const text = await tr.text();
+        if (text && !textarea.value) textarea.value = text;
+      } catch (e) {
+        // optional log
       }
     }
 
@@ -317,7 +322,7 @@
     document.addEventListener("DOMContentLoaded", () => {
       refreshDeliverables(window.currentTask);
       refreshPublishInfo(window.currentTask);
-      loadPublishText();
+      loadPublishTextFromTaskFields();
       refreshTaskState().catch(() => {});
     });
   </script>
