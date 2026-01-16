@@ -2,12 +2,15 @@
 
 import asyncio
 import hashlib
+import hmac
 import logging
 import os
 import re
 import shutil
 import subprocess
+import tempfile
 import time
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -15,7 +18,14 @@ from uuid import uuid4
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
 from pydantic import BaseModel
 
 from ..config import get_settings
@@ -141,6 +151,7 @@ from ..core.workspace import (
 logger = logging.getLogger(__name__)
 
 AUDIO_MM_KEY_TEMPLATE = "deliver/tasks/{task_id}/audio_mm.mp3"
+OP_HEADER_KEY = "X-OP-KEY"
 
 
 class DubProviderRequest(BaseModel):
@@ -462,6 +473,54 @@ def download_scenes(task_id: str, repo=Depends(get_task_repository)):
     return RedirectResponse(url=get_download_url(str(scenes_key)), status_code=302)
 
 
+@pages_router.get("/v1/tasks/{task_id}/publish_bundle")
+def download_publish_bundle(task_id: str, repo=Depends(get_task_repository)):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    raw_key = _task_key(task, "raw_path")
+    if not raw_key or not object_exists(raw_key):
+        raise HTTPException(status_code=404, detail="Final video not found")
+
+    tmpdir = tempfile.TemporaryDirectory()
+    raw_local = Path(tmpdir.name) / "final.mp4"
+    storage = get_storage_service()
+    try:
+        storage.download_file(str(raw_key), str(raw_local))
+    except Exception as exc:
+        tmpdir.cleanup()
+        raise HTTPException(status_code=500, detail=f"Raw download failed: {exc}") from exc
+    if not raw_local.exists():
+        tmpdir.cleanup()
+        raise HTTPException(status_code=500, detail="Raw download failed")
+
+    bundle = _build_copy_bundle(task)
+    caption_text = (
+        f"Caption:\n{bundle.get('caption', '')}\n\n"
+        f"Hashtags:\n{bundle.get('hashtags', '')}\n\n"
+        f"Comment CTA:\n{bundle.get('comment_cta', '')}\n\n"
+        f"Link Text:\n{bundle.get('link_text', '')}\n\n"
+        f"Publish Time Suggestion:\n{bundle.get('publish_time_suggestion', '')}\n"
+    )
+
+    zip_path = Path(tmpdir.name) / f"publish_bundle_{task_id}.zip"
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.write(raw_local, arcname="final.mp4")
+        zf.writestr("caption.txt", caption_text)
+        zf.writestr("SOP.md", _publish_sop_markdown())
+
+    def iterfile():
+        with zip_path.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                yield chunk
+        tmpdir.cleanup()
+
+    headers = {
+        "Content-Disposition": f"attachment; filename=publish_bundle_{task_id}.zip"
+    }
+    return StreamingResponse(iterfile(), media_type="application/zip", headers=headers)
+
+
 @pages_router.get("/v1/tasks/{task_id}/status")
 def task_status(task_id: str, repo=Depends(get_task_repository)):
     task = repo.get(task_id)
@@ -519,6 +578,168 @@ def _task_endpoint(task_id: str, kind: str) -> Optional[str]:
     if kind == "scenes":
         return f"/v1/tasks/{safe_id}/scenes"
     return None
+
+
+def _get_op_access_key() -> Optional[str]:
+    key = (os.getenv("OP_ACCESS_KEY") or "").strip()
+    return key or None
+
+
+def _op_gate_enabled() -> bool:
+    return bool(_get_op_access_key())
+
+
+def _op_key_valid(request: Request) -> bool:
+    secret = _get_op_access_key()
+    if not secret:
+        return True
+    header_val = (request.headers.get(OP_HEADER_KEY) or "").strip()
+    return hmac.compare_digest(header_val, secret)
+
+
+def _require_op_key(request: Request) -> None:
+    if not _op_key_valid(request):
+        raise HTTPException(status_code=401, detail="OP key required")
+
+
+def _op_sign(task_id: str, kind: str, exp: int) -> str:
+    secret = _get_op_access_key()
+    if not secret:
+        return ""
+    msg = f"{task_id}:{kind}:{exp}".encode("utf-8")
+    return hmac.new(secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+
+
+def _op_verify(task_id: str, kind: str, exp: int, sig: str) -> bool:
+    secret = _get_op_access_key()
+    if not secret:
+        return True
+    if not sig:
+        return False
+    expected = _op_sign(task_id, kind, exp)
+    return hmac.compare_digest(expected, sig)
+
+
+def _download_code(task_id: str) -> str:
+    return str(task_id).upper()[:6]
+
+
+def _read_mm_txt_from_task(task: dict) -> str:
+    mm_key = _task_key(task, "mm_srt_path")
+    if not mm_key:
+        return ""
+    txt_key = mm_key[:-4] + ".txt" if mm_key.endswith(".srt") else f"{mm_key}.txt"
+    if not object_exists(txt_key):
+        return ""
+    data = get_object_bytes(txt_key)
+    if not data:
+        return ""
+    try:
+        return data.decode("utf-8").strip()
+    except UnicodeDecodeError:
+        return data.decode(errors="ignore").strip()
+
+
+def _publish_sop_markdown() -> str:
+    return (
+        "# Publish SOP\n"
+        "1) Download the publish bundle zip.\n"
+        "2) Review caption and hashtags.\n"
+        "3) Upload final.mp4 to the platform.\n"
+        "4) Paste caption and hashtags.\n"
+        "5) Verify link and comment CTA.\n"
+    )
+
+
+def _build_copy_bundle(task: dict) -> dict[str, str]:
+    caption = _read_mm_txt_from_task(task) or (task.get("title") or "")
+    return {
+        "caption": caption.strip(),
+        "hashtags": "",
+        "comment_cta": "",
+        "link_text": task.get("publish_url") or "",
+        "publish_time_suggestion": "",
+    }
+
+
+def _deliverable_url(task_id: str, task: dict, kind: str) -> Optional[str]:
+    if kind == "final_mp4":
+        key = _task_key(task, "raw_path")
+        return _task_endpoint(task_id, "raw") if key and object_exists(key) else None
+    if kind == "pack_zip":
+        pack_type = _task_value(task, "pack_type")
+        pack_key = _task_value(task, "pack_key") or _task_value(task, "pack_path")
+        if pack_type == "capcut_v18" and pack_key and object_exists(str(pack_key)):
+            return _task_endpoint(task_id, "pack")
+        if pack_key and object_exists(str(pack_key)):
+            return _task_endpoint(task_id, "pack")
+        return None
+    if kind == "scenes_zip":
+        scenes_key = _task_value(task, "scenes_key")
+        return (
+            _task_endpoint(task_id, "scenes")
+            if scenes_key and object_exists(str(scenes_key))
+            else None
+        )
+    if kind == "origin_srt":
+        key = _task_key(task, "origin_srt_path")
+        return _task_endpoint(task_id, "origin") if key and object_exists(key) else None
+    if kind == "mm_srt":
+        key = _task_key(task, "mm_srt_path")
+        return _task_endpoint(task_id, "mm") if key and object_exists(key) else None
+    if kind == "mm_txt":
+        mm_key = _task_key(task, "mm_srt_path")
+        if not mm_key:
+            return None
+        txt_key = mm_key[:-4] + ".txt" if mm_key.endswith(".srt") else f"{mm_key}.txt"
+        return _task_endpoint(task_id, "mm_txt") if object_exists(txt_key) else None
+    if kind == "mm_audio":
+        key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
+        return _task_endpoint(task_id, "audio") if key and object_exists(key) else None
+    return None
+
+
+def _publish_hub_payload(task: dict) -> dict[str, object]:
+    task_id = str(_task_value(task, "task_id") or _task_value(task, "id") or "")
+    deliverables = {}
+    for key, label in (
+        ("final_mp4", "final.mp4"),
+        ("pack_zip", "pack.zip"),
+        ("scenes_zip", "scenes.zip"),
+        ("origin_srt", "origin.srt"),
+        ("mm_srt", "mm.srt"),
+        ("mm_txt", "mm.txt"),
+        ("mm_audio", "mm_audio"),
+    ):
+        url = _deliverable_url(task_id, task, key)
+        if url:
+            deliverables[key] = {"label": label, "url": url}
+
+    now_ts = int(time.time())
+    exp = now_ts + 86400
+    mobile_target = f"/op/dl/{task_id}?kind=final_mp4&exp={exp}"
+    sig = _op_sign(task_id, "final_mp4", exp)
+    if sig:
+        mobile_target = f"{mobile_target}&sig={sig}"
+
+    return {
+        "task_id": task_id,
+        "gate_enabled": _op_gate_enabled(),
+        "deliverables": deliverables,
+        "copy_bundle": _build_copy_bundle(task),
+        "download_code": _download_code(task_id),
+        "mobile": {
+            "qr_target": mobile_target,
+            "short_link": f"/d/{_download_code(task_id)}",
+        },
+        "sop_markdown": _publish_sop_markdown(),
+        "publish_bundle_url": f"/v1/tasks/{task_id}/publish_bundle",
+        "publish_status": task.get("publish_status"),
+        "publish_provider": task.get("publish_provider"),
+        "publish_key": task.get("publish_key"),
+        "publish_url": task.get("publish_url"),
+        "published_at": task.get("published_at"),
+    }
 
 
 def _task_value(task: dict, field: str) -> Optional[str]:
@@ -955,35 +1176,11 @@ async def task_publish_hub_page(
             status_code=404,
         )
 
-    paths = _resolve_download_urls(task)
     detail = _task_to_detail(task)
-    task_json = {
-        "task_id": detail.task_id,
-        "status": detail.status,
-        "platform": detail.platform,
-        "category_key": detail.category_key,
-        "content_lang": detail.content_lang,
-        "ui_lang": detail.ui_lang,
-        "source_url": detail.source_url,
-        "raw_path": detail.raw_path,
-        "origin_srt_path": detail.origin_srt_path,
-        "mm_srt_path": detail.mm_srt_path,
-        "mm_audio_path": detail.mm_audio_path,
-        "mm_txt_path": paths.get("mm_txt_path"),
-        "pack_path": detail.pack_path,
-        "scenes_path": detail.scenes_path,
-        "scenes_status": detail.scenes_status,
-        "scenes_key": detail.scenes_key,
-        "scenes_error": detail.scenes_error,
-        "subtitles_status": detail.subtitles_status,
-        "subtitles_key": detail.subtitles_key,
-        "subtitles_error": detail.subtitles_error,
-        "publish_status": detail.publish_status,
-        "publish_provider": detail.publish_provider,
-        "publish_key": detail.publish_key,
-        "publish_url": detail.publish_url,
-        "published_at": detail.published_at,
-    }
+    task_json = {"task_id": detail.task_id}
+    status_code = 200
+    if _op_gate_enabled() and not _op_key_valid(request):
+        status_code = 401
 
     return templates.TemplateResponse(
         "task_publish_hub.html",
@@ -992,7 +1189,51 @@ async def task_publish_hub_page(
             "task": detail,
             "task_json": task_json,
         },
+        status_code=status_code,
     )
+
+
+@pages_router.get("/op/dl/{task_id}")
+def op_download_proxy(
+    task_id: str,
+    kind: str = Query(default=..., min_length=1),
+    exp: int | None = Query(default=None),
+    sig: str | None = Query(default=None),
+    repo=Depends(get_task_repository),
+):
+    if _get_op_access_key():
+        if exp is None or not sig:
+            raise HTTPException(status_code=403, detail="Missing signature")
+        now_ts = int(time.time())
+        max_ttl = 7 * 24 * 3600
+        if exp < now_ts or exp > now_ts + max_ttl:
+            raise HTTPException(status_code=403, detail="Expired signature")
+        if not _op_verify(task_id, kind, exp, sig):
+            raise HTTPException(status_code=403, detail="Invalid signature")
+
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    url = _deliverable_url(task_id, task, kind)
+    if not url:
+        raise HTTPException(status_code=404, detail="Deliverable not found")
+    return RedirectResponse(url=url, status_code=302)
+
+
+@pages_router.get("/d/{code}")
+def resolve_download_code(code: str, repo=Depends(get_task_repository)):
+    code = (code or "").strip().lower()
+    if not code:
+        raise HTTPException(status_code=404, detail="Code not found")
+
+    items = sort_tasks_by_created(repo.list())
+    for t in items[:200]:
+        tid = str(t.get("task_id") or t.get("id") or "")
+        if tid and tid.lower().startswith(code):
+            return RedirectResponse(url=f"/tasks/{tid}/publish", status_code=302)
+
+    raise HTTPException(status_code=404, detail="Code not found")
 
 
 @api_router.post("/tasks", response_model=TaskDetail)
@@ -1273,6 +1514,17 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
     )
 
     return payload
+
+
+@api_router.get("/tasks/{task_id}/publish_hub")
+def get_publish_hub(
+    request: Request, task_id: str, repo=Depends(get_task_repository)
+):
+    _require_op_key(request)
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return _publish_hub_payload(task)
 
 
 @api_router.post("/tasks/{task_id}/parse")
