@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>Task Board 路 ShortVideo</title>
+  <title>Task Board 璺?ShortVideo</title>
   <link rel="stylesheet" href="/static/tasks_board.css">
   <style>
     :root { color-scheme: light; }
@@ -300,15 +300,15 @@
 
               {% set platform_key = (t.platform or "") | lower %}
               {% if platform_key == "douyin" %}
-                {% set platform_label_primary = "鎶栭煶" %}
-                {% set platform_label_secondary = "醼掅€贬€€横€氠€勧€? %}
-              {% elif platform_key in ["tk", "tiktok"] %}
+                {% set platform_label_primary = "??" %}
+                {% set platform_label_secondary = "???????" %}
+              {% elif platform_key == "tk" or platform_key == "tiktok" %}
                 {% set platform_label_primary = "TikTok" %}
                 {% set platform_label_secondary = "TikTok" %}
               {% elif platform_key == "xhs" %}
-                {% set platform_label_primary = "灏忕孩涔? %}
-                {% set platform_label_secondary = "灏忕孩涔? %}
-              {% elif platform_key in ["fb", "facebook"] %}
+                {% set platform_label_primary = "???" %}
+                {% set platform_label_secondary = "???" %}
+              {% elif platform_key == "fb" or platform_key == "facebook" %}
                 {% set platform_label_primary = "Facebook" %}
                 {% set platform_label_secondary = "Facebook" %}
               {% elif platform_key == "" %}
@@ -364,7 +364,7 @@
                       {% endif %}
                     </div>
                   {% else %}
-                    鈥?
+                    閳?
                   {% endif %}
                 </td>
                 <td data-label="{{ t_primary('publish') }} / {{ t_secondary('publish') }}">
@@ -441,10 +441,10 @@
       other: { primary: "{{ t_primary('category_other') }}", secondary: "{{ t_secondary('category_other') }}" },
     };
     const PLATFORM_LABELS = {
-      douyin: { primary: "鎶栭煶", secondary: "醼掅€贬€€横€氠€勧€? },
+      douyin: { primary: "閹舵牠鐓?, secondary: "閱兼巺鈧船鈧倿鈧í鈧盃鈧嫥鈧? },
       tk: { primary: "TikTok", secondary: "TikTok" },
       tiktok: { primary: "TikTok", secondary: "TikTok" },
-      xhs: { primary: "灏忕孩涔?, secondary: "灏忕孩涔? },
+      xhs: { primary: "鐏忓繒瀛╂稊?, secondary: "鐏忓繒瀛╂稊? },
       fb: { primary: "Facebook", secondary: "Facebook" },
       facebook: { primary: "Facebook", secondary: "Facebook" },
     };
@@ -493,7 +493,7 @@
 
     function truncate(text, limit = 240) {
       if (!text) return "";
-      return text.length > limit ? `${text.slice(0, limit - 1)}鈥 : text;
+      return text.length > limit ? `${text.slice(0, limit - 1)}閳ヮ泦 : text;
     }
 
     function extractFirstHttpUrl(text) {
@@ -579,7 +579,7 @@
                     <a href="/v1/tasks/${t.task_id}/pack" target="_blank" rel="noopener">{{ t_primary("download") }}</a>
                     ${showSecondary ? `<span class="secondary">{{ t_secondary("download") }}</span>` : ""}
                   </div>`
-                : "每"
+                : "姣?
             }</td>
             <td data-label="${LABELS.publish}">
               <div class="action-item">
@@ -651,7 +651,7 @@
 
       tasksInFlight = true;
       if (countPrimaryEl) {
-        countPrimaryEl.textContent = "Loading tasks鈥?;
+        countPrimaryEl.textContent = "Loading tasks閳?;
       }
       if (countSecondaryEl) {
         countSecondaryEl.textContent = "";
@@ -744,6 +744,7 @@
   </script>
 </body>
 </html>
+
 
 
 
