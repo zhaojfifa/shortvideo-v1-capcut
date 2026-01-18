@@ -17,7 +17,8 @@ from typing import Optional
 from uuid import uuid4
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Security
+from fastapi.security.api_key import APIKeyHeader
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
@@ -186,6 +187,7 @@ class PublishTaskRequest(BaseModel):
 pages_router = APIRouter()
 api_router = APIRouter(prefix="/api", tags=["tasks"])
 templates = get_templates()
+api_key_header = APIKeyHeader(name=OP_HEADER_KEY, auto_error=False)
 def _coerce_datetime(value) -> datetime:
     # Pydantic TaskDetail.created_at expects datetime, so guarantee it.
     if isinstance(value, datetime):
@@ -607,6 +609,14 @@ def _op_key_valid(request: Request) -> bool:
         return True
     header_val = (request.headers.get(OP_HEADER_KEY) or "").strip()
     return hmac.compare_digest(header_val, secret)
+
+def _op_key_valid_value(op_key: str | None) -> bool:
+    secret = _get_op_access_key()
+    if not secret:
+        return True
+    if not op_key:
+        return False
+    return hmac.compare_digest(op_key, secret)
 
 
 def _require_op_key(request: Request) -> None:
@@ -1252,30 +1262,13 @@ def resolve_download_code(code: str, repo=Depends(get_task_repository)):
         raise HTTPException(status_code=404, detail="Code not found")
 
     items = sort_tasks_by_created(repo.list())
-    matches: list[str] = []
-    for t in items[:500]:
+    for t in items[:200]:
         tid = str(t.get("task_id") or t.get("id") or "")
         if tid and tid.lower().startswith(code):
-            matches.append(tid)
-            if len(matches) >= 10:
-                break
+            signed = _signed_op_url(tid, "publish_bundle")
+            return RedirectResponse(url=signed, status_code=302)
 
-    if not matches:
-        raise HTTPException(status_code=404, detail="Code not found")
-    if len(matches) == 1:
-        return RedirectResponse(url=f"/tasks/{matches[0]}/publish", status_code=302)
-
-    links = "\n".join(
-        f'<li><a href="/tasks/{tid}/publish">{tid}</a></li>' for tid in matches
-    )
-    html = (
-        "<!doctype html><html><head><meta charset=\"utf-8\"/>"
-        "<title>Select task</title></head><body>"
-        "<h3>Multiple tasks matched. Select one:</h3>"
-        f"<ul>{links}</ul>"
-        "</body></html>"
-    )
-    return HTMLResponse(content=html, status_code=200)
+    raise HTTPException(status_code=404, detail="Code not found")
 
 
 @api_router.post("/tasks", response_model=TaskDetail)
@@ -1560,9 +1553,13 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
 
 @api_router.get("/tasks/{task_id}/publish_hub")
 def get_publish_hub(
-    request: Request, task_id: str, repo=Depends(get_task_repository)
+    request: Request,
+    task_id: str,
+    repo=Depends(get_task_repository),
+    op_key: str | None = Security(api_key_header),
 ):
-    _require_op_key(request)
+    if not _op_key_valid_value(op_key):
+        raise HTTPException(status_code=401, detail="OP key required")
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
