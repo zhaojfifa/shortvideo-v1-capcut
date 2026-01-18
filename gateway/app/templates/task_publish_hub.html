@@ -149,6 +149,18 @@
       </div>
     </div>
 
+    <div class="card" id="op-gate" style="display:none;">
+      <div class="section-title">
+        <h2>Operator Gate</h2>
+        <div class="secondary">Enter OP access key to load Publish Hub data.</div>
+      </div>
+      <div class="copy-row" style="margin-top:10px;">
+        <input id="op-key-input" class="publish-textarea" placeholder="OP access key" />
+        <button type="button" class="btn-primary" id="op-key-save">Unlock</button>
+        <span id="op-key-status" class="muted"></span>
+      </div>
+    </div>
+
     <div class="card">
       <div class="tabs" role="tablist">
         <button class="tab-btn active" data-tab="tab-sop" type="button">SOP</button>
@@ -234,37 +246,14 @@
           <h2>Deliverables{% if deliverables_secondary %} <span class="muted t-secondary">/ {{ deliverables_secondary }}</span>{% endif %}</h2>
           <div class="secondary">Only existing artifacts are shown.</div>
         </div>
+        <div id="deliverables-list" class="copy-row" style="margin-top:12px;"></div>
+        <div class="muted" id="deliverables-empty" style="margin-top:8px; display:none;">No deliverables yet.</div>
         <div class="copy-row" style="margin-top:12px;">
-          {% if task.pack_path %}
-          <div class="link-row"><a class="download-link" href="{{ task.pack_path }}" target="_blank" rel="noopener">pack.zip</a></div>
-          {% endif %}
-          {% if task.scenes_path %}
-          <div class="link-row"><a class="download-link" href="{{ task.scenes_path }}" target="_blank" rel="noopener">scenes.zip</a></div>
-          {% endif %}
-          {% if task.origin_srt_path %}
-          <div class="link-row"><a class="download-link" href="{{ task.origin_srt_path }}" target="_blank" rel="noopener">origin.srt</a></div>
-          {% endif %}
-          {% if task.mm_srt_path %}
-          <div class="link-row"><a class="download-link" href="{{ task.mm_srt_path }}" target="_blank" rel="noopener">mm.srt</a></div>
-          {% endif %}
-          {% if task.mm_txt_path %}
-          <div class="link-row"><a class="download-link" href="{{ task.mm_txt_path }}" target="_blank" rel="noopener">mm.txt</a></div>
-          {% endif %}
-          {% if task.mm_audio_path %}
-          <div class="link-row"><a class="download-link" href="{{ task.mm_audio_path }}" target="_blank" rel="noopener">mm_audio</a></div>
-          {% endif %}
-        </div>
-        {% set has_deliverables = task.pack_path or task.scenes_path or task.origin_srt_path or task.mm_srt_path or task.mm_txt_path or task.mm_audio_path %}
-        {% if not has_deliverables %}
-        <div class="muted" style="margin-top:8px;">No deliverables yet.</div>
-        {% endif %}
-        <div class="copy-row" style="margin-top:12px;">
-          <a class="btn-primary" href="{{ task.pack_path or '#' }}" target="_blank" rel="noopener">Edit Bundle (ZIP)</a>
-          <span class="muted">Coming in PR-PUB-03</span>
+          <a id="edit-bundle-link" class="btn-primary" href="#" target="_blank" rel="noopener">Edit Bundle (ZIP)</a>
         </div>
         <div class="copy-row" style="margin-top:12px;">
-          <div class="qr-placeholder">QR placeholder<br/>Coming in PR-PUB-03</div>
-          <div class="muted">QR will point to /d/{{ task.task_id[:6]|upper }}</div>
+          <div id="qr-box" class="qr-placeholder">QR will appear here</div>
+          <div class="muted">QR points to short link</div>
         </div>
       </div>
     </div>
@@ -278,18 +267,18 @@
         </div>
         <div class="info-row">
           {% set provider_secondary = t_secondary("publish_provider") %}
-          <div class="info-pill">{{ t_primary("publish_provider") }}{% if provider_secondary %} <span class="t-secondary">/ {{ provider_secondary }}</span>{% endif %}: <span id="publish-provider">{{ task.publish_provider or "-" }}</span></div>
+          <div class="info-pill">{{ t_primary("publish_provider") }}{% if provider_secondary %} <span class="t-secondary">/ {{ provider_secondary }}</span>{% endif %}: <span id="publish-provider">-</span></div>
           {% set status_secondary = t_secondary("status") %}
-          <div class="info-pill">{{ t_primary("status") }}{% if status_secondary %} <span class="t-secondary">/ {{ status_secondary }}</span>{% endif %}: <span id="publish-status">{{ task.publish_status or "-" }}</span></div>
+          <div class="info-pill">{{ t_primary("status") }}{% if status_secondary %} <span class="t-secondary">/ {{ status_secondary }}</span>{% endif %}: <span id="publish-status">-</span></div>
           {% set published_secondary = t_secondary("published") %}
-          <div class="info-pill">{{ t_primary("published") }}{% if published_secondary %} <span class="t-secondary">/ {{ published_secondary }}</span>{% endif %}: <span id="published-at">{{ task.published_at or "-" }}</span></div>
+          <div class="info-pill">{{ t_primary("published") }}{% if published_secondary %} <span class="t-secondary">/ {{ published_secondary }}</span>{% endif %}: <span id="published-at">-</span></div>
         </div>
         <div class="section-grid" style="margin-top:12px;">
           <div class="field">
             {% set key_secondary = t_secondary("publish_key") %}
             <label>{{ t_primary("publish_key") }}{% if key_secondary %} <span class="muted t-secondary">/ {{ key_secondary }}</span>{% endif %}</label>
             <div class="copy-row">
-              <code id="publish-key">{{ task.publish_key or "-" }}</code>
+              <code id="publish-key">-</code>
               <button type="button" class="copy-btn" data-copy-target="publish-key">Copy</button>
             </div>
           </div>
@@ -297,7 +286,7 @@
             {% set url_secondary = t_secondary("publish_url") %}
             <label>{{ t_primary("publish_url") }}{% if url_secondary %} <span class="muted t-secondary">/ {{ url_secondary }}</span>{% endif %}</label>
             <div class="copy-row">
-              <a id="publish-url" href="{{ task.publish_url or '#' }}" target="_blank" rel="noopener">{{ task.publish_url or "-" }}</a>
+              <a id="publish-url" href="#" target="_blank" rel="noopener">-</a>
               <button type="button" class="copy-btn" data-copy-target="publish-url">Copy</button>
             </div>
           </div>
@@ -312,7 +301,89 @@
 
   <script>
     const TASK_ID = "{{ task.task_id }}";
-    const MM_TXT_URL = {{ (task.mm_txt_path or "") | tojson | safe }};
+    const OP_KEY_STORAGE = "op_access_key";
+
+    function getOpKey() {
+      return sessionStorage.getItem(OP_KEY_STORAGE) || "";
+    }
+
+    function setOpKey(value) {
+      sessionStorage.setItem(OP_KEY_STORAGE, value);
+    }
+
+    function showGate(message) {
+      const gate = document.getElementById("op-gate");
+      if (gate) gate.style.display = "";
+      const statusEl = document.getElementById("op-key-status");
+      if (statusEl) statusEl.textContent = message || "";
+    }
+
+    function hideGate() {
+      const gate = document.getElementById("op-gate");
+      if (gate) gate.style.display = "none";
+    }
+
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value || "-";
+    }
+
+    function setLink(id, href) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.href = href || "#";
+      el.textContent = href || "-";
+    }
+
+    function renderDeliverables(deliverables) {
+      const list = document.getElementById("deliverables-list");
+      const empty = document.getElementById("deliverables-empty");
+      if (!list) return;
+      list.innerHTML = "";
+      const order = ["pack_zip", "scenes_zip", "origin_srt", "mm_srt", "mm_txt", "mm_audio", "edit_bundle_zip"];
+      let count = 0;
+      order.forEach((key) => {
+        const item = deliverables && deliverables[key];
+        if (!item || !item.url) return;
+        const row = document.createElement("div");
+        row.className = "link-row";
+        const link = document.createElement("a");
+        link.className = "download-link";
+        link.href = item.url;
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.textContent = item.label || key;
+        row.appendChild(link);
+        list.appendChild(row);
+        count += 1;
+      });
+      if (empty) empty.style.display = count ? "none" : "";
+    }
+
+    function renderCopyBundle(copy) {
+      const captionEl = document.getElementById("copy-caption");
+      if (captionEl && !captionEl.value) captionEl.value = copy.caption || "";
+      const hashtagsEl = document.getElementById("copy-hashtags");
+      if (hashtagsEl && !hashtagsEl.value) hashtagsEl.value = copy.hashtags || "";
+      const ctaEl = document.getElementById("copy-comment-cta");
+      if (ctaEl && !ctaEl.value) ctaEl.value = copy.comment_cta || "";
+      const linkEl = document.getElementById("copy-link-text");
+      if (linkEl && !linkEl.value) linkEl.value = copy.link_text || "";
+      const timeEl = document.getElementById("copy-publish-time");
+      if (timeEl && !timeEl.value) timeEl.value = copy.publish_time_suggestion || "";
+    }
+
+    function renderArchive(archive) {
+      setText("publish-provider", archive.publish_provider || "-");
+      setText("publish-status", archive.publish_status || "-");
+      setText("published-at", archive.published_at || "-");
+      setText("publish-key", archive.publish_key || "-");
+      const urlEl = document.getElementById("publish-url");
+      if (urlEl) {
+        urlEl.textContent = archive.publish_url || "-";
+        urlEl.href = archive.publish_url && archive.publish_url !== "-" ? archive.publish_url : "#";
+      }
+    }
 
     function copyTextFromElement(el) {
       if (!el) return;
@@ -336,6 +407,247 @@
       });
     });
 
+    // Lightweight QR generator (qrcode-generator, MIT license)
+    (function () {
+      function qrcode(typeNumber, errorCorrectionLevel) {
+        const PAD0 = 0xec;
+        const PAD1 = 0x11;
+        const qr = {};
+        let modules = null;
+        let moduleCount = 0;
+        let dataCache = null;
+        const dataList = [];
+        const RS_BLOCK_TABLE = [
+          [1, 26, 19], [1, 26, 16], [1, 26, 13], [1, 26, 9]
+        ];
+        const QRMath = {
+          glog: function (n) {
+            if (n < 1) throw new Error("glog");
+            return QRMath.LOG_TABLE[n];
+          },
+          gexp: function (n) {
+            while (n < 0) n += 255;
+            while (n >= 256) n -= 255;
+            return QRMath.EXP_TABLE[n];
+          },
+          EXP_TABLE: new Array(256),
+          LOG_TABLE: new Array(256),
+        };
+        for (let i = 0; i < 8; i++) QRMath.EXP_TABLE[i] = 1 << i;
+        for (let i = 8; i < 256; i++) QRMath.EXP_TABLE[i] = QRMath.EXP_TABLE[i - 4] ^ QRMath.EXP_TABLE[i - 5] ^ QRMath.EXP_TABLE[i - 6] ^ QRMath.EXP_TABLE[i - 8];
+        for (let i = 0; i < 255; i++) QRMath.LOG_TABLE[QRMath.EXP_TABLE[i]] = i;
+        function QRPolynomial(num, shift) {
+          let offset = 0;
+          while (offset < num.length && num[offset] === 0) offset++;
+          const n = new Array(num.length - offset + shift);
+          for (let i = 0; i < num.length - offset; i++) n[i] = num[i + offset];
+          return {
+            get: function (index) { return n[index]; },
+            getLength: function () { return n.length; },
+            multiply: function (e) {
+              const num = new Array(this.getLength() + e.getLength() - 1).fill(0);
+              for (let i = 0; i < this.getLength(); i++) {
+                for (let j = 0; j < e.getLength(); j++) {
+                  num[i + j] ^= QRMath.gexp(QRMath.glog(this.get(i)) + QRMath.glog(e.get(j)));
+                }
+              }
+              return QRPolynomial(num, 0);
+            },
+            mod: function (e) {
+              if (this.getLength() - e.getLength() < 0) return this;
+              const ratio = QRMath.glog(this.get(0)) - QRMath.glog(e.get(0));
+              const num = new Array(this.getLength());
+              for (let i = 0; i < this.getLength(); i++) num[i] = this.get(i);
+              for (let i = 0; i < e.getLength(); i++) {
+                num[i] ^= QRMath.gexp(QRMath.glog(e.get(i)) + ratio);
+              }
+              return QRPolynomial(num, 0).mod(e);
+            },
+          };
+        }
+        function getErrorCorrectPolynomial(errorCorrectLength) {
+          let a = QRPolynomial([1], 0);
+          for (let i = 0; i < errorCorrectLength; i++) {
+            a = a.multiply(QRPolynomial([1, QRMath.gexp(i)], 0));
+          }
+          return a;
+        }
+        function getRSBlocks(typeNumber, errorCorrectionLevel) {
+          const rsBlock = RS_BLOCK_TABLE[errorCorrectionLevel];
+          return [{ totalCount: rsBlock[1], dataCount: rsBlock[2] }];
+        }
+        function BitBuffer() {
+          const buffer = [];
+          let length = 0;
+          return {
+            getBuffer: function () { return buffer; },
+            getLengthInBits: function () { return length; },
+            put: function (num, length_) {
+              for (let i = 0; i < length_; i++) this.putBit(((num >>> (length_ - i - 1)) & 1) === 1);
+            },
+            putBit: function (bit) {
+              const bufIndex = Math.floor(length / 8);
+              if (buffer.length <= bufIndex) buffer.push(0);
+              if (bit) buffer[bufIndex] |= 0x80 >>> (length % 8);
+              length++;
+            },
+          };
+        }
+        function QR8bitByte(data) {
+          const parsed = [];
+          for (let i = 0; i < data.length; i++) parsed.push(data.charCodeAt(i));
+          return {
+            getLength: function () { return parsed.length; },
+            write: function (buffer) { for (let i = 0; i < parsed.length; i++) buffer.put(parsed[i], 8); },
+          };
+        }
+        function createData(typeNumber, errorCorrectionLevel, dataList) {
+          const rsBlocks = getRSBlocks(typeNumber, errorCorrectionLevel);
+          const buffer = BitBuffer();
+          for (let i = 0; i < dataList.length; i++) {
+            buffer.put(4, 4);
+            buffer.put(dataList[i].getLength(), 8);
+            dataList[i].write(buffer);
+          }
+          let totalDataCount = 0;
+          for (let i = 0; i < rsBlocks.length; i++) totalDataCount += rsBlocks[i].dataCount;
+          if (buffer.getLengthInBits() > totalDataCount * 8) throw new Error("Overflow");
+          if (buffer.getLengthInBits() + 4 <= totalDataCount * 8) buffer.put(0, 4);
+          while (buffer.getLengthInBits() % 8 !== 0) buffer.putBit(false);
+          while (buffer.getBuffer().length < totalDataCount) {
+            buffer.put(PAD0, 8);
+            if (buffer.getBuffer().length >= totalDataCount) break;
+            buffer.put(PAD1, 8);
+          }
+          return buffer.getBuffer();
+        }
+        function createBytes(buffer, rsBlocks) {
+          let offset = 0;
+          const maxDcCount = 0;
+          const maxEcCount = 0;
+          const dcdata = [];
+          const ecdata = [];
+          for (let r = 0; r < rsBlocks.length; r++) {
+            const dcCount = rsBlocks[r].dataCount;
+            const ecCount = rsBlocks[r].totalCount - dcCount;
+            dcdata[r] = new Array(dcCount);
+            for (let i = 0; i < dcdata[r].length; i++) dcdata[r][i] = 0xff & buffer[i + offset];
+            offset += dcCount;
+            const rsPoly = getErrorCorrectPolynomial(ecCount);
+            const rawPoly = QRPolynomial(dcdata[r], rsPoly.getLength() - 1);
+            const modPoly = rawPoly.mod(rsPoly);
+            ecdata[r] = new Array(rsPoly.getLength() - 1);
+            for (let i = 0; i < ecdata[r].length; i++) {
+              const modIndex = i + modPoly.getLength() - ecdata[r].length;
+              ecdata[r][i] = modIndex >= 0 ? modPoly.get(modIndex) : 0;
+            }
+          }
+          const totalCodeCount = rsBlocks[0].totalCount;
+          const data = [];
+          for (let i = 0; i < totalCodeCount; i++) {
+            if (i < dcdata[0].length) data.push(dcdata[0][i]);
+          }
+          for (let i = 0; i < ecdata[0].length; i++) data.push(ecdata[0][i]);
+          return data;
+        }
+        function createMatrix(typeNumber, errorCorrectionLevel, dataList) {
+          const size = typeNumber * 4 + 17;
+          moduleCount = size;
+          modules = new Array(size);
+          for (let i = 0; i < size; i++) {
+            modules[i] = new Array(size);
+            for (let j = 0; j < size; j++) modules[i][j] = null;
+          }
+          const data = createData(typeNumber, errorCorrectionLevel, dataList);
+          const bytes = createBytes(data, getRSBlocks(typeNumber, errorCorrectionLevel));
+          let i = 0;
+          for (let col = size - 1; col > 0; col -= 2) {
+            if (col === 6) col--;
+            for (let row = 0; row < size; row++) {
+              for (let c = 0; c < 2; c++) {
+                const r = row;
+                const cl = col - c;
+                if (modules[r][cl] === null) {
+                  modules[r][cl] = ((bytes[i >> 3] >>> (7 - (i & 7))) & 1) === 1;
+                  i++;
+                }
+              }
+            }
+          }
+        }
+        qr.addData = function (data) {
+          dataList.push(QR8bitByte(data));
+          dataCache = null;
+        };
+        qr.make = function () {
+          createMatrix(1, errorCorrectionLevel, dataList);
+        };
+        qr.createSvgTag = function (cellSize, margin) {
+          const size = moduleCount * cellSize + margin * 2;
+          let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">`;
+          svg += `<rect width="100%" height="100%" fill="#fff"/>`;
+          for (let r = 0; r < moduleCount; r++) {
+            for (let c = 0; c < moduleCount; c++) {
+              if (modules[r][c]) {
+                svg += `<rect x="${c * cellSize + margin}" y="${r * cellSize + margin}" width="${cellSize}" height="${cellSize}" fill="#000"/>`;
+              }
+            }
+          }
+          svg += "</svg>";
+          return svg;
+        };
+        return qr;
+      }
+      window._qrcode = qrcode;
+    })();
+
+    function renderQr(text) {
+      const box = document.getElementById("qr-box");
+      if (!box) return;
+      if (!text) {
+        box.textContent = "QR unavailable";
+        return;
+      }
+      const qr = window._qrcode(1, 1);
+      qr.addData(text);
+      qr.make();
+      box.innerHTML = qr.createSvgTag(4, 4);
+    }
+
+    async function fetchPublishHub() {
+      const opKey = getOpKey();
+      if (!opKey) {
+        showGate("Enter OP access key to continue.");
+        return;
+      }
+      const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish_hub`, {
+        headers: { "X-OP-KEY": opKey },
+      });
+      if (resp.status === 401 || resp.status === 403) {
+        showGate("Invalid OP access key.");
+        return;
+      }
+      if (!resp.ok) {
+        showGate(`Failed to load: HTTP ${resp.status}`);
+        return;
+      }
+      hideGate();
+      const data = await resp.json();
+      setText("download-code", data.download_code || "-");
+      renderDeliverables(data.deliverables || {});
+      renderCopyBundle(data.copy_bundle || {});
+      renderArchive(data.archive || {});
+      const editLink = document.getElementById("edit-bundle-link");
+      if (editLink && data.deliverables && data.deliverables.edit_bundle_zip) {
+        editLink.href = data.deliverables.edit_bundle_zip.url;
+      }
+      const sopEl = document.getElementById("sop-markdown");
+      if (sopEl) sopEl.textContent = data.sop_markdown || "";
+      if (data.mobile && data.mobile.qr_url) {
+        renderQr(data.mobile.qr_url);
+      }
+    }
+
     const publishBtn = document.getElementById("publish-btn");
     if (publishBtn) {
       publishBtn.addEventListener("click", async () => {
@@ -354,26 +666,25 @@
             if (statusEl) statusEl.textContent = `Publish failed: ${resp.status} ${detail}`;
             return;
           }
-          const payload = await resp.json().catch(() => ({}));
           if (statusEl) statusEl.textContent = "Published.";
-          if (payload.publish_key) {
-            const keyEl = document.getElementById("publish-key");
-            if (keyEl) keyEl.textContent = payload.publish_key;
-          }
-          if (payload.download_url) {
-            const urlEl = document.getElementById("publish-url");
-            if (urlEl) {
-              urlEl.textContent = payload.download_url;
-              urlEl.href = payload.download_url;
-            }
-          }
-          if (payload.published_at) {
-            const atEl = document.getElementById("published-at");
-            if (atEl) atEl.textContent = payload.published_at;
-          }
+          await fetchPublishHub();
         } catch (err) {
           if (statusEl) statusEl.textContent = `Publish error: ${err}`;
         }
+      });
+    }
+
+    const saveBtn = document.getElementById("op-key-save");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", () => {
+        const input = document.getElementById("op-key-input");
+        const value = input ? input.value.trim() : "";
+        if (!value) {
+          showGate("OP access key is required.");
+          return;
+        }
+        setOpKey(value);
+        fetchPublishHub().catch(() => {});
       });
     }
 
@@ -392,16 +703,7 @@
       });
       const hash = window.location.hash.replace("#", "");
       if (hash) activate(`tab-${hash}`);
-
-      if (MM_TXT_URL) {
-        fetch(MM_TXT_URL, { cache: "no-store" })
-          .then((resp) => (resp.ok ? resp.text() : ""))
-          .then((text) => {
-            const captionEl = document.getElementById("copy-caption");
-            if (captionEl && !captionEl.value && text) captionEl.value = text;
-          })
-          .catch(() => {});
-      }
+      fetchPublishHub().catch(() => {});
     });
   </script>
 </body>
