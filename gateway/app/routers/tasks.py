@@ -478,36 +478,46 @@ def download_publish_bundle(task_id: str, repo=Depends(get_task_repository)):
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    raw_key = _task_key(task, "raw_path")
-    if not raw_key or not object_exists(raw_key):
-        raise HTTPException(status_code=404, detail="Final video not found")
-
     tmpdir = tempfile.TemporaryDirectory()
-    raw_local = Path(tmpdir.name) / "final.mp4"
     storage = get_storage_service()
-    try:
-        storage.download_file(str(raw_key), str(raw_local))
-    except Exception as exc:
-        tmpdir.cleanup()
-        raise HTTPException(status_code=500, detail=f"Raw download failed: {exc}") from exc
-    if not raw_local.exists():
-        tmpdir.cleanup()
-        raise HTTPException(status_code=500, detail="Raw download failed")
+
+    def _download_if_exists(key: str | None, dest: Path) -> bool:
+        if not key or not object_exists(str(key)):
+            return False
+        try:
+            storage.download_file(str(key), str(dest))
+            return dest.exists()
+        except Exception:
+            return False
+
+    pack_key = _task_value(task, "pack_key") or _task_value(task, "pack_path")
+    scenes_key = _task_value(task, "scenes_key")
+    pack_local = Path(tmpdir.name) / "pack.zip"
+    scenes_local = Path(tmpdir.name) / "scenes.zip"
+
+    _download_if_exists(str(pack_key) if pack_key else None, pack_local)
+    _download_if_exists(str(scenes_key) if scenes_key else None, scenes_local)
 
     bundle = _build_copy_bundle(task)
-    caption_text = (
-        f"Caption:\n{bundle.get('caption', '')}\n\n"
-        f"Hashtags:\n{bundle.get('hashtags', '')}\n\n"
-        f"Comment CTA:\n{bundle.get('comment_cta', '')}\n\n"
-        f"Link Text:\n{bundle.get('link_text', '')}\n\n"
-        f"Publish Time Suggestion:\n{bundle.get('publish_time_suggestion', '')}\n"
-    )
-
     zip_path = Path(tmpdir.name) / f"publish_bundle_{task_id}.zip"
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.write(raw_local, arcname="final.mp4")
-        zf.writestr("caption.txt", caption_text)
+        if pack_local.exists():
+            zf.write(pack_local, arcname="pack.zip")
+        if scenes_local.exists():
+            zf.write(scenes_local, arcname="scenes.zip")
+        zf.writestr("copy/caption.txt", bundle.get("caption", ""))
+        zf.writestr("copy/hashtags.txt", bundle.get("hashtags", ""))
+        zf.writestr("copy/comment_cta.txt", bundle.get("comment_cta", ""))
+        zf.writestr("copy/link_text.txt", bundle.get("link_text", ""))
+        zf.writestr(
+            "copy/publish_time_suggestion.txt",
+            bundle.get("publish_time_suggestion", ""),
+        )
         zf.writestr("SOP.md", _publish_sop_markdown())
+        zf.writestr(
+            "README.md",
+            "This is the edit bundle. Final publish bundle will be available in v2.0.\n",
+        )
 
     def iterfile():
         with zip_path.open("rb") as fh:
@@ -577,6 +587,8 @@ def _task_endpoint(task_id: str, kind: str) -> Optional[str]:
         return f"/v1/tasks/{safe_id}/pack"
     if kind == "scenes":
         return f"/v1/tasks/{safe_id}/scenes"
+    if kind == "publish_bundle":
+        return f"/v1/tasks/{safe_id}/publish_bundle"
     return None
 
 
@@ -624,6 +636,13 @@ def _download_code(task_id: str) -> str:
     return str(task_id).upper()[:6]
 
 
+def _signed_op_url(task_id: str, kind: str) -> str:
+    exp = int(time.time()) + 86400
+    sig = _op_sign(task_id, kind, exp)
+    base = f"/op/dl/{task_id}?kind={kind}&exp={exp}"
+    return f"{base}&sig={sig}" if sig else base
+
+
 def _read_mm_txt_from_task(task: dict) -> str:
     mm_key = _task_key(task, "mm_srt_path")
     if not mm_key:
@@ -643,11 +662,10 @@ def _read_mm_txt_from_task(task: dict) -> str:
 def _publish_sop_markdown() -> str:
     return (
         "# Publish SOP\n"
-        "1) Download the publish bundle zip.\n"
-        "2) Review caption and hashtags.\n"
-        "3) Upload final.mp4 to the platform.\n"
-        "4) Paste caption and hashtags.\n"
-        "5) Verify link and comment CTA.\n"
+        "1) Download the edit bundle (pack.zip).\n"
+        "2) Import into CapCut and finish edits.\n"
+        "3) Copy caption and hashtags from Copy Bundle.\n"
+        "4) Publish manually (publish bundle in v2.0).\n"
     )
 
 
@@ -665,37 +683,39 @@ def _build_copy_bundle(task: dict) -> dict[str, str]:
 def _deliverable_url(task_id: str, task: dict, kind: str) -> Optional[str]:
     if kind == "final_mp4":
         key = _task_key(task, "raw_path")
-        return _task_endpoint(task_id, "raw") if key and object_exists(key) else None
+        return _signed_op_url(task_id, "raw") if key and object_exists(key) else None
     if kind == "pack_zip":
         pack_type = _task_value(task, "pack_type")
         pack_key = _task_value(task, "pack_key") or _task_value(task, "pack_path")
         if pack_type == "capcut_v18" and pack_key and object_exists(str(pack_key)):
-            return _task_endpoint(task_id, "pack")
+            return _signed_op_url(task_id, "pack")
         if pack_key and object_exists(str(pack_key)):
-            return _task_endpoint(task_id, "pack")
+            return _signed_op_url(task_id, "pack")
         return None
     if kind == "scenes_zip":
         scenes_key = _task_value(task, "scenes_key")
         return (
-            _task_endpoint(task_id, "scenes")
+            _signed_op_url(task_id, "scenes")
             if scenes_key and object_exists(str(scenes_key))
             else None
         )
     if kind == "origin_srt":
         key = _task_key(task, "origin_srt_path")
-        return _task_endpoint(task_id, "origin") if key and object_exists(key) else None
+        return _signed_op_url(task_id, "origin_srt") if key and object_exists(key) else None
     if kind == "mm_srt":
         key = _task_key(task, "mm_srt_path")
-        return _task_endpoint(task_id, "mm") if key and object_exists(key) else None
+        return _signed_op_url(task_id, "mm_srt") if key and object_exists(key) else None
     if kind == "mm_txt":
         mm_key = _task_key(task, "mm_srt_path")
         if not mm_key:
             return None
         txt_key = mm_key[:-4] + ".txt" if mm_key.endswith(".srt") else f"{mm_key}.txt"
-        return _task_endpoint(task_id, "mm_txt") if object_exists(txt_key) else None
+        return _signed_op_url(task_id, "mm_txt") if object_exists(txt_key) else None
     if kind == "mm_audio":
         key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
-        return _task_endpoint(task_id, "audio") if key and object_exists(key) else None
+        return _signed_op_url(task_id, "mm_audio") if key and object_exists(key) else None
+    if kind == "edit_bundle_zip":
+        return _signed_op_url(task_id, "publish_bundle")
     return None
 
 
@@ -703,42 +723,38 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
     task_id = str(_task_value(task, "task_id") or _task_value(task, "id") or "")
     deliverables = {}
     for key, label in (
-        ("final_mp4", "final.mp4"),
         ("pack_zip", "pack.zip"),
         ("scenes_zip", "scenes.zip"),
         ("origin_srt", "origin.srt"),
         ("mm_srt", "mm.srt"),
         ("mm_txt", "mm.txt"),
         ("mm_audio", "mm_audio"),
+        ("edit_bundle_zip", "edit_bundle.zip"),
     ):
         url = _deliverable_url(task_id, task, key)
         if url:
             deliverables[key] = {"label": label, "url": url}
-
-    now_ts = int(time.time())
-    exp = now_ts + 86400
-    mobile_target = f"/op/dl/{task_id}?kind=final_mp4&exp={exp}"
-    sig = _op_sign(task_id, "final_mp4", exp)
-    if sig:
-        mobile_target = f"{mobile_target}&sig={sig}"
+    short_code = _download_code(task_id)
+    short_url = f"/d/{short_code}"
 
     return {
         "task_id": task_id,
         "gate_enabled": _op_gate_enabled(),
         "deliverables": deliverables,
         "copy_bundle": _build_copy_bundle(task),
-        "download_code": _download_code(task_id),
+        "download_code": short_code,
         "mobile": {
-            "qr_target": mobile_target,
-            "short_link": f"/d/{_download_code(task_id)}",
+            "short_url": short_url,
+            "qr_url": short_url,
         },
         "sop_markdown": _publish_sop_markdown(),
-        "publish_bundle_url": f"/v1/tasks/{task_id}/publish_bundle",
-        "publish_status": task.get("publish_status"),
-        "publish_provider": task.get("publish_provider"),
-        "publish_key": task.get("publish_key"),
-        "publish_url": task.get("publish_url"),
-        "published_at": task.get("published_at"),
+        "archive": {
+            "publish_provider": task.get("publish_provider") or "-",
+            "publish_key": task.get("publish_key") or "-",
+            "publish_status": task.get("publish_status") or "-",
+            "publish_url": task.get("publish_url") or "-",
+            "published_at": task.get("published_at") or "-",
+        },
     }
 
 
@@ -1178,10 +1194,6 @@ async def task_publish_hub_page(
 
     detail = _task_to_detail(task)
     task_json = {"task_id": detail.task_id}
-    status_code = 200
-    if _op_gate_enabled() and not _op_key_valid(request):
-        status_code = 401
-
     return templates.TemplateResponse(
         "task_publish_hub.html",
         {
@@ -1189,7 +1201,6 @@ async def task_publish_hub_page(
             "task": detail,
             "task_json": task_json,
         },
-        status_code=status_code,
     )
 
 
@@ -1201,6 +1212,19 @@ def op_download_proxy(
     sig: str | None = Query(default=None),
     repo=Depends(get_task_repository),
 ):
+    kind = (kind or "").strip().lower()
+    kind_map = {
+        "raw": "raw",
+        "pack": "pack",
+        "scenes": "scenes",
+        "origin_srt": "origin",
+        "mm_srt": "mm",
+        "mm_txt": "mm_txt",
+        "mm_audio": "audio",
+        "publish_bundle": "publish_bundle",
+    }
+    if kind not in kind_map:
+        raise HTTPException(status_code=400, detail="Unsupported kind")
     if _get_op_access_key():
         if exp is None or not sig:
             raise HTTPException(status_code=403, detail="Missing signature")
@@ -1215,7 +1239,7 @@ def op_download_proxy(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    url = _deliverable_url(task_id, task, kind)
+    url = _task_endpoint(task_id, kind_map[kind])
     if not url:
         raise HTTPException(status_code=404, detail="Deliverable not found")
     return RedirectResponse(url=url, status_code=302)
@@ -1228,12 +1252,30 @@ def resolve_download_code(code: str, repo=Depends(get_task_repository)):
         raise HTTPException(status_code=404, detail="Code not found")
 
     items = sort_tasks_by_created(repo.list())
-    for t in items[:200]:
+    matches: list[str] = []
+    for t in items[:500]:
         tid = str(t.get("task_id") or t.get("id") or "")
         if tid and tid.lower().startswith(code):
-            return RedirectResponse(url=f"/tasks/{tid}/publish", status_code=302)
+            matches.append(tid)
+            if len(matches) >= 10:
+                break
 
-    raise HTTPException(status_code=404, detail="Code not found")
+    if not matches:
+        raise HTTPException(status_code=404, detail="Code not found")
+    if len(matches) == 1:
+        return RedirectResponse(url=f"/tasks/{matches[0]}/publish", status_code=302)
+
+    links = "\n".join(
+        f'<li><a href="/tasks/{tid}/publish">{tid}</a></li>' for tid in matches
+    )
+    html = (
+        "<!doctype html><html><head><meta charset=\"utf-8\"/>"
+        "<title>Select task</title></head><body>"
+        "<h3>Multiple tasks matched. Select one:</h3>"
+        f"<ul>{links}</ul>"
+        "</body></html>"
+    )
+    return HTMLResponse(content=html, status_code=200)
 
 
 @api_router.post("/tasks", response_model=TaskDetail)
