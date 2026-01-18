@@ -254,6 +254,10 @@
           <div class="link-row"><a class="download-link" href="{{ task.mm_audio_path }}" target="_blank" rel="noopener">mm_audio</a></div>
           {% endif %}
         </div>
+        {% set has_deliverables = task.pack_path or task.scenes_path or task.origin_srt_path or task.mm_srt_path or task.mm_txt_path or task.mm_audio_path %}
+        {% if not has_deliverables %}
+        <div class="muted" style="margin-top:8px;">No deliverables yet.</div>
+        {% endif %}
         <div class="copy-row" style="margin-top:12px;">
           <a class="btn-primary" href="{{ task.pack_path or '#' }}" target="_blank" rel="noopener">Edit Bundle (ZIP)</a>
           <span class="muted">Coming in PR-PUB-03</span>
