@@ -754,6 +754,8 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
         "copy_bundle": _build_copy_bundle(task),
         "download_code": short_code,
         "mobile": {
+            "qr_target": short_url,
+            "short_link": short_url,
             "short_url": short_url,
             "qr_url": short_url,
         },
