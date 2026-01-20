@@ -383,6 +383,26 @@ async def pipeline_lab(request: Request) -> HTMLResponse:
     )
 
 
+@pages_router.get("/tools/hub", response_class=HTMLResponse)
+async def tools_hub_page(request: Request) -> HTMLResponse:
+    """Render tools hub list page."""
+
+    return templates.TemplateResponse(
+        "tools_hub.html",
+        {"request": request},
+    )
+
+
+@pages_router.get("/tools/{tool_id}", response_class=HTMLResponse)
+async def tool_detail_page(request: Request, tool_id: str) -> HTMLResponse:
+    """Render tool detail page."""
+
+    return templates.TemplateResponse(
+        "tool_detail.html",
+        {"request": request, "tool_id": tool_id},
+    )
+
+
 @pages_router.get("/v1/tasks/{task_id}/raw")
 def download_raw(task_id: str, repo=Depends(get_task_repository)):
     task = repo.get(task_id)

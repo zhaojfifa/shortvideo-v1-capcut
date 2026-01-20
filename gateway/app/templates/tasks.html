@@ -59,6 +59,18 @@
       display: inline-block;
     }
     .btn-primary:hover { background: #1d4ed8; }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111827;
+      padding: 10px 14px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 0.95rem;
+      display: inline-block;
+    }
+    .btn-secondary:hover { background: #d1d5db; }
+    .header-actions { display: flex; gap: 10px; align-items: center; }
     .table-wrapper { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
     thead { background: #f9fafb; color: #475569; }
@@ -164,12 +176,15 @@
             </span>
           </div>
         </div>
-        <a class="btn-primary" href="/tasks/new">
-          {{ t_primary("new_suitcase_task") }}
-          {% if ui_show_secondary %}
-            <span class="secondary">{{ t_secondary("new_suitcase_task") }}</span>
-          {% endif %}
-        </a>
+        <div class="header-actions">
+          <a class="btn-secondary" href="/tools/hub">Tools</a>
+          <a class="btn-primary" href="/tasks/new">
+            {{ t_primary("new_suitcase_task") }}
+            {% if ui_show_secondary %}
+              <span class="secondary">{{ t_secondary("new_suitcase_task") }}</span>
+            {% endif %}
+          </a>
+        </div>
       </div>
 
       <div class="table-wrapper">
