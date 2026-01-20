@@ -704,11 +704,13 @@ def _deliverable_url(task_id: str, task: dict, kind: str) -> Optional[str]:
         return None
     if kind == "scenes_zip":
         scenes_key = _task_value(task, "scenes_key")
-        return (
-            _signed_op_url(task_id, "scenes")
-            if scenes_key and object_exists(str(scenes_key))
-            else None
-        )
+        scenes_path = _task_value(task, "scenes_path")
+        scenes_status = str(_task_value(task, "scenes_status") or "").lower()
+        if scenes_key and object_exists(str(scenes_key)):
+            return _signed_op_url(task_id, "scenes")
+        if scenes_path and scenes_status == "ready":
+            return _signed_op_url(task_id, "scenes")
+        return None
     if kind == "origin_srt":
         key = _task_key(task, "origin_srt_path")
         return _signed_op_url(task_id, "origin_srt") if key and object_exists(key) else None
