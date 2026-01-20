@@ -72,6 +72,7 @@
       font-weight: 700;
     }
     .download-link.disabled { color: #9ca3af; pointer-events: none; }
+    a.disabled { color: #9ca3af; pointer-events: none; }
     .info-row { display: flex; flex-wrap: wrap; gap: 12px; }
     .info-pill {
       background: #f1f5f9;
@@ -147,40 +148,70 @@
       background: #111827;
       color: #ffffff;
     }
-    .lang-mm { display: none; }
-    .lang-zh { display: inline; }
-    .lang-mm-block { display: none; }
-    .lang-zh-block { display: block; }
+    .i18n.zh { display: inline; }
+    .i18n.mm { display: none; }
+    .i18n.block { display: block; }
+    body[data-lang="mm"] .i18n.zh { display: none; }
+    body[data-lang="mm"] .i18n.mm { display: inline; }
+    body[data-lang="mm"] .i18n.block { display: block; }
   </style>
 </head>
-<body>
+<body data-lang="zh">
   <div class="page publish">
     <div class="card">
       <div class="header-row">
         <div>
-          {% set publish_secondary = t_secondary("publish") %}
-          <h1>Publish Hub{% if publish_secondary %} <span class="muted t-secondary">/ {{ publish_secondary }}</span>{% endif %}</h1>
-          {% set id_secondary = t_secondary("id") %}
-          <div class="muted">{{ t_primary("id") }}: {{ task.task_id }}{% if id_secondary %} <span class="t-secondary">/ {{ id_secondary }}</span>{% endif %}</div>
+          <h1>
+            <span class="i18n zh">发布中心</span>
+            <span class="i18n mm">ထုတ်ဝေစင်တာ</span>
+          </h1>
+          <div class="muted">
+            <span class="i18n zh">任务 ID</span>
+            <span class="i18n mm">Task ID</span>
+            : {{ task.task_id }}
+          </div>
         </div>
         <div class="copy-row">
-          <a class="btn-secondary" href="/tasks">Back to Task Board</a>
-          <a class="btn-primary" href="/tasks/{{ task.task_id }}">Back to Workbench</a>
+          <div class="lang-toggle" id="lang-toggle">
+            <button type="button" class="lang-btn" data-lang="zh">ZH</button>
+            <button type="button" class="lang-btn" data-lang="mm">MM</button>
+          </div>
+          <a class="btn-secondary" href="/tasks">
+            <span class="i18n zh">返回看板</span>
+            <span class="i18n mm">ဘုတ်ဘား</span>
+          </a>
+          <a class="btn-primary" href="/tasks/{{ task.task_id }}">
+            <span class="i18n zh">返回工作台</span>
+            <span class="i18n mm">အလုပ်ဘုတ်</span>
+          </a>
         </div>
       </div>
       <div class="info-row" style="margin-top:10px;">
-        <div class="info-pill">Download code: <span id="download-code">{{ task.task_id[:6]|upper }}</span></div>
+        <div class="info-pill">
+          <span class="i18n zh">下载码</span>
+          <span class="i18n mm">ဒေါင်းလုပ်ကုဒ်</span>
+          : <span id="download-code">{{ task.task_id[:6]|upper }}</span>
+        </div>
       </div>
     </div>
 
     <div class="card" id="op-gate" style="display:none;">
       <div class="section-title">
-        <h2>Operator Gate</h2>
-        <div class="secondary">Enter OP access key to load Publish Hub data.</div>
+        <h2>
+          <span class="i18n zh">运营门禁</span>
+          <span class="i18n mm">OP မျက်နှာတံခါး</span>
+        </h2>
+        <div class="secondary">
+          <span class="i18n zh">请输入 OP Access Key 以加载发布数据。</span>
+          <span class="i18n mm">OP Access Key ဖြည့်ပြီး Publish Hub ဒေတာကို ဖွင့်ပါ။</span>
+        </div>
       </div>
       <div class="copy-row" style="margin-top:10px;">
         <input id="op-key-input" class="publish-textarea" placeholder="OP access key" />
-        <button type="button" class="btn-primary" id="op-key-save">Unlock</button>
+        <button type="button" class="btn-primary" id="op-key-save">
+          <span class="i18n zh">解锁</span>
+          <span class="i18n mm">ဖွင့်</span>
+        </button>
         <span id="op-key-status" class="muted"></span>
       </div>
     </div>
@@ -188,10 +219,22 @@
     <div id="hub-content" style="display:none;">
       <div class="card">
         <div class="tabs" role="tablist">
-          <button class="tab-btn active" data-tab="tab-sop" type="button">SOP</button>
-          <button class="tab-btn" data-tab="tab-copy" type="button">Copy Bundle</button>
-          <button class="tab-btn" data-tab="tab-deliverables" type="button">Deliverables</button>
-          <button class="tab-btn" data-tab="tab-archive" type="button">Archive</button>
+          <button class="tab-btn active" data-tab="tab-sop" type="button">
+            <span class="i18n zh">SOP 指引</span>
+            <span class="i18n mm">SOP</span>
+          </button>
+          <button class="tab-btn" data-tab="tab-copy" type="button">
+            <span class="i18n zh">文案包</span>
+            <span class="i18n mm">Copy Bundle</span>
+          </button>
+          <button class="tab-btn" data-tab="tab-deliverables" type="button">
+            <span class="i18n zh">交付物</span>
+            <span class="i18n mm">Deliverables</span>
+          </button>
+          <button class="tab-btn" data-tab="tab-archive" type="button">
+            <span class="i18n zh">归档</span>
+            <span class="i18n mm">Archive</span>
+          </button>
         </div>
       </div>
 
@@ -199,109 +242,97 @@
       <div class="card">
         <div class="section-title">
           <h2>
-            <span class="lang-zh">SOP 操作指引</span>
-            <span class="lang-mm">SOP လုပ္ငန္းညွန္</span>
+            <span class="i18n zh">SOP 操作指引</span>
+            <span class="i18n mm">SOP လုပ်ငန်းညွှန်</span>
           </h2>
           <div class="secondary">
-            <span class="lang-zh">v1.85 交付操作步骤。</span>
-            <span class="lang-mm">v1.85 အတွက် လုပ်ငန်းဆောင်ရွက်မှုအဆင့်များ။</span>
-          </div>
-          <div class="lang-toggle" data-lang-toggle>
-            <button type="button" class="lang-btn active" data-lang="zh">ZH</button>
-            <button type="button" class="lang-btn" data-lang="mm">MM</button>
+            <span class="i18n zh">v1.85 交付操作步骤。</span>
+            <span class="i18n mm">v1.85 အတွက် လုပ်ငန်းဆောင်ရွက်မှုအဆင့်များ။</span>
           </div>
         </div>
-        <div class="lang-zh-block">
-          <div>1) 在 Deliverables 下载 pack.zip 或 scenes.zip。</div>
-          <div style="margin-top:8px;">2) 导入手机剪辑工具（如 CapCut），检查字幕与时长。</div>
-          <div style="margin-top:8px;">3) 使用 Copy Bundle 填写标题/话题/评论引导。</div>
-          <div style="margin-top:8px;">4) v1.85 仅提供编辑交付，发布包将在 2.0 提供。</div>
-        </div>
-        <div class="lang-mm-block">
-          <div>1) Deliverables ထဲက pack.zip သို့ scenes.zip ကိုဒေါင်းလုပ်လုပ်ပါ။</div>
-          <div style="margin-top:8px;">2) ဖုန်းအပေါ် CapCut စတာတွေထဲ ထည့်ပြီး စာတန်းနဲ့ အချိန်ကို စစ်ပါ။</div>
-          <div style="margin-top:8px;">3) Copy Bundle ကိုသုံးပြီး ခေါင်းစဉ်/ဟက်ရှ်တက်/မှတ်ချက်ခေါ်ဆောင်မှု ဖြည့်ပါ။</div>
-          <div style="margin-top:8px;">4) v1.85 မှာ editing delivery ပါသာ; Publish bundle ကို v2.0 မှာပေးမည်။</div>
-        </div>
+        <div class="i18n zh block">1) 在交付物中下载 pack.zip 或 scenes.zip。</div>
+        <div class="i18n zh block" style="margin-top:8px;">2) 导入手机剪辑工具（如 CapCut），核对字幕与时长。</div>
+        <div class="i18n zh block" style="margin-top:8px;">3) 使用文案包填写标题/话题/评论引导。</div>
+        <div class="i18n zh block" style="margin-top:8px;">4) v1.85 仅提供编辑交付，发布包在 2.0 提供。</div>
+        <div class="i18n mm block">1) Deliverables ထဲက pack.zip သို့ scenes.zip ကိုဒေါင်းလုပ်လုပ်ပါ။</div>
+        <div class="i18n mm block" style="margin-top:8px;">2) ဖုန်းအပေါ် CapCut စတာတွေထဲ ထည့်ပြီး စာတန်းနဲ့ အချိန်ကို စစ်ပါ။</div>
+        <div class="i18n mm block" style="margin-top:8px;">3) Copy Bundle ကိုသုံးပြီး ခေါင်းစဉ်/ဟက်ရှ်တက်/မှတ်ချက်ခေါ်ဆောင်မှု ဖြည့်ပါ။</div>
+        <div class="i18n mm block" style="margin-top:8px;">4) v1.85 မှာ editing delivery ပါသာ; Publish bundle ကို v2.0 မှာပေးမည်။</div>
       </div>
     </div>
     <div class="tab-panel" id="tab-copy">
       <div class="card">
         <div class="section-title">
           <h2>
-            <span class="lang-zh">文案包</span>
-            <span class="lang-mm">Copy Bundle</span>
+            <span class="i18n zh">文案包</span>
+            <span class="i18n mm">Copy Bundle</span>
           </h2>
           <div class="secondary">
-            <span class="lang-zh">运营可编辑字段，修改不会保存。</span>
-            <span class="lang-mm">အော်ပရေးရှင်းတွေအတွက် ပြင်ဆင်နိုင်သော အချက်အလက်များ (မသိမ်းဆည်းပါ)။</span>
-          </div>
-          <div class="lang-toggle" data-lang-toggle>
-            <button type="button" class="lang-btn active" data-lang="zh">ZH</button>
-            <button type="button" class="lang-btn" data-lang="mm">MM</button>
+            <span class="i18n zh">运营可编辑字段，修改不会保存。</span>
+            <span class="i18n mm">အော်ပရေးရှင်းတွေအတွက် ပြင်ဆင်နိုင်သော အချက်အလက်များ (မသိမ်းဆည်းပါ)။</span>
           </div>
         </div>
         <div class="field" style="margin-top:10px;">
           <label>
-            <span class="lang-zh">标题/文案</span>
-            <span class="lang-mm">ခေါင်းစဉ်</span>
+            <span class="i18n zh">标题/文案</span>
+            <span class="i18n mm">ခေါင်းစဉ်</span>
           </label>
           <div class="copy-row">
             <button type="button" class="copy-btn" data-copy-target="copy-caption">
-              <span class="lang-zh">复制</span>
-              <span class="lang-mm">ကူးယူ</span>
+              <span class="i18n zh">复制</span>
+              <span class="i18n mm">ကူးယူ</span>
             </button>
           </div>
           <textarea id="copy-caption" class="publish-textarea"></textarea>
         </div>
         <div class="field" style="margin-top:10px;">
           <label>
-            <span class="lang-zh">话题标签</span>
-            <span class="lang-mm">ဟက်ရှ်တက်</span>
+            <span class="i18n zh">话题标签</span>
+            <span class="i18n mm">ဟက်ရှ်တက်</span>
           </label>
           <div class="copy-row">
             <button type="button" class="copy-btn" data-copy-target="copy-hashtags">
-              <span class="lang-zh">复制</span>
-              <span class="lang-mm">ကူးယူ</span>
+              <span class="i18n zh">复制</span>
+              <span class="i18n mm">ကူးယူ</span>
             </button>
           </div>
           <textarea id="copy-hashtags" class="publish-textarea"></textarea>
         </div>
         <div class="field" style="margin-top:10px;">
           <label>
-            <span class="lang-zh">评论引导</span>
-            <span class="lang-mm">မှတ်ချက်ခေါ်ဆောင်မှု</span>
+            <span class="i18n zh">评论引导</span>
+            <span class="i18n mm">မှတ်ချက်ခေါ်ဆောင်မှု</span>
           </label>
           <div class="copy-row">
             <button type="button" class="copy-btn" data-copy-target="copy-comment-cta">
-              <span class="lang-zh">复制</span>
-              <span class="lang-mm">ကူးယူ</span>
+              <span class="i18n zh">复制</span>
+              <span class="i18n mm">ကူးယူ</span>
             </button>
           </div>
           <textarea id="copy-comment-cta" class="publish-textarea"></textarea>
         </div>
         <div class="field" style="margin-top:10px;">
           <label>
-            <span class="lang-zh">挂链文案</span>
-            <span class="lang-mm">လင့်ခ်စာသား</span>
+            <span class="i18n zh">挂链文案</span>
+            <span class="i18n mm">လင့်ခ်စာသား</span>
           </label>
           <div class="copy-row">
             <button type="button" class="copy-btn" data-copy-target="copy-link-text">
-              <span class="lang-zh">复制</span>
-              <span class="lang-mm">ကူးယူ</span>
+              <span class="i18n zh">复制</span>
+              <span class="i18n mm">ကူးယူ</span>
             </button>
           </div>
           <textarea id="copy-link-text" class="publish-textarea"></textarea>
         </div>
         <div class="field" style="margin-top:10px;">
           <label>
-            <span class="lang-zh">发布时间建议</span>
-            <span class="lang-mm">ထုတ်လွှတ်ချိန်အကြံပြု</span>
+            <span class="i18n zh">发布时间建议</span>
+            <span class="i18n mm">ထုတ်လွှတ်ချိန်အကြံပြု</span>
           </label>
           <div class="copy-row">
             <button type="button" class="copy-btn" data-copy-target="copy-publish-time">
-              <span class="lang-zh">复制</span>
-              <span class="lang-mm">ကူးယူ</span>
+              <span class="i18n zh">复制</span>
+              <span class="i18n mm">ကူးယူ</span>
             </button>
           </div>
           <textarea id="copy-publish-time" class="publish-textarea"></textarea>
@@ -311,75 +342,156 @@
     <div class="tab-panel" id="tab-deliverables">
       <div class="card">
         <div class="section-title">
-          {% set deliverables_secondary = t_secondary("download") %}
-          <h2>Deliverables{% if deliverables_secondary %} <span class="muted t-secondary">/ {{ deliverables_secondary }}</span>{% endif %}</h2>
-          <div class="secondary">Only existing artifacts are shown.</div>
+          <h2>
+            <span class="i18n zh">交付物</span>
+            <span class="i18n mm">Deliverables</span>
+          </h2>
+          <div class="secondary">
+            <span class="i18n zh">仅显示已生成的产物。</span>
+            <span class="i18n mm">အပြီးထွက်ထားတာပဲ ပြမယ်။</span>
+          </div>
         </div>
         <div id="deliverables-list" class="copy-row" style="margin-top:12px;"></div>
-        <div class="muted" id="deliverables-empty" style="margin-top:8px; display:none;">No deliverables yet.</div>
+        <div class="muted" id="deliverables-empty" style="margin-top:8px; display:none;">
+          <span class="i18n zh">暂无交付物。</span>
+          <span class="i18n mm">Deliverables မရှိသေးပါ။</span>
+        </div>
         <div class="copy-row" style="margin-top:12px;">
-          <a id="edit-bundle-link" class="btn-primary" href="#" target="_blank" rel="noopener">Edit Bundle (ZIP)</a>
+          <a id="edit-bundle-link" class="btn-primary" href="#" target="_blank" rel="noopener">
+            <span class="i18n zh">编辑包 (ZIP)</span>
+            <span class="i18n mm">Edit Bundle (ZIP)</span>
+          </a>
         </div>
         <div class="copy-row" style="margin-top:12px;">
           <img id="qr-image" alt="QR" style="width:180px;height:180px;border:1px solid #e5e7eb;background:#fff;" />
-          <div class="muted">Scan to download Edit Bundle on phone.</div>
+          <div class="muted">
+            <span class="i18n zh">扫码下载编辑包</span>
+            <span class="i18n mm">QR scan လုပ်ပြီး Edit Bundle ကိုဒေါင်းလုပ်ပါ</span>
+          </div>
         </div>
         <div class="copy-row" style="margin-top:6px;">
-          <a id="qr-link" href="#" target="_blank" rel="noopener">Open link</a>
-          <button type="button" class="copy-btn" data-copy-target="qr-link">Copy link</button>
+          <a id="qr-link" href="#" target="_blank" rel="noopener">
+            <span class="i18n zh">打开链接</span>
+            <span class="i18n mm">Open link</span>
+          </a>
+          <button type="button" class="copy-btn" data-copy-target="qr-link">
+            <span class="i18n zh">复制链接</span>
+            <span class="i18n mm">Copy link</span>
+          </button>
         </div>
         <div class="copy-row" style="margin-top:6px;">
-          <a id="short-link" href="#" target="_blank" rel="noopener">Short link</a>
-          <button type="button" class="copy-btn" data-copy-target="short-link">Copy short</button>
+          <a id="short-link" href="#" target="_blank" rel="noopener">
+            <span class="i18n zh">短链</span>
+            <span class="i18n mm">Short link</span>
+          </a>
+          <button type="button" class="copy-btn" data-copy-target="short-link">
+            <span class="i18n zh">复制短链</span>
+            <span class="i18n mm">Copy short</span>
+          </button>
         </div>
       </div>
     </div>
-
     <div class="tab-panel" id="tab-archive">
       <div class="card">
         <div class="section-title">
-          {% set publish_secondary = t_secondary("publish") %}
-          <h2>{{ t_primary("publish") }}{% if publish_secondary %} <span class="muted t-secondary">/ {{ publish_secondary }}</span>{% endif %}</h2>
-          <div class="secondary">Archive confirms delivery, not necessarily published.</div>
+          <h2>
+            <span class="i18n zh">归档</span>
+            <span class="i18n mm">Archive</span>
+          </h2>
+          <div class="secondary">
+            <span class="i18n zh">归档确认交付，不代表已发布。</span>
+            <span class="i18n mm">Archive က တင်ပို့မှုကို အတည်ပြုတာသာဖြစ်ပြီး ထုတ်ဝေပြီးခြင်းမဟုတ်ပါ။</span>
+          </div>
         </div>
         <div class="info-row">
-          {% set provider_secondary = t_secondary("publish_provider") %}
-          <div class="info-pill">{{ t_primary("publish_provider") }}{% if provider_secondary %} <span class="t-secondary">/ {{ provider_secondary }}</span>{% endif %}: <span id="publish-provider">-</span></div>
-          {% set status_secondary = t_secondary("status") %}
-          <div class="info-pill">{{ t_primary("status") }}{% if status_secondary %} <span class="t-secondary">/ {{ status_secondary }}</span>{% endif %}: <span id="publish-status">-</span></div>
-          {% set published_secondary = t_secondary("published") %}
-          <div class="info-pill">{{ t_primary("published") }}{% if published_secondary %} <span class="t-secondary">/ {{ published_secondary }}</span>{% endif %}: <span id="published-at">-</span></div>
+          <div class="info-pill">
+            <span class="i18n zh">发布时间</span>
+            <span class="i18n mm">Published at</span>
+            : <span id="published-at">-</span>
+          </div>
         </div>
         <div class="section-grid" style="margin-top:12px;">
           <div class="field">
-            {% set key_secondary = t_secondary("publish_key") %}
-            <label>{{ t_primary("publish_key") }}{% if key_secondary %} <span class="muted t-secondary">/ {{ key_secondary }}</span>{% endif %}</label>
+            <label>
+              <span class="i18n zh">归档位置</span>
+              <span class="i18n mm">Archive location</span>
+            </label>
+            <input id="archive-location" class="publish-textarea" style="min-height:0;height:36px;" />
+          </div>
+          <div class="field">
+            <label>
+              <span class="i18n zh">状态</span>
+              <span class="i18n mm">Status</span>
+            </label>
+            <input id="archive-status" class="publish-textarea" style="min-height:0;height:36px;" />
+          </div>
+          <div class="field">
+            <label>
+              <span class="i18n zh">已发布</span>
+              <span class="i18n mm">Published</span>
+            </label>
             <div class="copy-row">
-              <code id="publish-key">-</code>
-              <button type="button" class="copy-btn" data-copy-target="publish-key">Copy</button>
+              <input type="checkbox" id="archive-published" />
+              <span class="muted">
+                <span class="i18n zh">勾选表示已发布</span>
+                <span class="i18n mm">အမှန်ခြစ်ရင် ထုတ်ဝေပြီး</span>
+              </span>
             </div>
           </div>
           <div class="field">
-            {% set url_secondary = t_secondary("publish_url") %}
-            <label>{{ t_primary("publish_url") }}{% if url_secondary %} <span class="muted t-secondary">/ {{ url_secondary }}</span>{% endif %}</label>
+            <label>
+              <span class="i18n zh">下载链接</span>
+              <span class="i18n mm">Download URL</span>
+            </label>
             <div class="copy-row">
-              <a id="publish-url" href="#" target="_blank" rel="noopener">-</a>
-              <button type="button" class="copy-btn" data-copy-target="publish-url">Copy</button>
+              <input id="archive-download-url" class="publish-textarea" style="min-height:0;height:36px;" />
+              <a id="archive-download-link" class="btn-secondary" href="#" target="_blank" rel="noopener">
+                <span class="i18n zh">打开</span>
+                <span class="i18n mm">Open</span>
+              </a>
             </div>
+          </div>
+          <div class="field">
+            <label>
+              <span class="i18n zh">归档 Key</span>
+              <span class="i18n mm">Archive Key</span>
+            </label>
+            <input id="archive-key" class="publish-textarea" style="min-height:0;height:36px;" />
           </div>
         </div>
         <div class="action-row" style="margin-top:12px;">
-          {% set publish_now_secondary = t_secondary("publish_now") %}
-          <button id="publish-btn" class="btn-success">{{ t_primary("publish_now") }}{% if publish_now_secondary %} <span class="muted t-secondary">/ {{ publish_now_secondary }}</span>{% endif %}</button>
+          <button id="archive-save-btn" class="btn-primary">
+            <span class="i18n zh">保存归档</span>
+            <span class="i18n mm">Save</span>
+          </button>
+          <button id="publish-btn" class="btn-success">
+            <span class="i18n zh">提交归档</span>
+            <span class="i18n mm">Publish</span>
+          </button>
+          <span id="archive-save-status" class="muted"></span>
         </div>
       </div>
     </div>
-  </div>
-    </div>
-
+    
   <script>
     const TASK_ID = "{{ task.task_id }}";
     const OP_KEY_STORAGE = "op_access_key";
+    const LANG_STORAGE = "ui_lang_publish_hub";
+
+    function resolveLang(serverLang) {
+      const saved = localStorage.getItem(LANG_STORAGE);
+      return saved || serverLang || "zh";
+    }
+
+    function applyLang(lang) {
+      document.body.dataset.lang = lang;
+      localStorage.setItem(LANG_STORAGE, lang);
+      const toggle = document.getElementById("lang-toggle");
+      if (!toggle) return;
+      toggle.querySelectorAll(".lang-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.lang === lang);
+      });
+    }
 
     function getOpKey() {
       return sessionStorage.getItem(OP_KEY_STORAGE) || "";
@@ -413,8 +525,30 @@
     function setLink(id, href) {
       const el = document.getElementById(id);
       if (!el) return;
-      el.href = href || "#";
-      el.textContent = href || "-";
+      if (href) {
+        el.href = href;
+        el.classList.remove("disabled");
+      } else {
+        el.href = "#";
+        el.classList.add("disabled");
+      }
+    }
+
+    function setInputValue(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.value = value || "";
+    }
+
+    function setArchiveLink(url) {
+      const el = document.getElementById("archive-download-link");
+      if (!el) return;
+      if (url) {
+        el.href = url;
+        el.classList.remove("disabled");
+      } else {
+        el.href = "#";
+        el.classList.add("disabled");
+      }
     }
 
     function renderDeliverables(deliverables) {
@@ -455,16 +589,50 @@
       if (timeEl && !timeEl.value) timeEl.value = copy.publish_time_suggestion || "";
     }
 
-    function renderArchive(archive) {
-      setText("publish-provider", archive.publish_provider || "-");
-      setText("publish-status", archive.publish_status || "-");
-      setText("published-at", archive.published_at || "-");
-      setText("publish-key", archive.publish_key || "-");
-      const urlEl = document.getElementById("publish-url");
-      if (urlEl) {
-        urlEl.textContent = archive.publish_url || "-";
-        urlEl.href = archive.publish_url && archive.publish_url !== "-" ? archive.publish_url : "#";
+    async function fetchText(kind) {
+      const headers = {};
+      const opKey = getOpKey();
+      if (opKey) headers["X-OP-KEY"] = opKey;
+      const url = `/api/tasks/${encodeURIComponent(TASK_ID)}/text?kind=${encodeURIComponent(kind)}`;
+      const resp = await fetch(url, { headers });
+      if (!resp.ok) return "";
+      const text = await resp.text();
+      return (text || "").trim();
+    }
+
+    async function fillCaptionFallback(copy) {
+      const captionEl = document.getElementById("copy-caption");
+      if (!captionEl || captionEl.value) return;
+      const fromPayload = (copy && copy.caption) || "";
+      if (fromPayload) {
+        captionEl.value = fromPayload;
+        return;
       }
+      const candidates = ["mm_edited", "mm_txt", "origin_srt"];
+      for (const kind of candidates) {
+        try {
+          const text = await fetchText(kind);
+          if (text) {
+            captionEl.value = text;
+            break;
+          }
+        } catch (err) {
+          continue;
+        }
+      }
+    }
+
+    function renderArchive(archive) {
+      setText("published-at", archive.published_at || "-");
+      setInputValue("archive-location", archive.archive_location || archive.publish_provider || "");
+      setInputValue("archive-status", archive.status || archive.publish_status || "");
+      setInputValue("archive-key", archive.archive_key || archive.publish_key || "");
+      const downloadUrl = archive.download_url || archive.publish_url || "";
+      setInputValue("archive-download-url", downloadUrl);
+      setArchiveLink(downloadUrl);
+      const published = Boolean(archive.published || archive.published_at) && archive.published_at !== "-";
+      const publishedEl = document.getElementById("archive-published");
+      if (publishedEl) publishedEl.checked = published;
     }
 
     function copyTextFromElement(el) {
@@ -511,15 +679,21 @@
       setText("download-code", data.download_code || "-");
       renderDeliverables(data.deliverables || {});
       renderCopyBundle(data.copy_bundle || {});
+      await fillCaptionFallback(data.copy_bundle || {});
       renderArchive(data.archive || {});
       const editLink = document.getElementById("edit-bundle-link");
       if (editLink && data.deliverables && data.deliverables.edit_bundle_zip) {
         editLink.href = data.deliverables.edit_bundle_zip.url;
+        editLink.classList.remove("disabled");
+      } else if (editLink) {
+        editLink.href = "#";
+        editLink.classList.add("disabled");
       }
       const sopEl = document.getElementById("sop-markdown");
       if (sopEl) sopEl.textContent = data.sop_markdown || "";
-      const qrTarget = data.mobile && (data.mobile.qr_target || data.mobile.qr_url);
-      const shortLink = data.mobile && (data.mobile.short_link || data.mobile.short_url);
+      const mobile = data.mobile || {};
+      const shortLink = mobile.short_url || mobile.short_link || mobile.qr_target || mobile.qr_url;
+      const qrTarget = shortLink || mobile.qr_target || mobile.qr_url;
       if (qrTarget) {
         const abs = new URL(qrTarget, window.location.origin).toString();
         const qrImg = document.getElementById("qr-image");
@@ -531,21 +705,27 @@
       if (shortLink) {
         setLink("short-link", new URL(shortLink, window.location.origin).toString());
       }
+      const serverLang = data.ui_lang;
+      const savedLang = localStorage.getItem("ui_lang_publish_hub");
+      if (!savedLang && serverLang) {
+        applyLang(serverLang);
+      }
     }
 
     const publishBtn = document.getElementById("publish-btn");
     if (publishBtn) {
       publishBtn.addEventListener("click", async () => {
-        const statusEl = document.getElementById("publish-status");
-        if (statusEl) statusEl.textContent = "Publishing...";
-        try {
-          const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ task_id: TASK_ID, force: false }),
-          });
+      const statusEl = document.getElementById("publish-status");
+      if (statusEl) statusEl.textContent = "Publishing...";
+      try {
+        const opKey = getOpKey();
+        const headers = { "Content-Type": "application/json" };
+        if (opKey) headers["X-OP-KEY"] = opKey;
+        const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ task_id: TASK_ID, force: false }),
+        });
           if (!resp.ok) {
             const detail = await resp.text();
             if (statusEl) statusEl.textContent = `Publish failed: ${resp.status} ${detail}`;
@@ -556,6 +736,50 @@
         } catch (err) {
           if (statusEl) statusEl.textContent = `Publish error: ${err}`;
         }
+      });
+    }
+
+    const archiveSaveBtn = document.getElementById("archive-save-btn");
+    if (archiveSaveBtn) {
+      archiveSaveBtn.addEventListener("click", async () => {
+        const statusEl = document.getElementById("archive-save-status");
+        if (statusEl) statusEl.textContent = "Saving...";
+        const payload = {
+          archive: {
+            archive_location: document.getElementById("archive-location")?.value?.trim() || "",
+            status: document.getElementById("archive-status")?.value?.trim() || "",
+            published: Boolean(document.getElementById("archive-published")?.checked),
+            download_url: document.getElementById("archive-download-url")?.value?.trim() || "",
+            archive_key: document.getElementById("archive-key")?.value?.trim() || "",
+          },
+        };
+        Object.assign(payload, payload.archive);
+        try {
+          const opKey = getOpKey();
+          const headers = { "Content-Type": "application/json" };
+          if (opKey) headers["X-OP-KEY"] = opKey;
+          const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+          });
+          if (!resp.ok) {
+            const detail = await resp.text();
+            if (statusEl) statusEl.textContent = `Save failed: ${resp.status} ${detail}`;
+            return;
+          }
+          if (statusEl) statusEl.textContent = "Saved.";
+          await fetchPublishHub();
+        } catch (err) {
+          if (statusEl) statusEl.textContent = `Save error: ${err}`;
+        }
+      });
+    }
+
+    const archiveUrlInput = document.getElementById("archive-download-url");
+    if (archiveUrlInput) {
+      archiveUrlInput.addEventListener("input", () => {
+        setArchiveLink(archiveUrlInput.value.trim());
       });
     }
 
@@ -588,19 +812,18 @@
       });
       const hash = window.location.hash.replace("#", "");
       if (hash) activate(`tab-${hash}`);
-
-      document.querySelectorAll("[data-lang-toggle]").forEach((toggle) => {
-        toggle.addEventListener("click", (event) => {
+      const initialLang = resolveLang(null);
+      applyLang(initialLang);
+      const langToggle = document.getElementById("lang-toggle");
+      if (langToggle) {
+        langToggle.addEventListener("click", (event) => {
           const btn = event.target.closest(".lang-btn");
           if (!btn) return;
           const lang = btn.dataset.lang;
-          toggle.querySelectorAll(".lang-btn").forEach((b) => b.classList.toggle("active", b === btn));
-          document.querySelectorAll(".lang-zh").forEach((el) => (el.style.display = lang == "zh" ? "inline" : "none"));
-          document.querySelectorAll(".lang-mm").forEach((el) => (el.style.display = lang == "mm" ? "inline" : "none"));
-          document.querySelectorAll(".lang-zh-block").forEach((el) => (el.style.display = lang == "zh" ? "block" : "none"));
-          document.querySelectorAll(".lang-mm-block").forEach((el) => (el.style.display = lang == "mm" ? "block" : "none"));
+          if (!lang) return;
+          applyLang(lang);
         });
-      });
+      }
 
       if (!getOpKey()) {
         showGate("Enter OP access key to continue.");
