@@ -61,6 +61,7 @@ def log_routes_on_startup() -> None:
 
 app.include_router(tasks_router.pages_router)
 app.include_router(tasks_router.api_router)
+app.include_router(api_tools.router)
 app.include_router(v1_actions.router, prefix="/v1")
 app.include_router(publish_router.router)
 app.include_router(admin_publish.router, tags=["admin"])
