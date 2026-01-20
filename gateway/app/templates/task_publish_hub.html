@@ -149,11 +149,9 @@
       color: #ffffff;
     }
     .i18n.zh { display: inline; }
-    .i18n.mm { display: none; }
+    .i18n.mm { display: inline; }
+    .i18n.mm:not(.block)::before { content: " / "; }
     .i18n.block { display: block; }
-    body[data-lang="mm"] .i18n.zh { display: none; }
-    body[data-lang="mm"] .i18n.mm { display: inline; }
-    body[data-lang="mm"] .i18n.block { display: block; }
   </style>
 </head>
 <body data-lang="zh">
@@ -172,7 +170,7 @@
           </div>
         </div>
         <div class="copy-row">
-          <div class="lang-toggle" id="lang-toggle">
+          <div class="lang-toggle" id="lang-toggle" style="display:none;">
             <button type="button" class="lang-btn" data-lang="zh">ZH</button>
             <button type="button" class="lang-btn" data-lang="mm">MM</button>
           </div>
@@ -478,7 +476,15 @@
     const OP_KEY_STORAGE = "op_access_key";
     const LANG_STORAGE = "ui_lang_publish_hub";
 
-    function resolveLang(serverLang) {
+        // UI language policy: show ZH + MM together in UI (English stays in code/logs only).
+    function bi(zh, mm) {
+      if (!zh && !mm) return "";
+      if (!mm) return zh;
+      if (!zh) return mm;
+      return `${zh} / ${mm}`;
+    }
+
+function resolveLang(serverLang) {
       const saved = localStorage.getItem(LANG_STORAGE);
       return saved || serverLang || "zh";
     }
@@ -660,18 +666,18 @@
     async function fetchPublishHub() {
       const opKey = getOpKey();
       if (!opKey) {
-        showGate("Enter OP access key to continue.");
+        showGate(bi("请输入 OP Access Key 继续。", "OP Access Key ဖြည့်ပြီး ဆက်လုပ်ပါ။"));
         return;
       }
       const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish_hub`, {
         headers: { "X-OP-KEY": opKey },
       });
       if (resp.status === 401 || resp.status === 403) {
-        showGate("Invalid OP access key.");
+        showGate(bi("OP Access Key 不正确。", "OP Access Key မမှန်ပါ။"));
         return;
       }
       if (!resp.ok) {
-        showGate(`Failed to load: HTTP ${resp.status}`);
+        showGate(bi(`加载失败: HTTP ${resp.status}`, `မအောင်မြင်ပါ: HTTP ${resp.status}`));
         return;
       }
       hideGate();
@@ -716,7 +722,7 @@
     if (publishBtn) {
       publishBtn.addEventListener("click", async () => {
       const statusEl = document.getElementById("publish-status");
-      if (statusEl) statusEl.textContent = "Publishing...";
+      if (statusEl) statusEl.textContent = bi("提交中...", "တင်ပို့နေသည်...");
       try {
         const opKey = getOpKey();
         const headers = { "Content-Type": "application/json" };
@@ -728,13 +734,13 @@
         });
           if (!resp.ok) {
             const detail = await resp.text();
-            if (statusEl) statusEl.textContent = `Publish failed: ${resp.status} ${detail}`;
+            if (statusEl) statusEl.textContent = bi(`提交失败: ${resp.status} ${detail}`, `မအောင်မြင်ပါ: ${resp.status} ${detail}`);
             return;
           }
-          if (statusEl) statusEl.textContent = "Published.";
+          if (statusEl) statusEl.textContent = bi("已提交。", "တင်ပြီးပါပြီ။");
           await fetchPublishHub();
         } catch (err) {
-          if (statusEl) statusEl.textContent = `Publish error: ${err}`;
+          if (statusEl) statusEl.textContent = bi(`提交错误: ${err}`, `အမှား: ${err}`);
         }
       });
     }
@@ -743,7 +749,7 @@
     if (archiveSaveBtn) {
       archiveSaveBtn.addEventListener("click", async () => {
         const statusEl = document.getElementById("archive-save-status");
-        if (statusEl) statusEl.textContent = "Saving...";
+        if (statusEl) statusEl.textContent = bi("保存中...", "သိမ်းနေသည်...");
         const payload = {
           archive: {
             archive_location: document.getElementById("archive-location")?.value?.trim() || "",
@@ -765,13 +771,13 @@
           });
           if (!resp.ok) {
             const detail = await resp.text();
-            if (statusEl) statusEl.textContent = `Save failed: ${resp.status} ${detail}`;
+            if (statusEl) statusEl.textContent = bi(`保存失败: ${resp.status} ${detail}`, `မအောင်မြင်ပါ: ${resp.status} ${detail}`);
             return;
           }
-          if (statusEl) statusEl.textContent = "Saved.";
+          if (statusEl) statusEl.textContent = bi("已保存。", "သိမ်းပြီးပါပြီ။");
           await fetchPublishHub();
         } catch (err) {
-          if (statusEl) statusEl.textContent = `Save error: ${err}`;
+          if (statusEl) statusEl.textContent = bi(`保存错误: ${err}`, `အမှား: ${err}`);
         }
       });
     }
@@ -789,7 +795,7 @@
         const input = document.getElementById("op-key-input");
         const value = input ? input.value.trim() : "";
         if (!value) {
-          showGate("OP access key is required.");
+          showGate(bi("需要 OP Access Key。", "OP Access Key လိုအပ်သည်။"));
           return;
         }
         setOpKey(value);
@@ -826,7 +832,7 @@
       }
 
       if (!getOpKey()) {
-        showGate("Enter OP access key to continue.");
+        showGate(bi("请输入 OP Access Key 继续。", "OP Access Key ဖြည့်ပြီး ဆက်လုပ်ပါ။"));
         return;
       }
       fetchPublishHub().catch(() => {});
