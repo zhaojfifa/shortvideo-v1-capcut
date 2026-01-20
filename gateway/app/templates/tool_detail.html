@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tool Detail</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #f3f4f6;
+      color: #0f172a;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+    .card {
+      background: #ffffff;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      padding: 16px;
+    }
+    h1 { margin: 0; font-size: 1.6rem; font-weight: 800; }
+    .muted { color: #64748b; font-size: 0.9rem; }
+    .btn {
+      padding: 8px 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #d1d5db;
+      color: #111827;
+      background: #f9fafb;
+    }
+    .btn.primary {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: #ffffff;
+    }
+    .btn.disabled { opacity: 0.5; pointer-events: none; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #334155;
+      margin-right: 6px;
+      margin-bottom: 4px;
+    }
+    .badge { display: inline-flex; padding: 4px 8px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; }
+    .badge.status { background: #e0f2fe; color: #0369a1; }
+    .badge.level { background: #dcfce7; color: #166534; }
+    .section-title { font-weight: 800; margin-bottom: 6px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .error { color: #b91c1c; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <a class="btn" href="/tools/hub">Back to Tools Hub</a>
+    </div>
+    <div class="card" id="tool-header">
+      <div class="muted">Loading...</div>
+    </div>
+    <div class="card" id="tool-body" style="display:none;"></div>
+  </div>
+
+  <script>
+    const TOOL_ID = "{{ tool_id }}";
+
+    function nameFor(tool) {
+      const name = tool.name || {};
+      return name.zh || name.en || name.mm || tool.tool_id || "Unknown";
+    }
+
+    function render(tool) {
+      const header = document.getElementById("tool-header");
+      const body = document.getElementById("tool-body");
+      if (!header || !body) return;
+
+      const toolId = tool.tool_id || "";
+      const name = nameFor(tool);
+      const status = (tool.status || {}).state || "-";
+      const level = (tool.integration || {}).level || "-";
+      const risk = (tool.governance || {}).risk_level || "-";
+      const shortDesc = (tool.ui || {}).short_desc || "";
+      const note = (tool.status || {}).note || "";
+      const access = tool.access || {};
+
+      header.innerHTML = `
+        <h1>${name}</h1>
+        <div class="muted">${toolId}</div>
+        <div style="margin-top:8px;">
+          <span class="badge status">${status}</span>
+          <span class="badge level">${level}</span>
+          <span class="chip">risk:${risk}</span>
+        </div>
+      `;
+
+      body.style.display = "block";
+      body.innerHTML = `
+        <div class="section-title">Description</div>
+        <div class="muted">${shortDesc || "-"}</div>
+        <div class="muted" style="margin-top:6px;">${note || ""}</div>
+
+        <div class="section-title" style="margin-top:16px;">Capabilities</div>
+        <div>${(tool.capabilities || []).map((c) => `<span class="chip">${c}</span>`).join("") || "-"}</div>
+
+        <div class="section-title" style="margin-top:16px;">Tags</div>
+        <div>${(tool.tags || []).map((t) => `<span class="chip">${t}</span>`).join("") || "-"}</div>
+
+        <div class="section-title" style="margin-top:16px;">Supported Steps</div>
+        <div>${((tool.integration || {}).supported_steps || []).map((s) => `<span class="chip">${s}</span>`).join("") || "-"}</div>
+
+        <div class="section-title" style="margin-top:16px;">Links</div>
+        <div class="grid">
+          <a class="btn ${access.entry_url ? "primary" : "disabled"}" href="${access.entry_url || "#"}" target="_blank" rel="noopener">Open</a>
+          <a class="btn ${access.docs_url ? "" : "disabled"}" href="${access.docs_url || "#"}" target="_blank" rel="noopener">Docs</a>
+          <a class="btn ${access.deep_link ? "" : "disabled"}" href="${access.deep_link || "#"}" target="_blank" rel="noopener">Deep Link</a>
+        </div>
+      `;
+    }
+
+    async function init() {
+      const header = document.getElementById("tool-header");
+      try {
+        const resp = await fetch(`/api/tools/${encodeURIComponent(TOOL_ID)}`);
+        if (resp.status === 404) {
+          header.innerHTML = `<div class="error">Tool not found.</div>`;
+          return;
+        }
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const tool = await resp.json();
+        render(tool);
+      } catch (err) {
+        if (header) header.innerHTML = `<div class="error">Failed to load tool: ${err}</div>`;
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
