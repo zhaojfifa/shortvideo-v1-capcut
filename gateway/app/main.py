@@ -12,6 +12,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from gateway.app.auth import (
     COOKIE_NAME,
@@ -34,6 +35,7 @@ from gateway.routes import v1_actions
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 UI_HTML_PATH = STATIC_DIR / "ui.html"
+templates = Jinja2Templates(directory="gateway/app/templates")
 AUDIO_DIR = Path(get_settings().workspace_root).expanduser().resolve() / "audio"
 WORKSPACE_ROOT = Path(
     os.environ.get("VIDEO_WORKSPACE", "/opt/render/project/src/video_workspace")
@@ -82,8 +84,11 @@ ALLOW_PREFIXES = (
     "/healthz",
     "/static/",
     "/auth/login",
-    "/auth/logout",
+    "/api/auth/login",
+    "/api/auth/logout",
+    "/api/auth/me",
 )
+ADMIN_PREFIXES = ("/admin", "/api/admin")
 
 
 def _is_allowed_path(path: str) -> bool:
@@ -92,6 +97,10 @@ def _is_allowed_path(path: str) -> bool:
 
 def _is_api_path(path: str) -> bool:
     return path.startswith("/api/") or path.startswith("/v1/")
+
+
+def _is_admin_area(path: str) -> bool:
+    return any(path == p or path.startswith(p) for p in ADMIN_PREFIXES)
 
 
 @app.middleware("http")
@@ -125,6 +134,10 @@ async def auth_middleware(request: Request, call_next):
             session_ok = True
 
     if header_ok or session_ok:
+        if _is_admin_area(path):
+            role = getattr(request.state, "role", "")
+            if str(role).lower() != "admin":
+                return JSONResponse(status_code=403, content={"detail": "Admin only"})
         return await call_next(request)
 
     if _is_api_path(path):
@@ -134,6 +147,16 @@ async def auth_middleware(request: Request, call_next):
     if request.url.query:
         next_url += "?" + request.url.query
     return RedirectResponse(url=f"/auth/login?next={next_url}", status_code=302)
+
+
+@app.get("/auth/login", response_class=HTMLResponse, include_in_schema=False)
+def auth_login_page(request: Request, next: str = "/tasks"):
+    return templates.TemplateResponse("auth_login.html", {"request": request, "next": next})
+
+
+@app.get("/admin/tools", response_class=HTMLResponse, include_in_schema=False)
+def admin_tools_page(request: Request):
+    return templates.TemplateResponse("admin_tools.html", {"request": request})
 
 
 @app.get("/", include_in_schema=False)

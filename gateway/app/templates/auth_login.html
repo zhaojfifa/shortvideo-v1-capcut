@@ -11,28 +11,46 @@
     input { width:100%; padding:10px; margin-top:6px; border:1px solid #d7dbe0; border-radius:10px; }
     button { margin-top: 16px; width:100%; padding:10px 12px; border:0; border-radius:10px; background:#2563eb; color:#fff; font-weight:700; cursor:pointer; }
     .muted { color:#6b7280; font-size: 12px; margin-top: 10px; }
-    .error { color:#b91c1c; margin-top: 10px; font-weight: 600; }
+    .error { color:#b91c1c; margin-top: 10px; font-weight: 600; display:none; }
   </style>
 </head>
 <body>
   <div class="card">
     <h2>运营登录</h2>
-    <div class="muted">请输入 Operator 名与访问密钥（OP_ACCESS_KEY）。登录后将使用会话访问 Tasks/Tools/Publish。</div>
+    <div class="muted">请输入 Operator 名与访问密钥（OP_ACCESS_KEY）。支持 admin/operator。</div>
 
-    {% if error %}
-      <div class="error">{{ error }}</div>
-    {% endif %}
+    <div id="err" class="error">Invalid key</div>
 
-    <form method="post" action="/auth/login">
-      <input type="hidden" name="next" value="{{ next }}" />
-      <label>Operator</label>
-      <input name="operator" placeholder="ops / admin" required />
+    <label>Operator</label>
+    <input id="op" placeholder="ops / admin" />
 
-      <label>Key</label>
-      <input name="key" placeholder="OP_ACCESS_KEY" required />
+    <label>Key</label>
+    <input id="key" placeholder="OP_ACCESS_KEY" />
 
-      <button type="submit">登录</button>
-    </form>
+    <button id="btn">登录</button>
   </div>
+
+<script>
+  const nextUrl = "{{ next }}";
+  const err = document.getElementById("err");
+  document.getElementById("btn").addEventListener("click", async () => {
+    err.style.display = "none";
+    const username = (document.getElementById("op").value || "").trim();
+    const key = (document.getElementById("key").value || "").trim();
+
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({username, key}),
+    });
+
+    if (!res.ok) {
+      err.textContent = "Invalid key";
+      err.style.display = "block";
+      return;
+    }
+    location.href = nextUrl || "/tasks";
+  });
+</script>
 </body>
 </html>
