@@ -11,7 +11,7 @@ def load_registry() -> dict[str, Any]:
     if not REGISTRY_PATH.exists():
         raise RuntimeError(f"tools registry missing: {REGISTRY_PATH}")
     try:
-        return json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+        return json.loads(REGISTRY_PATH.read_text(encoding="utf-8-sig"))
     except Exception as exc:  # pragma: no cover
         raise RuntimeError(f"tools registry invalid: {exc}") from exc
 
