@@ -149,12 +149,12 @@
         </div>
 
         <div class="field" id="tools-section">
-          <label>Tools / ??</label>
-          <div class="muted">Default: all tools selected.</div>
+          <label>工具</label>
+          <div class="muted">默认：全选工具。</div>
           <div class="tools-actions">
-            <button type="button" class="btn-secondary" id="tools-select-all">Select All</button>
-            <button type="button" class="btn-secondary" id="tools-select-recommended">Select Recommended</button>
-            <button type="button" class="btn-secondary" id="tools-clear">Clear</button>
+            <button type="button" class="btn-secondary" id="tools-select-all">全选</button>
+            <button type="button" class="btn-secondary" id="tools-select-recommended">仅选推荐</button>
+            <button type="button" class="btn-secondary" id="tools-clear">清空</button>
           </div>
           <div id="tools-buckets" class="tools-buckets"></div>
         </div>
@@ -186,18 +186,18 @@
 
     const toolsState = { items: [], selected: new Set() };
     const BUCKETS = [
-      { key: "keyframe_det", title: "??? / ?????", subtitle: "???????????", ids: ["local:ffprobe_inspect", "local:ffmpeg_scene_split", "local:ffmpeg_keyframe_extract"] },
-      { key: "post_det", title: "?????????", subtitle: "????????????", ids: ["local:ffmpeg_transcode", "local:ffmpeg_burn_subtitles"] },
-      { key: "voice_audio", title: "?? / ??", subtitle: "TTS??????/??", ids: ["local:ffmpeg_audio_mix", "tts:edge_tts", "tts:lovo"] },
-      { key: "editors", title: "???", subtitle: "??????????????", ids: ["editor:capcut", "editor:youcut", "editor:vn"] },
-      { key: "face_swap", title: "??", subtitle: "??????/??", ids: ["vendor:akool_face_swap"] },
-      { key: "avatar", title: "???", subtitle: "??/??/???", ids: ["vendor:kling_motion", "vendor:heygen_avatar"] },
-      { key: "gemini", title: "??????Gemini?", subtitle: "??????????/??", ids: ["google:gemini_video_understanding", "google:veo", "google:gemini_copywriter", "asr:whisper"] },
+      { key: "keyframe_det", title: "关键帧 / 确定性工程", subtitle: "选镜头、切片、提关键帧", ids: ["local:ffprobe_inspect", "local:ffmpeg_scene_split", "local:ffmpeg_keyframe_extract"] },
+      { key: "post_det", title: "后期交付（确定性）", subtitle: "转码、字幕烧录、交付封装", ids: ["local:ffmpeg_transcode", "local:ffmpeg_burn_subtitles"] },
+      { key: "voice_audio", title: "配音 / 音频", subtitle: "TTS、混音、响度/降噪", ids: ["local:ffmpeg_audio_mix", "tts:edge_tts", "tts:lovo"] },
+      { key: "editors", title: "剪辑器", subtitle: "导入包、模板剪辑、移动端导出", ids: ["editor:capcut", "editor:youcut", "editor:vn"] },
+      { key: "face_swap", title: "换脸", subtitle: "人脸替换（单/多）", ids: ["vendor:akool_face_swap"] },
+      { key: "avatar", title: "数字人", subtitle: "口播/驱动/素材库", ids: ["vendor:kling_motion", "vendor:heygen_avatar"] },
+      { key: "gemini", title: "理解与生成（Gemini）", subtitle: "视频理解、生成、文案/脚本", ids: ["google:gemini_video_understanding", "google:veo", "google:gemini_copywriter", "asr:whisper"] },
     ];
 
-    function toolName(tool) {
-      const name = tool.name || {};
-      return name.zh || name.en || name.mm || tool.tool_id;
+    function toolDisplayName(tool) {
+      const name = (tool && tool.name) || {};
+      return name.zh || name.en || tool.tool_id;
     }
 
     function renderTools() {
@@ -219,9 +219,9 @@
           row.innerHTML = `
             <input type="checkbox" data-tool-id="${tool.tool_id}" ${checked} />
             <div>
-              <div>${toolName(tool)}</div>
-              <div class="tool-meta">${(tool.ui && tool.ui.short_desc) || ""}</div>
-            </div>`;
+              <div>${toolDisplayName(tool)}</div>
+            <div class="tool-meta">${(tool.ui && tool.ui.short_desc) || ""}</div>
+          </div>`;
           bucket.appendChild(row);
         });
         container.appendChild(bucket);
@@ -234,7 +234,7 @@
       });
 
       const remaining = toolsState.items.filter((t) => !seen.has(t.tool_id));
-      addBucket("Other / ??", "?????", remaining);
+      addBucket("其他", "未归类工具", remaining);
 
       container.querySelectorAll("input[type=checkbox][data-tool-id]").forEach((input) => {
         input.addEventListener("change", () => {
