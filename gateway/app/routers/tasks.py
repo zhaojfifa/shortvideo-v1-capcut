@@ -1,6 +1,7 @@
 """Task API and HTML routers for the gateway application."""
 
 import asyncio
+import json
 import hashlib
 import hmac
 import logging
@@ -41,6 +42,7 @@ from ..schemas import (
     TaskDetail,
     TaskListResponse,
     TaskSummary,
+    TaskUpdate,
 )
 
 from gateway.app.web.templates import get_templates
@@ -346,6 +348,7 @@ async def tasks_page(
                 "created_at": t.get("created_at") or "",
                 "pack_path": _pack_path_for_list(t),
                 "ui_lang": t.get("ui_lang") or "",
+                "selected_tool_ids": _normalize_selected_tool_ids(t.get("selected_tool_ids")),
             }
         )
 
@@ -892,6 +895,25 @@ def _model_allowed_fields(model_cls) -> set[str]:
         return set(model_cls.__fields__.keys())
     return set()
 
+
+def _normalize_selected_tool_ids(value: Any) -> Optional[list[str]]:
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return [str(v) for v in value if str(v).strip()]
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            decoded = json.loads(text)
+        except Exception:
+            decoded = None
+        if isinstance(decoded, list):
+            return [str(v) for v in decoded if str(v).strip()]
+        return [v.strip() for v in text.split(",") if v.strip()]
+    return None
+
 def _task_to_detail(task: dict) -> TaskDetail:
     paths = _resolve_download_urls(task)
     status = task.get("status") or "pending"
@@ -951,6 +973,7 @@ def _task_to_detail(task: dict) -> TaskDetail:
         "priority": task.get("priority"),
         "assignee": task.get("assignee"),
         "ops_notes": task.get("ops_notes"),
+        "selected_tool_ids": _normalize_selected_tool_ids(task.get("selected_tool_ids")),
     }
 
     allowed = _model_allowed_fields(TaskDetail)
@@ -1321,6 +1344,7 @@ def create_task(
         "ui_lang": payload.ui_lang or "en",
         "style_preset": payload.style_preset,
         "face_swap_enabled": bool(payload.face_swap_enabled),
+        "selected_tool_ids": _normalize_selected_tool_ids(payload.selected_tool_ids),
         "status": "pending",
         "last_step": None,
         "error_message": None,
@@ -1344,6 +1368,25 @@ def create_task(
     background_tasks.add_task(_run_pipeline_background, task_id, repo)
 
     return _task_to_detail(stored_task)
+
+
+@api_router.patch("/tasks/{task_id}", response_model=TaskDetail)
+def update_task_selected_tools(
+    task_id: str,
+    payload: TaskUpdate,
+    repo=Depends(get_task_repository),
+):
+    updates: dict[str, Any] = {}
+    if payload.selected_tool_ids is not None:
+        updates["selected_tool_ids"] = _normalize_selected_tool_ids(payload.selected_tool_ids)
+    if not updates:
+        raise HTTPException(status_code=400, detail="No updatable fields provided")
+
+    repo.upsert(task_id, updates)
+    updated = repo.get(task_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return _task_to_detail(updated)
 
 
 @api_router.get("/tasks", response_model=TaskListResponse)
@@ -1419,6 +1462,7 @@ def list_tasks(
                 priority=t.get("priority"),
                 assignee=t.get("assignee"),
                 ops_notes=t.get("ops_notes"),
+                selected_tool_ids=_normalize_selected_tool_ids(t.get("selected_tool_ids")),
             )
         )
 
