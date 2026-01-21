@@ -7,6 +7,9 @@ import time
 from dataclasses import dataclass
 from typing import Any, Optional, Set
 
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
 DEFAULT_HEADER_NAME = "X-OP-KEY"
 COOKIE_NAME = "op_session"
 
@@ -99,3 +102,19 @@ def verify_op_key(header_value: Optional[str], expected_key: str) -> bool:
     if not header_value or not expected_key:
         return False
     return hmac.compare_digest(header_value.strip(), expected_key)
+
+
+def is_admin(role: str | None) -> bool:
+    return (role or "").strip().lower() == "admin"
+
+
+def deny_admin(request: Request):
+    if request.url.path.startswith("/api/") or request.url.path.startswith("/v1/"):
+        return JSONResponse(status_code=403, content={"detail": "Admin only"})
+    return JSONResponse(status_code=403, content={"detail": "Admin only"})
+
+
+def require_admin(request: Request):
+    role = getattr(request.state, "role", None)
+    if not is_admin(role):
+        raise RuntimeError("ADMIN_ONLY")

@@ -1,49 +1,34 @@
-﻿from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
+﻿from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from gateway.app.auth import (
     COOKIE_NAME,
     issue_session,
+    is_admin,
     load_auth_settings,
+    scopes_for_role,
     verify_op_key,
 )
 
-router = APIRouter()
-templates = Jinja2Templates(directory="gateway/app/templates")
+router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-def role_for_operator(name: str) -> str:
-    return "admin" if name.strip().lower() == "admin" else "operator"
+class LoginBody(BaseModel):
+    username: str
+    key: str
 
 
-@router.get("/auth/login", response_class=HTMLResponse)
-def login_page(request: Request, next: str = "/tasks"):
-    return templates.TemplateResponse(
-        "auth_login.html",
-        {"request": request, "next": next},
-    )
-
-
-@router.post("/auth/login")
-def login(
-    request: Request,
-    operator: str = Form(...),
-    key: str = Form(...),
-    next: str = Form("/tasks"),
-):
+@router.post("/login")
+def login(body: LoginBody):
     s = load_auth_settings()
-    if not verify_op_key(key, s.op_access_key):
-        return templates.TemplateResponse(
-            "auth_login.html",
-            {"request": request, "next": next, "error": "Invalid key"},
-            status_code=401,
-        )
+    if not verify_op_key(body.key, s.op_access_key):
+        return JSONResponse(status_code=401, content={"detail": "Invalid key"})
 
-    role = role_for_operator(operator)
-    token = issue_session(operator, role, s.session_ttl_seconds, s.session_secret)
+    role = "admin" if body.username.strip().lower() == "admin" else "operator"
+    token = issue_session(body.username, role, s.session_ttl_seconds, s.session_secret)
 
-    resp = RedirectResponse(url=next or "/tasks", status_code=302)
+    resp = JSONResponse(content={"ok": True, "username": body.username, "role": role})
     resp.set_cookie(
         key=COOKIE_NAME,
         value=token,
@@ -55,8 +40,18 @@ def login(
     return resp
 
 
-@router.post("/auth/logout")
+@router.post("/logout")
 def logout():
-    resp = RedirectResponse(url="/auth/login", status_code=302)
+    resp = JSONResponse(content={"ok": True})
     resp.delete_cookie(COOKIE_NAME)
     return resp
+
+
+@router.get("/me")
+def me(request: Request):
+    role = getattr(request.state, "role", None)
+    op = getattr(request.state, "op", None)
+    scopes = getattr(request.state, "scopes", None)
+    if not role:
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    return {"username": op, "role": role, "scopes": list(scopes or [])}
