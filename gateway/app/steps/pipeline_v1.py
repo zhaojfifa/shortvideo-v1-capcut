@@ -27,6 +27,7 @@ from gateway.app.services.steps_v1 import (
     run_subtitles_step,
 )
 from gateway.app.providers.registry import get_provider, resolve_tool_providers
+from gateway.app.utils.pipeline_config import parse_pipeline_config
 logger = logging.getLogger(__name__)
 
 DEFAULT_MM_LANG = os.getenv("DEFAULT_MM_LANG", "my")
@@ -68,7 +69,8 @@ async def run_pipeline_for_task(task_id: str, db: Session):
         return
 
     try:
-        tool_cfg = resolve_tool_providers(engine, get_settings()).get("tools", {})
+        settings = get_settings()
+        tool_cfg = resolve_tool_providers(engine, settings).get("tools", {})
         defaults = {
             key: (value.get("provider") if isinstance(value, dict) else None)
             for key, value in tool_cfg.items()
@@ -82,6 +84,16 @@ async def run_pipeline_for_task(task_id: str, db: Session):
         defaults.setdefault("dub", "lovo")
         defaults.setdefault("pack", "capcut")
         defaults.setdefault("face_swap", "none")
+
+        pipeline_config = parse_pipeline_config(getattr(task, "pipeline_config", None))
+        subtitles_mode = pipeline_config.get("subtitles_mode")
+        dub_mode = pipeline_config.get("dub_mode")
+        if dub_mode == "edge":
+            defaults["dub"] = "edge-tts"
+        elif dub_mode == "lovo":
+            defaults["dub"] = "lovo"
+        elif not getattr(settings, "lovo_api_key", None):
+            defaults["dub"] = "edge-tts"
 
         get_task_workspace(task_id)
         workspace = Workspace(task_id)
@@ -165,11 +177,12 @@ async def run_pipeline_for_task(task_id: str, db: Session):
             return
         subtitles_provider = defaults.get("subtitles")
         subtitles_handler = get_provider("subtitles", subtitles_provider)
+        translate_enabled = subtitles_mode != "whisper-only"
         subs_req = schemas.SubtitlesRequest(
             task_id=task.id,
             target_lang=DEFAULT_MM_LANG,
             force=False,
-            translate=True,
+            translate=translate_enabled,
             with_scenes=True,
         )
         ok, subs_res = await _run_step("subtitles", subtitles_handler(subs_req))

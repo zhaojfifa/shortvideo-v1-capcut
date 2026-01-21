@@ -121,6 +121,8 @@ def ensure_task_extra_columns(engine) -> None:
         alter_statements.append(
             "ALTER TABLE tasks ADD COLUMN selected_tool_ids TEXT"
         )
+    if "pipeline_config" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN pipeline_config TEXT")
 
     if not alter_statements:
         return

@@ -78,6 +78,7 @@ class TaskCreate(BaseModel):
     title: Optional[str] = None
     note: Optional[str] = None
     selected_tool_ids: Optional[list[str]] = None
+    pipeline_config: Optional[dict[str, str]] = None
 
     category_key: Optional[str] = "beauty"
     content_lang: Optional[str] = "my"
@@ -88,6 +89,7 @@ class TaskCreate(BaseModel):
 
 class TaskUpdate(BaseModel):
     selected_tool_ids: Optional[list[str]] = None
+    pipeline_config: Optional[dict[str, str]] = None
 
 
 class TaskSummary(BaseModel):
@@ -139,6 +141,7 @@ class TaskSummary(BaseModel):
     assignee: Optional[str] = None
     ops_notes: Optional[str] = None
     selected_tool_ids: Optional[list[str]] = None
+    pipeline_config: Optional[dict[str, str]] = None
 
     class Config:
         orm_mode = True
@@ -154,6 +157,7 @@ class TaskDetail(TaskSummary):
     pack_path: Optional[str] = None
     scenes_path: Optional[str] = None
     selected_tool_ids: Optional[list[str]] = None
+    pipeline_config: Optional[dict[str, str]] = None
     stale: Optional[bool] = None
     stale_reason: Optional[str] = None
     stale_for_seconds: Optional[int] = None

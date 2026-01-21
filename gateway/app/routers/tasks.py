@@ -141,6 +141,7 @@ from gateway.app.db import SessionLocal
 
 from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
 from gateway.app.services.task_cleanup import delete_task_record, purge_task_artifacts
+from gateway.app.utils.pipeline_config import parse_pipeline_config, pipeline_config_to_storage
 
 from ..core.workspace import (
     Workspace,
@@ -974,6 +975,7 @@ def _task_to_detail(task: dict) -> TaskDetail:
         "assignee": task.get("assignee"),
         "ops_notes": task.get("ops_notes"),
         "selected_tool_ids": _normalize_selected_tool_ids(task.get("selected_tool_ids")),
+        "pipeline_config": parse_pipeline_config(task.get("pipeline_config")),
     }
 
     allowed = _model_allowed_fields(TaskDetail)
@@ -1345,6 +1347,7 @@ def create_task(
         "style_preset": payload.style_preset,
         "face_swap_enabled": bool(payload.face_swap_enabled),
         "selected_tool_ids": _normalize_selected_tool_ids(payload.selected_tool_ids),
+        "pipeline_config": pipeline_config_to_storage(payload.pipeline_config),
         "status": "pending",
         "last_step": None,
         "error_message": None,
@@ -1379,6 +1382,8 @@ def update_task_selected_tools(
     updates: dict[str, Any] = {}
     if payload.selected_tool_ids is not None:
         updates["selected_tool_ids"] = _normalize_selected_tool_ids(payload.selected_tool_ids)
+    if payload.pipeline_config is not None:
+        updates["pipeline_config"] = pipeline_config_to_storage(payload.pipeline_config)
     if not updates:
         raise HTTPException(status_code=400, detail="No updatable fields provided")
 
@@ -1463,6 +1468,7 @@ def list_tasks(
                 assignee=t.get("assignee"),
                 ops_notes=t.get("ops_notes"),
                 selected_tool_ids=_normalize_selected_tool_ids(t.get("selected_tool_ids")),
+                pipeline_config=parse_pipeline_config(t.get("pipeline_config")),
             )
         )
 
@@ -1778,7 +1784,19 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    provider_raw = payload.provider or "edge-tts"
+    settings = get_settings()
+    provider_raw = payload.provider
+    if not provider_raw:
+        pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+        dub_mode = pipeline_config.get("dub_mode")
+        if dub_mode == "edge":
+            provider_raw = "edge-tts"
+        elif dub_mode == "lovo":
+            provider_raw = "lovo"
+        else:
+            provider_raw = "lovo" if getattr(settings, "lovo_api_key", None) else "edge-tts"
+    if not provider_raw:
+        provider_raw = "edge-tts"
     provider_norm = provider_raw.lower().replace("-", "_")
     if provider_norm == "edge":
         provider_norm = "edge_tts"
@@ -1786,7 +1804,6 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         raise HTTPException(status_code=400, detail="Unsupported dub provider")
     provider = "edge-tts" if provider_norm == "edge_tts" else "lovo"
 
-    settings = get_settings()
     if provider == "lovo" and not getattr(settings, "lovo_api_key", None):
         raise HTTPException(status_code=400, detail="LOVO_API_KEY is not configured")
 
@@ -2077,6 +2094,9 @@ def build_subtitles(
         target_lang = (payload.target_lang if payload else None) or task.get("content_lang") or "my"
         force = payload.force if payload else False
         translate = payload.translate if payload else True
+        pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+        if pipeline_config.get("subtitles_mode") == "whisper-only":
+            translate = False
 
         run_async = os.getenv("RUN_STEPS_ASYNC", "1").strip().lower() not in ("0", "false", "no")
         repo.upsert(
