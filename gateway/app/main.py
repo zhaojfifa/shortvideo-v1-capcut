@@ -19,6 +19,7 @@ from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_ta
 from gateway.app import models
 from gateway.app.ports.storage_provider import get_storage_service, set_storage_service
 from gateway.app.routers import admin_publish, publish as publish_router, tasks as tasks_router
+from gateway.app.routers.api_tools import router as tools_api_router
 from gateway.app.routes.v17_pack import router as v17_pack_router
 from gateway.routes import v1_actions
 
@@ -61,7 +62,7 @@ def log_routes_on_startup() -> None:
 
 app.include_router(tasks_router.pages_router)
 app.include_router(tasks_router.api_router)
-app.include_router(api_tools.router)
+app.include_router(tools_api_router)
 app.include_router(v1_actions.router, prefix="/v1")
 app.include_router(publish_router.router)
 app.include_router(admin_publish.router, tags=["admin"])
