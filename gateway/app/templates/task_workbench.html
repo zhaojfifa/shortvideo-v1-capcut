@@ -160,6 +160,10 @@
         <div class="meta-item"><strong>Account <span class="muted t-secondary">/ 账号</span></strong><span>{{ task.account_id or '-' }}</span></div>
         <div class="meta-item"><strong>Category <span class="muted t-secondary">/ 分类</span></strong><span>{{ task.category_key or '-' }}</span></div>
         <div class="meta-item"><strong>Language <span class="muted t-secondary">/ 语种</span></strong><span>{{ task.content_lang or '-' }}</span></div>
+        {% set pipeline = task.pipeline_config or {} %}
+        {% set subtitles_mode = pipeline.get("subtitles_mode", "whisper+gemini") %}
+        {% set dub_mode = pipeline.get("dub_mode", "auto-fallback") %}
+        <div class="meta-item"><strong>Pipeline <span class="muted t-secondary">/ 工具</span></strong><span>Subtitles: {{ subtitles_mode }} · Dub: {{ dub_mode }}</span></div>
         <div class="meta-item"><strong>Status <span class="muted t-secondary">/ 状态</span></strong><span>{{ task.status }}</span></div>
         <div class="meta-item"><strong>Created <span class="muted t-secondary">/ 创建时间</span></strong><span>{{ task.created_at }}</span></div>
         <div class="meta-item">

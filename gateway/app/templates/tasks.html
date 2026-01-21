@@ -404,9 +404,14 @@
                         <span class="secondary">{{ t_secondary("open") }}</span>
                       {% endif %}
                     </div>
-                    {% set tools_count = t.selected_tool_ids|length if t.selected_tool_ids else 0 %}
+                    {% set pipeline = t.pipeline_config or {} %}
+                    {% set subtitles_mode = pipeline.get("subtitles_mode", "whisper+gemini") %}
+                    {% set dub_mode = pipeline.get("dub_mode", "auto-fallback") %}
                     <div class="action-item">
-                      <span class="muted">Tools: {{ tools_count if tools_count > 0 else "all" }}</span>
+                      <span class="muted">Subtitles: {{ subtitles_mode }}</span>
+                    </div>
+                    <div class="action-item">
+                      <span class="muted">Dub: {{ dub_mode }}</span>
                     </div>
                     <div class="action-item">
                       <button type="button"
@@ -567,9 +572,9 @@
           const srcRaw = t.source_url || "";
           const srcUrl = extractFirstHttpUrl(srcRaw);
           const row = document.createElement("tr");
-          const toolsCount = Array.isArray(t.selected_tool_ids) && t.selected_tool_ids.length
-            ? t.selected_tool_ids.length
-            : "all";
+          const pipeline = t.pipeline_config || {};
+          const subtitlesMode = pipeline.subtitles_mode || "whisper+gemini";
+          const dubMode = pipeline.dub_mode || "auto-fallback";
           row.innerHTML = `
             <td class="truncate" data-label="${LABELS.id}" title="${t.task_id || ""}"><a href="/tasks/${t.task_id}">${truncate(t.task_id, 16)}</a></td>
             <td data-label="${LABELS.platform}">
@@ -615,7 +620,10 @@
                   ${showSecondary ? `<span class="secondary">{{ t_secondary("open") }}</span>` : ""}
                 </div>
                 <div class="action-item">
-                  <span class="muted">Tools: ${toolsCount}</span>
+                  <span class="muted">Subtitles: ${subtitlesMode}</span>
+                </div>
+                <div class="action-item">
+                  <span class="muted">Dub: ${dubMode}</span>
                 </div>
                 <div class="action-item">
                   <button type="button"

@@ -148,15 +148,19 @@
           <textarea id="note" name="note" placeholder="给运营备注 / အော်ပရေးရှင်းမှတ်ချက်"></textarea>
         </div>
 
-        <div class="field" id="tools-section">
-          <label>工具</label>
-          <div class="muted">默认：全选工具。</div>
-          <div class="tools-actions">
-            <button type="button" class="btn-secondary" id="tools-select-all">全选</button>
-            <button type="button" class="btn-secondary" id="tools-select-recommended">仅选推荐</button>
-            <button type="button" class="btn-secondary" id="tools-clear">清空</button>
+        <div class="field" id="pipeline-tools">
+          <label>流水线工具</label>
+          <div class="muted">仅配置字幕与配音，其它工具在 Workbench 设置。</div>
+          <div class="radio-group" style="margin-top:6px;">
+            <label class="radio"><input type="radio" name="subtitles_mode" value="whisper-only" /> Whisper only（仅 ASR 字幕）</label>
+            <label class="radio"><input type="radio" name="subtitles_mode" value="whisper+gemini" checked /> Whisper + Gemini（ASR + 翻译/润色）</label>
           </div>
-          <div id="tools-buckets" class="tools-buckets"></div>
+          <div class="radio-group" style="margin-top:6px;">
+            <label class="radio"><input type="radio" name="dub_mode" value="edge" /> Edge TTS</label>
+            <label class="radio"><input type="radio" name="dub_mode" value="lovo" /> LOVO</label>
+            <label class="radio"><input type="radio" name="dub_mode" value="auto-fallback" checked /> 自动兜底（优先可用）</label>
+          </div>
+          <div class="muted" style="margin-top:6px;">更多工具（关键帧/后期/换脸/数字人/剪辑器）请在 <a href="/tools/hub">Tools Hub</a> 配置。</div>
         </div>
 
         <div class="summary" id="summary-block">
@@ -184,98 +188,6 @@
     const form = document.getElementById("task-form");
     const resultEl = document.getElementById("create-result");
 
-    const toolsState = { items: [], selected: new Set() };
-    const BUCKETS = [
-      { key: "keyframe_det", title: "关键帧 / 确定性工程", subtitle: "选镜头、切片、提关键帧", ids: ["local:ffprobe_inspect", "local:ffmpeg_scene_split", "local:ffmpeg_keyframe_extract"] },
-      { key: "post_det", title: "后期交付（确定性）", subtitle: "转码、字幕烧录、交付封装", ids: ["local:ffmpeg_transcode", "local:ffmpeg_burn_subtitles"] },
-      { key: "voice_audio", title: "配音 / 音频", subtitle: "TTS、混音、响度/降噪", ids: ["local:ffmpeg_audio_mix", "tts:edge_tts", "tts:lovo"] },
-      { key: "editors", title: "剪辑器", subtitle: "导入包、模板剪辑、移动端导出", ids: ["editor:capcut", "editor:youcut", "editor:vn"] },
-      { key: "face_swap", title: "换脸", subtitle: "人脸替换（单/多）", ids: ["vendor:akool_face_swap"] },
-      { key: "avatar", title: "数字人", subtitle: "口播/驱动/素材库", ids: ["vendor:kling_motion", "vendor:heygen_avatar"] },
-      { key: "gemini", title: "理解与生成（Gemini）", subtitle: "视频理解、生成、文案/脚本", ids: ["google:gemini_video_understanding", "google:veo", "google:gemini_copywriter", "asr:whisper"] },
-    ];
-
-    function toolDisplayName(tool) {
-      const name = (tool && tool.name) || {};
-      return name.zh || name.en || tool.tool_id;
-    }
-
-    function renderTools() {
-      const container = document.getElementById("tools-buckets");
-      if (!container) return;
-      container.innerHTML = "";
-      const toolMap = new Map(toolsState.items.map((t) => [t.tool_id, t]));
-      const seen = new Set();
-
-      const addBucket = (title, subtitle, items) => {
-        if (!items.length) return;
-        const bucket = document.createElement("div");
-        bucket.className = "tools-bucket";
-        bucket.innerHTML = `<h4>${title}</h4><div class="subtitle">${subtitle}</div>`;
-        items.forEach((tool) => {
-          const row = document.createElement("label");
-          row.className = "tool-item";
-          const checked = toolsState.selected.has(tool.tool_id) ? "checked" : "";
-          row.innerHTML = `
-            <input type="checkbox" data-tool-id="${tool.tool_id}" ${checked} />
-            <div>
-              <div>${toolDisplayName(tool)}</div>
-            <div class="tool-meta">${(tool.ui && tool.ui.short_desc) || ""}</div>
-          </div>`;
-          bucket.appendChild(row);
-        });
-        container.appendChild(bucket);
-      };
-
-      BUCKETS.forEach((bucket) => {
-        const items = bucket.ids.map((id) => toolMap.get(id)).filter(Boolean);
-        items.forEach((t) => seen.add(t.tool_id));
-        addBucket(bucket.title, bucket.subtitle, items);
-      });
-
-      const remaining = toolsState.items.filter((t) => !seen.has(t.tool_id));
-      addBucket("其他", "未归类工具", remaining);
-
-      container.querySelectorAll("input[type=checkbox][data-tool-id]").forEach((input) => {
-        input.addEventListener("change", () => {
-          const id = input.getAttribute("data-tool-id");
-          if (!id) return;
-          if (input.checked) toolsState.selected.add(id);
-          else toolsState.selected.delete(id);
-        });
-      });
-    }
-
-    function selectAllTools() {
-      toolsState.selected = new Set(toolsState.items.map((t) => t.tool_id));
-      renderTools();
-    }
-
-    function selectRecommendedTools() {
-      const selected = new Set();
-      toolsState.items.forEach((t) => {
-        if (t.ui && t.ui.recommended) selected.add(t.tool_id);
-      });
-      toolsState.selected = selected;
-      renderTools();
-    }
-
-    function clearTools() {
-      toolsState.selected = new Set();
-      renderTools();
-    }
-
-    async function loadTools() {
-      try {
-        const res = await fetch("/api/tools");
-        if (!res.ok) return;
-        const data = await res.json();
-        toolsState.items = data.items || [];
-        selectAllTools();
-      } catch (_) {
-        // Ignore tools loading failures; tasks can still be created.
-      }
-    }
 
     function updateSummary() {
       const platform = document.getElementById("platform").value;
@@ -291,10 +203,6 @@
     form.addEventListener("change", updateSummary);
     document.addEventListener("DOMContentLoaded", () => {
       updateSummary();
-      loadTools();
-      document.getElementById("tools-select-all")?.addEventListener("click", selectAllTools);
-      document.getElementById("tools-select-recommended")?.addEventListener("click", selectRecommendedTools);
-      document.getElementById("tools-clear")?.addEventListener("click", clearTools);
     });
 
     form.addEventListener("submit", async (ev) => {
@@ -314,9 +222,8 @@
       const stylePreset = form.querySelector("input[name='style_preset']:checked")?.value || "review_brief";
       const title = document.getElementById("title").value.trim();
       const note = document.getElementById("note").value.trim();
-      const selectedToolIds = toolsState.selected.size
-        ? Array.from(toolsState.selected)
-        : toolsState.items.map((t) => t.tool_id);
+      const subtitlesMode = form.querySelector("input[name='subtitles_mode']:checked")?.value || "whisper+gemini";
+      const dubMode = form.querySelector("input[name='dub_mode']:checked")?.value || "auto-fallback";
 
       const payload = {
         source_url: rawSource,
@@ -327,7 +234,10 @@
         template: stylePreset,
         title: title || undefined,
         note: note || undefined,
-        selected_tool_ids: selectedToolIds.length ? selectedToolIds : undefined,
+        pipeline_config: {
+          subtitles_mode: subtitlesMode,
+          dub_mode: dubMode,
+        },
         category_key: "suitcase",
         content_lang: "mm",
         ui_lang: "zh",
