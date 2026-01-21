@@ -77,12 +77,17 @@ class TaskCreate(BaseModel):
     template: Optional[str] = None
     title: Optional[str] = None
     note: Optional[str] = None
+    selected_tool_ids: Optional[list[str]] = None
 
     category_key: Optional[str] = "beauty"
     content_lang: Optional[str] = "my"
     ui_lang: Optional[str] = "en"
     style_preset: Optional[str] = None
     face_swap_enabled: Optional[bool] = False
+
+
+class TaskUpdate(BaseModel):
+    selected_tool_ids: Optional[list[str]] = None
 
 
 class TaskSummary(BaseModel):
@@ -133,6 +138,7 @@ class TaskSummary(BaseModel):
     priority: Optional[int] = None
     assignee: Optional[str] = None
     ops_notes: Optional[str] = None
+    selected_tool_ids: Optional[list[str]] = None
 
     class Config:
         orm_mode = True
@@ -147,6 +153,7 @@ class TaskDetail(TaskSummary):
     mm_audio_key: Optional[str] = None
     pack_path: Optional[str] = None
     scenes_path: Optional[str] = None
+    selected_tool_ids: Optional[list[str]] = None
     stale: Optional[bool] = None
     stale_reason: Optional[str] = None
     stale_for_seconds: Optional[int] = None

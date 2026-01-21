@@ -404,6 +404,10 @@
                         <span class="secondary">{{ t_secondary("open") }}</span>
                       {% endif %}
                     </div>
+                    {% set tools_count = t.selected_tool_ids|length if t.selected_tool_ids else 0 %}
+                    <div class="action-item">
+                      <span class="muted">Tools: {{ tools_count if tools_count > 0 else "all" }}</span>
+                    </div>
                     <div class="action-item">
                       <button type="button"
                               class="link-button danger"
@@ -563,6 +567,9 @@
           const srcRaw = t.source_url || "";
           const srcUrl = extractFirstHttpUrl(srcRaw);
           const row = document.createElement("tr");
+          const toolsCount = Array.isArray(t.selected_tool_ids) && t.selected_tool_ids.length
+            ? t.selected_tool_ids.length
+            : "all";
           row.innerHTML = `
             <td class="truncate" data-label="${LABELS.id}" title="${t.task_id || ""}"><a href="/tasks/${t.task_id}">${truncate(t.task_id, 16)}</a></td>
             <td data-label="${LABELS.platform}">
@@ -606,6 +613,9 @@
                 <div class="action-item">
                   <a href="/tasks/${t.task_id}">{{ t_primary("open") }}</a>
                   ${showSecondary ? `<span class="secondary">{{ t_secondary("open") }}</span>` : ""}
+                </div>
+                <div class="action-item">
+                  <span class="muted">Tools: ${toolsCount}</span>
                 </div>
                 <div class="action-item">
                   <button type="button"

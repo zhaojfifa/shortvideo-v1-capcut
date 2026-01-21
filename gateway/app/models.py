@@ -74,6 +74,7 @@ class Task(Base):
     priority = Column(Integer, nullable=True)
     assignee = Column(String(64), nullable=True)
     ops_notes = Column(Text, nullable=True)
+    selected_tool_ids = Column(Text, nullable=True)
     last_step = Column(String(32), nullable=True)
     error_message = Column(Text, nullable=True)
     error_reason = Column(Text, nullable=True)
