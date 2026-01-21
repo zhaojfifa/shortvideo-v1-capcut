@@ -1,0 +1,38 @@
+﻿<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Operator Login</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; background:#f6f7f9; }
+    .card { max-width: 520px; margin: 60px auto; background:#fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+    label { display:block; margin-top: 12px; font-weight: 600; }
+    input { width:100%; padding:10px; margin-top:6px; border:1px solid #d7dbe0; border-radius:10px; }
+    button { margin-top: 16px; width:100%; padding:10px 12px; border:0; border-radius:10px; background:#2563eb; color:#fff; font-weight:700; cursor:pointer; }
+    .muted { color:#6b7280; font-size: 12px; margin-top: 10px; }
+    .error { color:#b91c1c; margin-top: 10px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>运营登录</h2>
+    <div class="muted">请输入 Operator 名与访问密钥（OP_ACCESS_KEY）。登录后将使用会话访问 Tasks/Tools/Publish。</div>
+
+    {% if error %}
+      <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/auth/login">
+      <input type="hidden" name="next" value="{{ next }}" />
+      <label>Operator</label>
+      <input name="operator" placeholder="ops / admin" required />
+
+      <label>Key</label>
+      <input name="key" placeholder="OP_ACCESS_KEY" required />
+
+      <button type="submit">登录</button>
+    </form>
+  </div>
+</body>
+</html>

@@ -9,10 +9,17 @@ import shutil
 from typing import Any, Dict
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Response
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from gateway.app.auth import (
+    COOKIE_NAME,
+    load_auth_settings,
+    scopes_for_role,
+    verify_op_key,
+    verify_session,
+)
 from gateway.app.config import create_storage_service, get_settings
 from gateway.app.core.logging_config import configure_logging
 from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
@@ -20,6 +27,7 @@ from gateway.app import models
 from gateway.app.ports.storage_provider import get_storage_service, set_storage_service
 from gateway.app.routers import admin_publish, publish as publish_router, tasks as tasks_router
 from gateway.app.routers.api_tools import router as tools_api_router
+from gateway.app.routes.auth import router as auth_router
 from gateway.app.routes.v17_pack import router as v17_pack_router
 from gateway.routes import v1_actions
 
@@ -62,11 +70,70 @@ def log_routes_on_startup() -> None:
 
 app.include_router(tasks_router.pages_router)
 app.include_router(tasks_router.api_router)
+app.include_router(auth_router)
 app.include_router(tools_api_router)
 app.include_router(v1_actions.router, prefix="/v1")
 app.include_router(publish_router.router)
 app.include_router(admin_publish.router, tags=["admin"])
 app.include_router(v17_pack_router)
+
+ALLOW_PREFIXES = (
+    "/health",
+    "/healthz",
+    "/static/",
+    "/auth/login",
+    "/auth/logout",
+)
+
+
+def _is_allowed_path(path: str) -> bool:
+    return any(path == p or path.startswith(p) for p in ALLOW_PREFIXES)
+
+
+def _is_api_path(path: str) -> bool:
+    return path.startswith("/api/") or path.startswith("/v1/")
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    path = request.url.path
+    if _is_allowed_path(path):
+        return await call_next(request)
+
+    s = load_auth_settings()
+    if s.auth_mode == "off":
+        return await call_next(request)
+
+    header_ok = False
+    if s.auth_mode in ("header", "both"):
+        hv = request.headers.get(s.header_name)
+        header_ok = verify_op_key(hv, s.op_access_key)
+        if header_ok:
+            request.state.op = "header"
+            request.state.role = "operator"
+            request.state.scopes = scopes_for_role("operator")
+
+    session_ok = False
+    if not header_ok and s.auth_mode in ("session", "both"):
+        token = request.cookies.get(COOKIE_NAME)
+        claims = verify_session(token, s.session_secret) if token else None
+        if claims:
+            role = claims.get("role", "operator")
+            request.state.op = claims.get("op", "ops")
+            request.state.role = role
+            request.state.scopes = scopes_for_role(role)
+            session_ok = True
+
+    if header_ok or session_ok:
+        return await call_next(request)
+
+    if _is_api_path(path):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+    next_url = str(request.url.path)
+    if request.url.query:
+        next_url += "?" + request.url.query
+    return RedirectResponse(url=f"/auth/login?next={next_url}", status_code=302)
 
 
 @app.get("/", include_in_schema=False)
