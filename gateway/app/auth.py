@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Optional, Set
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 
 DEFAULT_HEADER_NAME = "X-OP-KEY"
@@ -118,3 +118,15 @@ def require_admin(request: Request):
     role = getattr(request.state, "role", None)
     if not is_admin(role):
         raise RuntimeError("ADMIN_ONLY")
+
+
+def require_operator_session(request: Request) -> None:
+    role = getattr(request.state, "role", None)
+    if not role:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+def require_admin_session(request: Request) -> None:
+    role = getattr(request.state, "role", None)
+    if not is_admin(role):
+        raise HTTPException(status_code=403, detail="Admin only")

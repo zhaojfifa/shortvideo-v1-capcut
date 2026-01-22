@@ -111,16 +111,17 @@
       }
       const data = await res.json();
       const tools = data.tools || {};
+      const available = data.available || {};
       const parseTool = tools.parse || {};
       const subtitlesTool = tools.subtitles || {};
       const dubTool = tools.dub || {};
       const packTool = tools.pack || {};
       const faceSwapTool = tools.face_swap || {};
-      populateSelect(document.getElementById("parse-provider"), parseTool.available || [], parseTool.provider);
-      populateSelect(document.getElementById("subtitles-provider"), subtitlesTool.available || [], subtitlesTool.provider);
-      populateSelect(document.getElementById("dub-provider"), dubTool.available || [], dubTool.provider);
-      populateSelect(document.getElementById("pack-provider"), packTool.available || [], packTool.provider);
-      populateSelect(document.getElementById("face-swap-provider"), faceSwapTool.available || [], faceSwapTool.provider);
+      populateSelect(document.getElementById("parse-provider"), available.parse || [], parseTool.provider);
+      populateSelect(document.getElementById("subtitles-provider"), available.subtitles || [], subtitlesTool.provider);
+      populateSelect(document.getElementById("dub-provider"), available.dub || [], dubTool.provider);
+      populateSelect(document.getElementById("pack-provider"), available.pack || [], packTool.provider);
+      populateSelect(document.getElementById("face-swap-provider"), available.face_swap || [], faceSwapTool.provider);
       document.getElementById("parse-enabled").checked = Boolean(parseTool.enabled);
       document.getElementById("subtitles-enabled").checked = Boolean(subtitlesTool.enabled);
       document.getElementById("dub-enabled").checked = Boolean(dubTool.enabled);
