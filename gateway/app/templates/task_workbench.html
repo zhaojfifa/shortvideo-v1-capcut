@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
   <link rel="stylesheet" href="/static/pipeline_lab.css" />
   <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css">
   <style>
     :root { color-scheme: light; }
     .page.workbench {
@@ -229,32 +230,22 @@
 
     <div class="panel">
       <div class="section-title">
-        <h2>场景切片 (Scenes) <span class="muted t-secondary">/  (Scenes)</span></h2>
-        <div class="secondary">用于运营复用的场景切片 /  Scene </div>
+        <h2>场景切片</h2>
+        <div class="secondary">用于运营复用的场景切片。</div>
       </div>
       <div class="section-grid" style="margin-top:12px;">
         <div class="field">
-          <label>说明 / </label>
-          <div class="muted t-secondary" style="white-space:pre-wrap;">
-中文：
-生成 Scenes 会把本次 Task 的视频按字幕时间切成多个“可复用片段（MSC）”，并打包为 Scenes.zip。
-用法：先点“生成场景切片”，状态变为 Ready 后点“下载 Scenes.zip”。无需打开或编辑 JSON。
-
-缅文：
-Scenes     (MSC)  Scenes.zip  
- — “Scenes ”  Ready  “Scenes.zip ”  JSON   
-          </div>
-          <div class="muted t-secondary" style="margin-top:8px;">
-中文：Scenes.zip 不会影响 Pack.zip，两个包用途不同。<br/>
-缅文：Scenes.zip  Pack.zip   (用途 )
+          <label>说明</label>
+          <div class="muted" style="white-space:pre-wrap;">
+生成场景切片会按字幕时间切分视频并打包为 Scenes.zip。点击“生成场景切片”，状态就绪后下载 Scenes.zip。无需打开或编辑 JSON。Scenes.zip 不影响 Pack.zip，两个包用途不同。
           </div>
         </div>
         <div class="field">
-          <label>操作 / </label>
+          <label>操作</label>
           <div class="action-row" style="margin-top:8px; flex-wrap:wrap; gap:8px;">
-            <button id="btn-scenes" class="btn-primary">生成场景切片 / Scenes </button>
-            <a id="btn-scenes-download" class="btn-secondary disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">下载 Scenes.zip / Scenes.zip </a>
-            <span id="scenes-step-status" class="muted">未就绪 / </span>
+            <button id="btn-scenes" class="btn-primary">生成场景切片</button>
+            <a id="btn-scenes-download" class="btn-secondary disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">下载 Scenes.zip</a>
+            <span id="scenes-step-status" class="muted">未就绪</span>
           </div>
           <div id="scenes-error" class="muted t-secondary" style="margin-top:6px;"></div>
         </div>

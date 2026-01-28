@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Task Board - ShortVideo</title>
+  <title>任务看板 - ShortVideo</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
   <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css">
   <style>
     :root { color-scheme: light; }
     body {
@@ -15,11 +16,7 @@
       color: #111827;
     }
     header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
       margin-bottom: 12px;
-      gap: 8px;
     }
     h1 { margin: 0; font-size: 1.25rem; font-weight: 700; }
     .actions { display: flex; gap: 8px; }
@@ -88,12 +85,17 @@
   </style>
 </head>
 <body>
-  <header>
-    <h1 data-i18n="ui.tasks.board">任务看板</h1>
-    {% include "_lang_tabs.html" %}
-    <div class="actions">
-      <a class="btn" href="/tasks/new" data-i18n="ui.tasks.new">新建任务</a>
-      <button id="refresh-btn" type="button">刷新</button>
+  <header class="topbar">
+    <div class="topbar-left">
+      <h1 data-i18n="ui.tasks.board">任务看板</h1>
+    </div>
+    <div class="topbar-mid"></div>
+    <div class="topbar-right">
+      {% include "_lang_tabs.html" %}
+      <div class="actions">
+        <a class="btn" href="/tasks/new" data-i18n="ui.tasks.new">新建任务</a>
+        <button id="refresh-btn" type="button">刷新</button>
+      </div>
     </div>
   </header>
 
