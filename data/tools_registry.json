@@ -14,7 +14,7 @@
       "tags": ["vendor:google","type:api","tier:S","lang:multi"],
       "status": {"state": "active", "note": "Primary understanding provider"},
       "ui": {"short_desc": "Video Q&A, tagging, risk hints", "recommended": true, "sort_weight": 95},
-      "access": {"type": "api", "entry_url": "", "docs_url": "", "deep_link": ""},
+      "access": {"type": "api", "entry_url": "https://aistudio.google.com/", "docs_url": "https://ai.google.dev/gemini-api/docs", "deep_link": "/tools/google%3Agemini_video_understanding"},
       "integration": {"level": "integrated_open", "adapter_key": null, "supported_steps": ["intelligence_sound"]},
       "governance": {"risk_level": "medium", "owner": "ops", "visible_to_roles": ["operator","admin"]},
       "auth": {"type": "api_key", "secret_ref": "GEMINI_API_KEY"}
@@ -27,7 +27,7 @@
       "tags": ["vendor:google","type:api","tier:S","duration:short"],
       "status": {"state": "active", "note": "Primary video generation provider"},
       "ui": {"short_desc": "Text/Image to short video (e.g., 8s)", "recommended": true, "sort_weight": 94},
-      "access": {"type": "api", "entry_url": "", "docs_url": "", "deep_link": ""},
+      "access": {"type": "api", "entry_url": "https://aistudio.google.com/", "docs_url": "https://ai.google.dev/", "deep_link": "/tools/google%3Aveo"},
       "integration": {"level": "integrated_open", "adapter_key": null, "supported_steps": ["video_gen"]},
       "governance": {"risk_level": "medium", "owner": "ops", "visible_to_roles": ["operator","admin"]},
       "auth": {"type": "api_key", "secret_ref": "GEMINI_API_KEY"}
@@ -40,7 +40,7 @@
       "tags": ["vendor:google","type:api","tier:S","use:script"],
       "status": {"state": "active", "note": "Copy/script rewrite helper"},
       "ui": {"short_desc": "Script rewrite, captions, CTA variants", "recommended": true, "sort_weight": 70},
-      "access": {"type": "api", "entry_url": "", "docs_url": "", "deep_link": ""},
+      "access": {"type": "api", "entry_url": "https://ffmpeg.org/", "docs_url": "https://ffmpeg.org/ffmpeg.html", "deep_link": "/tools/local%3Affmpeg_keyframe_extract"},
       "integration": {"level": "integrated_open", "adapter_key": null, "supported_steps": ["intelligence_sound","publish"]},
       "governance": {"risk_level": "low", "owner": "ops", "visible_to_roles": ["operator","admin"]},
       "auth": {"type": "api_key", "secret_ref": "GEMINI_API_KEY"}
@@ -54,7 +54,7 @@
       "tags": ["vendor:local","type:cli","tier:S","deterministic:true"],
       "status": {"state": "active", "note": "Deterministic inspection"},
       "ui": {"short_desc": "Inspect streams/duration/fps for routing", "recommended": true, "sort_weight": 80},
-      "access": {"type": "cli", "entry_url": "", "docs_url": "", "deep_link": ""},
+      "access": {"type": "cli", "entry_url": "https://ffmpeg.org/", "docs_url": "https://ffmpeg.org/ffmpeg-filters.html", "deep_link": "/tools/local%3Affmpeg_scene_split"},
       "integration": {"level": "integrated_open", "adapter_key": null, "supported_steps": ["keyframe","pack"]},
       "governance": {"risk_level": "low", "owner": "eng", "visible_to_roles": ["operator","admin"]},
       "auth": {"type": "none", "secret_ref": ""}
@@ -67,7 +67,7 @@
       "tags": ["vendor:local","type:cli","tier:S","deterministic:true"],
       "status": {"state": "active", "note": "Deterministic scene splitting"},
       "ui": {"short_desc": "Scene detection and split segments", "recommended": true, "sort_weight": 82},
-      "access": {"type": "cli", "entry_url": "", "docs_url": "", "deep_link": ""},
+      "access": {"type": "cli", "entry_url": "https://ffmpeg.org/", "docs_url": "https://ffmpeg.org/ffprobe.html", "deep_link": "/tools/local%3Affprobe_inspect"},
       "integration": {"level": "integrated_open", "adapter_key": null, "supported_steps": ["keyframe"]},
       "governance": {"risk_level": "low", "owner": "eng", "visible_to_roles": ["operator","admin"]},
       "auth": {"type": "none", "secret_ref": ""}
