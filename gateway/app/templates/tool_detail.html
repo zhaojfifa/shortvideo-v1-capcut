@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>工具详情</title>
+  <title>{{ t("page.tools.detail.title") }}</title>
   <link rel="stylesheet" href="/static/css/ui_v185.css">
   <style>
     :root { color-scheme: light; }
@@ -65,15 +65,15 @@
 <body>
   <div class="page">
     {% set title_key = "ui.tools.detail" %}
-{% set title_text = "工具详情" %}
+{% set title_text = t("page.tools.detail.title") %}
 {% set subtitle_text = tool_id %}
 {% set active_nav = "tools" %}
-{% set secondary_label = "工具中心" %}
+{% set secondary_label = t("action.back_tools") %}
 {% set secondary_href = "/tools/hub" %}
 {% include "_topbar.html" %}
 
     <div class="card" id="tool-header">
-      <div class="muted">Loading...</div>
+      <div class="muted">{{ t("tools.loading") }}</div>
     </div>
     <div class="card" id="tool-body" style="display:none;"></div>
   </div>
@@ -112,23 +112,23 @@
 
       body.style.display = "block";
       body.innerHTML = `
-        <div class="section-title">Description</div>
+        <div class="section-title">{{ t("tools.detail.description") }}</div>
         <div class="muted">${shortDesc || "-"}</div>
         <div class="muted" style="margin-top:6px;">${note || ""}</div>
 
-        <div class="section-title" style="margin-top:16px;">Capabilities</div>
+        <div class="section-title" style="margin-top:16px;">{{ t("tools.detail.capabilities") }}</div>
         <div>${(tool.capabilities || []).map((c) => `<span class="chip">${c}</span>`).join("") || "-"}</div>
 
-        <div class="section-title" style="margin-top:16px;">Tags</div>
+        <div class="section-title" style="margin-top:16px;">{{ t("tools.detail.tags") }}</div>
         <div>${(tool.tags || []).map((t) => `<span class="chip">${t}</span>`).join("") || "-"}</div>
 
-        <div class="section-title" style="margin-top:16px;">Supported Steps</div>
+        <div class="section-title" style="margin-top:16px;">{{ t("tools.detail.steps") }}</div>
         <div>${((tool.integration || {}).supported_steps || []).map((s) => `<span class="chip">${s}</span>`).join("") || "-"}</div>
 
-        <div class="section-title" style="margin-top:16px;">Links</div>
+        <div class="section-title" style="margin-top:16px;">{{ t("tools.detail.links") }}</div>
         <div class="grid">
-          <a class="btn ${access.entry_url ? "primary" : "disabled"}" href="${access.entry_url || "#"}" target="_blank" rel="noopener">Open</a>
-          <a class="btn ${access.docs_url ? "" : "disabled"}" href="${access.docs_url || "#"}" target="_blank" rel="noopener">Docs</a>
+          <a class="btn ${access.entry_url ? "primary" : "disabled"}" href="${access.entry_url || "#"}" target="_blank" rel="noopener">{{ t("tools.actions.open") }}</a>
+          <a class="btn ${access.docs_url ? "" : "disabled"}" href="${access.docs_url || "#"}" target="_blank" rel="noopener">{{ t("tools.actions.docs") }}</a>
           <a class="btn ${access.deep_link ? "" : "disabled"}" href="${access.deep_link || "#"}" target="_blank" rel="noopener">Deep Link</a>
         </div>
       `;
@@ -139,14 +139,14 @@
       try {
         const resp = await fetch(`/api/tools/${encodeURIComponent(TOOL_ID)}`);
         if (resp.status === 404) {
-          header.innerHTML = `<div class="error">Tool not found.</div>`;
+          header.innerHTML = `<div class="error">{{ t("tools.detail.not_found") }}</div>`;
           return;
         }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const tool = await resp.json();
         render(tool);
       } catch (err) {
-        if (header) header.innerHTML = `<div class="error">Failed to load tool: ${err}</div>`;
+        if (header) header.innerHTML = `<div class="error">${window.__V185_I18N__.t("tools.detail.load_failed", { error: err })}</div>`;
       }
     }
 

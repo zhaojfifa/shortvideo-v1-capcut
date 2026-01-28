@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>新建任务 - ShortVideo</title>
+  <title>{{ t("page.tasks.new.title") }} - ShortVideo</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
   <link rel="stylesheet" href="/static/i18n.css" />
   <link rel="stylesheet" href="/static/css/ui_v185.css">
@@ -88,10 +88,10 @@
 <body>
   <div class="page">
     {% set title_key = "ui.tasks.new" %}
-{% set title_text = "新建任务" %}
-{% set subtitle_text = "粘贴链接 → 一键生成 Smart Pack + README" %}
+{% set title_text = t("page.tasks.new.title") %}
+{% set subtitle_text = t("page.tasks.new.subtitle") %}
 {% set active_nav = "tasks" %}
-{% set secondary_label = "任务看板" %}
+{% set secondary_label = t("action.back_tasks") %}
 {% set secondary_href = "/tasks" %}
 {% include "_topbar.html" %}
 
@@ -99,22 +99,22 @@
     <main class="card">
       <form id="task-form">
         <div class="field">
-          <label for="source_url">来源链接 *</label>
-          <input id="source_url" name="source_url" type="text" autocomplete="off" required placeholder="粘贴来源链接 (Douyin/XHS/TK/FB)" />
+          <label for="source_url">{{ t("label.source_url") }} *</label>
+          <input id="source_url" name="source_url" type="text" autocomplete="off" required placeholder="{{ t('label.source_url.placeholder') }}" />
         </div>
 
         <div class="row">
           <div class="field">
-            <label for="platform">平台</label>
+            <label for="platform">{{ t("label.platform") }}</label>
             <select id="platform" name="platform">
-              <option value="douyin" selected>抖音</option>
-              <option value="xhs">小红书</option>
+              <option value="douyin" selected>{{ t("label.platform_douyin") }}</option>
+              <option value="xhs">{{ t("label.platform_xhs") }}</option>
               <option value="tiktok">TikTok</option>
               <option value="fb">Facebook</option>
             </select>
           </div>
           <div class="field">
-            <label for="account_id">账号</label>
+            <label for="account_id">{{ t("label.account") }}</label>
             <select id="account_id" name="account_id">
               <option value="suitcase_mm_1">Suitcase MM #1</option>
             </select>
@@ -123,87 +123,87 @@
         </div>
 
         <div class="field">
-          <label>视频类型</label>
-          <div class="muted t-secondary">选择业务意图</div>
+          <label>{{ t("label.video_type") }}</label>
+          <div class="muted t-secondary">{{ t("label.video_type.hint") }}</div>
           <div class="option-grid" style="margin-top:6px;">
             <label class="option-item">
               <input type="radio" name="video_type" value="review" checked />
-              <span class="opt-text">对比测评</span>
+              <span class="opt-text">{{ t("label.video_type.review") }}</span>
             </label>
             <label class="option-item">
               <input type="radio" name="video_type" value="scenario" />
-              <span class="opt-text">场景使用</span>
+              <span class="opt-text">{{ t("label.video_type.scenario") }}</span>
             </label>
           </div>
         </div>
 
         <div class="field">
-          <label>风格预设</label>
-          <div class="muted t-secondary">定义节奏与剪辑意图</div>
+          <label>{{ t("label.style_preset") }}</label>
+          <div class="muted t-secondary">{{ t("label.style_preset.hint") }}</div>
           <div class="option-grid" style="margin-top:6px;">
             <label class="option-item">
               <input type="radio" name="style_preset" value="review_brief" checked />
-              <span class="opt-text">短评快节奏</span>
+              <span class="opt-text">{{ t("label.style.fast") }}</span>
             </label>
             <label class="option-item">
               <input type="radio" name="style_preset" value="scenario_story" />
-              <span class="opt-text">情景叙事</span>
+              <span class="opt-text">{{ t("label.style.story") }}</span>
             </label>
           </div>
         </div>
 
         <div class="field">
-          <label for="title">标题（可选）</label>
-          <input id="title" name="title" type="text" placeholder="可选标题" />
+          <label for="title">{{ t("label.title.optional") }}</label>
+          <input id="title" name="title" type="text" placeholder="{{ t('label.title.placeholder') }}" />
         </div>
 
         <div class="field">
-          <label for="note">备注 / 运营提示</label>
-          <textarea id="note" name="note" placeholder="给运营备注"></textarea>
+          <label for="note">{{ t("label.note") }}</label>
+          <textarea id="note" name="note" placeholder="{{ t('label.note.placeholder') }}"></textarea>
         </div>
 
         <div class="field" id="pipeline-tools">
-          <label>流水线工具</label>
-          <div class="muted">仅配置字幕与配音，其它工具在 Workbench 设置。</div>
+          <label>{{ t("label.pipeline_tools") }}</label>
+          <div class="muted">{{ t("label.pipeline_hint") }}</div>
           <div class="option-grid" style="margin-top:6px;">
             <label class="option-item">
               <input type="radio" name="subtitles_mode" value="whisper-only" />
-              <span class="opt-text">Whisper only（仅 ASR 字幕）</span>
+              <span class="opt-text">{{ t("label.subtitles_mode.whisper_only") }}</span>
             </label>
             <label class="option-item">
               <input type="radio" name="subtitles_mode" value="whisper+gemini" checked />
-              <span class="opt-text">Whisper + Gemini（ASR + 翻译/润色）</span>
+              <span class="opt-text">{{ t("label.subtitles_mode.whisper_gemini") }}</span>
             </label>
           </div>
           <div class="option-grid" style="margin-top:6px;">
             <label class="option-item">
               <input type="radio" name="dub_mode" value="edge" />
-              <span class="opt-text">Edge TTS</span>
+              <span class="opt-text">{{ t("label.dub_mode.edge") }}</span>
             </label>
             <label class="option-item">
               <input type="radio" name="dub_mode" value="lovo" />
-              <span class="opt-text">LOVO</span>
+              <span class="opt-text">{{ t("label.dub_mode.lovo") }}</span>
             </label>
             <label class="option-item">
               <input type="radio" name="dub_mode" value="auto-fallback" checked />
-              <span class="opt-text">自动兜底（优先可用）</span>
+              <span class="opt-text">{{ t("label.dub_mode.auto") }}</span>
             </label>
           </div>
-          <div class="muted" style="margin-top:6px;">更多工具（关键帧/后期/换脸/数字人/剪辑器）请在 <a href="/tools/hub">Tools Hub</a> 配置。</div>
+          <div class="muted" style="margin-top:6px;">{{ t("label.more_tools") }} <a href="/tools/hub">Tools Hub</a>.</div>
         </div>
 
         <div class="summary" id="summary-block">
           <div class="summary-grid">
-            <div class="summary-item"><strong>平台</strong><span id="summary-platform">-</span></div>
-            <div class="summary-item"><strong>账号</strong><span id="summary-account">-</span></div>
-            <div class="summary-item"><strong>视频类型</strong><span id="summary-video">-</span></div>
-            <div class="summary-item"><strong>风格</strong><span id="summary-style">-</span></div>
-            <div class="summary-item"><strong>语种</strong><span id="summary-lang">缅语 (MM)</span></div>
+            <div class="summary-item"><strong>{{ t("label.platform") }}</strong><span id="summary-platform">-</span></div>
+            <div class="summary-item"><strong>{{ t("label.account") }}</strong><span id="summary-account">-</span></div>
+            <div class="summary-item"><strong>{{ t("label.video_type") }}</strong><span id="summary-video">-</span></div>
+            <div class="summary-item"><strong>{{ t("label.style") }}</strong><span id="summary-style">-</span></div>
+            <div class="summary-item"><strong>{{ t("label.language") }}</strong><span id="summary-lang">{{ t("label.lang.mm") }}</span></div>
           </div>
         </div>
 
-        <button class="btn-primary" type="submit">创建并运行</button>
-        <div class="muted t-secondary" style="margin-top: 6px;">Auto-category: Suitcase · Language: Burmese · UI: Chinese</div>
+        <button class="btn-primary" type="submit">{{ t("action.create") }}</button>
+        <div class="muted t-secondary" style="margin-top: 6px;">{{ t("label.auto_category_hint") }}</div>
       </form>
 
       <div style="margin-top: 12px;">
@@ -236,11 +236,11 @@
 
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
-      resultEl.textContent = "提交中...";
+      resultEl.textContent = window.__V185_I18N__.t("label.submit.status.submitting");
 
       const rawSource = document.getElementById("source_url").value.trim();
       if (!rawSource) {
-        alert("必须填写来源链接");
+        alert(window.__V185_I18N__.t("label.submit.error.missing_link"));
         resultEl.textContent = "";
         return;
       }
@@ -293,10 +293,15 @@
 
         const taskId = data?.task_id || "(unknown)";
         resultEl.classList.remove("error");
-        resultEl.textContent = `已创建任务 ${taskId}, 状态: ${data?.status || "pending"}`;
+        resultEl.textContent = window.__V185_I18N__.t("label.submit.status.created", {
+          task_id: taskId,
+          status: data?.status || "pending",
+        });
         setTimeout(() => { window.location.href = "/tasks"; }, 800);
       } catch (err) {
-        resultEl.textContent = "请求失败: " + err.message;
+        resultEl.textContent = window.__V185_I18N__.t("label.submit.status.failed", {
+          error: err.message,
+        });
         resultEl.classList.add("error");
       }
     });
@@ -304,4 +309,3 @@
   <script src="/static/js/i18n_v185.js"></script>
 </body>
 </html>
-

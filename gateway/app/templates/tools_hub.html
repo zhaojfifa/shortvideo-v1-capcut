@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Tools Hub</title>
+  <title>{{ t("page.tools.hub.title") }}</title>
   <link rel="stylesheet" href="/static/css/ui_v185.css">
   <style>
     :root { color-scheme: light; }
@@ -120,45 +120,45 @@
 <body>
   <div class="page">
     {% set title_key = "ui.tools.title" %}
-{% set title_text = "工具中心" %}
-{% set subtitle_text = "工具配置与入口（SSOT）" %}
+{% set title_text = t("page.tools.hub.title") %}
+{% set subtitle_text = t("page.tools.hub.subtitle") %}
 {% set active_nav = "tools" %}
-{% set secondary_label = "任务看板" %}
+{% set secondary_label = t("action.back_tasks") %}
 {% set secondary_href = "/tasks" %}
 {% include "_topbar.html" %}
     <div class="card">
       <div class="filters">
         <div>
-          <label for="filter-q">Search</label>
-          <input id="filter-q" placeholder="name, tool id, description" />
+          <label for="filter-q">{{ t("tools.filters.search") }}</label>
+          <input id="filter-q" placeholder="{{ t("tools.filters.search_placeholder") }}" />
         </div>
         <div>
-          <label for="filter-category">Category</label>
+          <label for="filter-category">{{ t("tools.filters.category") }}</label>
           <select id="filter-category">
-            <option value="">All</option>
+            <option value="">{{ t("tools.filters.all") }}</option>
           </select>
         </div>
         <div>
-          <label for="filter-capabilities">Capabilities (comma)</label>
-          <input id="filter-capabilities" placeholder="tts, scene_split" />
+          <label for="filter-capabilities">{{ t("tools.filters.capabilities") }}</label>
+          <input id="filter-capabilities" placeholder="{{ t("tools.filters.capabilities_placeholder") }}" />
         </div>
         <div>
-          <label for="filter-tags">Tags (comma)</label>
-          <input id="filter-tags" placeholder="vendor:google, tier:S" />
+          <label for="filter-tags">{{ t("tools.filters.tags") }}</label>
+          <input id="filter-tags" placeholder="{{ t("tools.filters.tags_placeholder") }}" />
         </div>
         <div>
-          <label for="filter-level">Integration</label>
+          <label for="filter-level">{{ t("tools.filters.integration") }}</label>
           <select id="filter-level">
-            <option value="">All</option>
+            <option value="">{{ t("tools.filters.all") }}</option>
             <option value="integrated_run">integrated_run</option>
             <option value="integrated_open">integrated_open</option>
             <option value="external_link">external_link</option>
           </select>
         </div>
         <div>
-          <label for="filter-status">Status</label>
+          <label for="filter-status">{{ t("tools.filters.status") }}</label>
           <select id="filter-status">
-            <option value="">All</option>
+            <option value="">{{ t("tools.filters.all") }}</option>
             <option value="active">active</option>
             <option value="degraded">degraded</option>
             <option value="outage">outage</option>
@@ -169,13 +169,13 @@
         </div>
         <div>
           <label>&nbsp;</label>
-          <button id="filter-clear" class="btn">Clear filters</button>
+          <button id="filter-clear" class="btn">{{ t("tools.filters.clear") }}</button>
         </div>
       </div>
     </div>
 
     <div class="card">
-      <div id="tools-state" class="muted">Loading tools...</div>
+      <div id="tools-state" class="muted">{{ t("tools.loading") }}</div>
       <div id="tools-list" class="tool-list" style="display:none;"></div>
     </div>
   </div>
@@ -185,44 +185,44 @@
     const BUCKETS = [
       {
         key: "keyframe_det",
-        title: "关键帧 / 确定性工程",
-        subtitle: "选镜头、切片、提关键帧",
+        title: "{{ t('tools.bucket.keyframe.title') }}",
+        subtitle: "{{ t('tools.bucket.keyframe.subtitle') }}",
         ids: ["local:ffprobe_inspect", "local:ffmpeg_scene_split", "local:ffmpeg_keyframe_extract"],
       },
       {
         key: "post_det",
-        title: "后期交付（确定性）",
-        subtitle: "转码、烧录字幕、交付封装",
+        title: "{{ t('tools.bucket.post.title') }}",
+        subtitle: "{{ t('tools.bucket.post.subtitle') }}",
         ids: ["local:ffmpeg_transcode", "local:ffmpeg_burn_subtitles"],
       },
       {
         key: "voice_audio",
-        title: "配音 / 音频",
-        subtitle: "TTS、混音、响度/降噪",
+        title: "{{ t('tools.bucket.voice.title') }}",
+        subtitle: "{{ t('tools.bucket.voice.subtitle') }}",
         ids: ["local:ffmpeg_audio_mix", "tts:edge_tts", "tts:lovo"],
       },
       {
         key: "editors",
-        title: "剪辑器",
-        subtitle: "导入包、模板剪辑、移动端导出",
+        title: "{{ t('tools.bucket.editors.title') }}",
+        subtitle: "{{ t('tools.bucket.editors.subtitle') }}",
         ids: ["editor:capcut", "editor:youcut", "editor:vn"],
       },
       {
         key: "face_swap",
-        title: "换脸",
-        subtitle: "人脸替换（单/多）",
+        title: "{{ t('tools.bucket.face_swap.title') }}",
+        subtitle: "{{ t('tools.bucket.face_swap.subtitle') }}",
         ids: ["vendor:akool_face_swap"],
       },
       {
         key: "avatar",
-        title: "数字人",
-        subtitle: "口播/驱动/素材库",
+        title: "{{ t('tools.bucket.avatar.title') }}",
+        subtitle: "{{ t('tools.bucket.avatar.subtitle') }}",
         ids: ["vendor:kling_motion", "vendor:heygen_avatar"],
       },
       {
         key: "gemini",
-        title: "理解与生成（Gemini）",
-        subtitle: "视频理解、生成、文案/脚本",
+        title: "{{ t('tools.bucket.gemini.title') }}",
+        subtitle: "{{ t('tools.bucket.gemini.subtitle') }}",
         ids: [
           "google:gemini_video_understanding",
           "google:veo",
@@ -322,8 +322,8 @@
       const remaining = tools.filter((t) => !seen.has(t.tool_id));
       if (remaining.length) {
         groups.push({
-          title: "Other / 其他",
-          subtitle: "未归类工具",
+          title: "{{ t('tools.bucket.other.title') }}",
+          subtitle: "{{ t('tools.bucket.other.subtitle') }}",
           items: sortTools(remaining),
         });
       }
