@@ -16,9 +16,9 @@
     <div class="actions">
       {% if secondary_label %}
         {% if secondary_href %}
-          <a class="btn-ghost btn-nav" href="{{ secondary_href }}" {% if secondary_id %}id="{{ secondary_id }}"{% endif %}>{{ secondary_label }}</a>
+          <a class="btn-ghost btn-nav" href="{{ secondary_href }}" {% if secondary_id %}id="{{ secondary_id }}"{% endif %}>← {{ secondary_label }}</a>
         {% else %}
-          <button type="button" class="btn-ghost btn-nav" {% if secondary_id %}id="{{ secondary_id }}"{% endif %}>{{ secondary_label }}</button>
+          <button type="button" class="btn-ghost btn-nav" {% if secondary_id %}id="{{ secondary_id }}"{% endif %}>← {{ secondary_label }}</button>
         {% endif %}
       {% endif %}
       {% if primary_label %}
