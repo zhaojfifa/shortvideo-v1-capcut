@@ -120,11 +120,12 @@
   <div class="page">
     <div class="card header">
       <div>
-        <h1>Tools Hub</h1>
-        <div class="subhead">Tool Registry (SSOT) — choose tools by category/capability</div>
+        <h1 data-i18n="ui.tools.title">工具中心</h1>
+        <div class="subhead">Tool Registry (SSOT)</div>
       </div>
       <div class="actions">
-        <a class="btn" href="/tasks">Back to Task Board</a>
+        {% include "_lang_tabs.html" %}
+        <a class="btn" href="/tasks" data-i18n="ui.tasks.board">任务看板</a>
       </div>
     </div>
 
@@ -453,5 +454,6 @@
 
     init();
   </script>
+  <script src="/static/js/i18n_v185.js"></script>
 </body>
 </html>

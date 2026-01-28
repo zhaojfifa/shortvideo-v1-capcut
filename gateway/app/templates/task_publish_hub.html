@@ -150,7 +150,7 @@
     }
     .i18n.zh { display: inline; }
     .i18n.mm { display: inline; }
-    .i18n.mm:not(.block)::before { content: " / "; }
+    .i18n.mm:not(.block)::before { content: ""; }
     .i18n.block { display: block; }
   </style>
 </head>
@@ -159,35 +159,19 @@
     <div class="card">
       <div class="header-row">
         <div>
-          <h1>
-            <span class="i18n zh">发布中心</span>
-            <span class="i18n mm">ထုတ်ဝေစင်တာ</span>
-          </h1>
-          <div class="muted">
-            <span class="i18n zh">任务 ID</span>
-            <span class="i18n mm">Task ID</span>
-            : {{ task.task_id }}
-          </div>
+          <h1 data-i18n="ui.publish.title">发布中心</h1>
+          <div class="muted">Task ID: {{ task.task_id }}</div>
         </div>
         <div class="copy-row">
-          <div class="lang-toggle" id="lang-toggle" style="display:none;">
-            <button type="button" class="lang-btn" data-lang="zh">ZH</button>
-            <button type="button" class="lang-btn" data-lang="mm">MM</button>
-          </div>
-          <a class="btn-secondary" href="/tasks">
-            <span class="i18n zh">返回看板</span>
-            <span class="i18n mm">ဘုတ်ဘား</span>
-          </a>
-          <a class="btn-primary" href="/tasks/{{ task.task_id }}">
-            <span class="i18n zh">返回工作台</span>
-            <span class="i18n mm">အလုပ်ဘုတ်</span>
-          </a>
+          {% include "_lang_tabs.html" %}
+          <a class="btn-secondary" href="/tasks" data-i18n="ui.tasks.board">任务看板</a>
+          <a class="btn-primary" href="/tasks/{{ task.task_id }}" data-i18n="ui.workbench.title">???</a>
         </div>
       </div>
       <div class="info-row" style="margin-top:10px;">
         <div class="info-pill">
           <span class="i18n zh">下载码</span>
-          <span class="i18n mm">ဒေါင်းလုပ်ကုဒ်</span>
+          <span class="i18n mm"></span>
           : <span id="download-code">{{ task.task_id[:6]|upper }}</span>
         </div>
       </div>
@@ -197,18 +181,18 @@
       <div class="section-title">
         <h2>
           <span class="i18n zh">运营门禁</span>
-          <span class="i18n mm">OP မျက်နှာတံခါး</span>
+          <span class="i18n mm">OP </span>
         </h2>
         <div class="secondary">
           <span class="i18n zh">请输入 OP Access Key 以加载发布数据。</span>
-          <span class="i18n mm">OP Access Key ဖြည့်ပြီး Publish Hub ဒေတာကို ဖွင့်ပါ။</span>
+          <span class="i18n mm">OP Access Key  Publish Hub  </span>
         </div>
       </div>
       <div class="copy-row" style="margin-top:10px;">
         <input id="op-key-input" class="publish-textarea" placeholder="OP access key" />
         <button type="button" class="btn-primary" id="op-key-save">
           <span class="i18n zh">解锁</span>
-          <span class="i18n mm">ဖွင့်</span>
+          <span class="i18n mm"></span>
         </button>
         <span id="op-key-status" class="muted"></span>
       </div>
@@ -241,21 +225,21 @@
         <div class="section-title">
           <h2>
             <span class="i18n zh">SOP 操作指引</span>
-            <span class="i18n mm">SOP လုပ်ငန်းညွှန်</span>
+            <span class="i18n mm">SOP </span>
           </h2>
           <div class="secondary">
             <span class="i18n zh">v1.85 交付操作步骤。</span>
-            <span class="i18n mm">v1.85 အတွက် လုပ်ငန်းဆောင်ရွက်မှုအဆင့်များ။</span>
+            <span class="i18n mm">v1.85  </span>
           </div>
         </div>
         <div class="i18n zh block">1) 在交付物中下载 pack.zip 或 scenes.zip。</div>
         <div class="i18n zh block" style="margin-top:8px;">2) 导入手机剪辑工具（如 CapCut），核对字幕与时长。</div>
         <div class="i18n zh block" style="margin-top:8px;">3) 使用文案包填写标题/话题/评论引导。</div>
         <div class="i18n zh block" style="margin-top:8px;">4) v1.85 仅提供编辑交付，发布包在 2.0 提供。</div>
-        <div class="i18n mm block">1) Deliverables ထဲက pack.zip သို့ scenes.zip ကိုဒေါင်းလုပ်လုပ်ပါ။</div>
-        <div class="i18n mm block" style="margin-top:8px;">2) ဖုန်းအပေါ် CapCut စတာတွေထဲ ထည့်ပြီး စာတန်းနဲ့ အချိန်ကို စစ်ပါ။</div>
-        <div class="i18n mm block" style="margin-top:8px;">3) Copy Bundle ကိုသုံးပြီး ခေါင်းစဉ်/ဟက်ရှ်တက်/မှတ်ချက်ခေါ်ဆောင်မှု ဖြည့်ပါ။</div>
-        <div class="i18n mm block" style="margin-top:8px;">4) v1.85 မှာ editing delivery ပါသာ; Publish bundle ကို v2.0 မှာပေးမည်။</div>
+        <div class="i18n mm block">1) Deliverables  pack.zip  scenes.zip </div>
+        <div class="i18n mm block" style="margin-top:8px;">2)  CapCut     </div>
+        <div class="i18n mm block" style="margin-top:8px;">3) Copy Bundle  // </div>
+        <div class="i18n mm block" style="margin-top:8px;">4) v1.85  editing delivery ; Publish bundle  v2.0 </div>
       </div>
     </div>
     <div class="tab-panel" id="tab-copy">
@@ -267,18 +251,18 @@
           </h2>
           <div class="secondary">
             <span class="i18n zh">运营可编辑字段，修改不会保存。</span>
-            <span class="i18n mm">အော်ပရေးရှင်းတွေအတွက် ပြင်ဆင်နိုင်သော အချက်အလက်များ (မသိမ်းဆည်းပါ)။</span>
+            <span class="i18n mm">   ()</span>
           </div>
         </div>
         <div class="field" style="margin-top:10px;">
           <label>
             <span class="i18n zh">标题/文案</span>
-            <span class="i18n mm">ခေါင်းစဉ်</span>
+            <span class="i18n mm"></span>
           </label>
           <div class="copy-row">
             <button type="button" class="copy-btn" data-copy-target="copy-caption">
               <span class="i18n zh">复制</span>
-              <span class="i18n mm">ကူးယူ</span>
+              <span class="i18n mm"></span>
             </button>
           </div>
           <textarea id="copy-caption" class="publish-textarea"></textarea>
@@ -286,12 +270,12 @@
         <div class="field" style="margin-top:10px;">
           <label>
             <span class="i18n zh">话题标签</span>
-            <span class="i18n mm">ဟက်ရှ်တက်</span>
+            <span class="i18n mm"></span>
           </label>
           <div class="copy-row">
             <button type="button" class="copy-btn" data-copy-target="copy-hashtags">
               <span class="i18n zh">复制</span>
-              <span class="i18n mm">ကူးယူ</span>
+              <span class="i18n mm"></span>
             </button>
           </div>
           <textarea id="copy-hashtags" class="publish-textarea"></textarea>
@@ -299,12 +283,12 @@
         <div class="field" style="margin-top:10px;">
           <label>
             <span class="i18n zh">评论引导</span>
-            <span class="i18n mm">မှတ်ချက်ခေါ်ဆောင်မှု</span>
+            <span class="i18n mm"></span>
           </label>
           <div class="copy-row">
             <button type="button" class="copy-btn" data-copy-target="copy-comment-cta">
               <span class="i18n zh">复制</span>
-              <span class="i18n mm">ကူးယူ</span>
+              <span class="i18n mm"></span>
             </button>
           </div>
           <textarea id="copy-comment-cta" class="publish-textarea"></textarea>
@@ -312,12 +296,12 @@
         <div class="field" style="margin-top:10px;">
           <label>
             <span class="i18n zh">挂链文案</span>
-            <span class="i18n mm">လင့်ခ်စာသား</span>
+            <span class="i18n mm"></span>
           </label>
           <div class="copy-row">
             <button type="button" class="copy-btn" data-copy-target="copy-link-text">
               <span class="i18n zh">复制</span>
-              <span class="i18n mm">ကူးယူ</span>
+              <span class="i18n mm"></span>
             </button>
           </div>
           <textarea id="copy-link-text" class="publish-textarea"></textarea>
@@ -325,12 +309,12 @@
         <div class="field" style="margin-top:10px;">
           <label>
             <span class="i18n zh">发布时间建议</span>
-            <span class="i18n mm">ထုတ်လွှတ်ချိန်အကြံပြု</span>
+            <span class="i18n mm"></span>
           </label>
           <div class="copy-row">
             <button type="button" class="copy-btn" data-copy-target="copy-publish-time">
               <span class="i18n zh">复制</span>
-              <span class="i18n mm">ကူးယူ</span>
+              <span class="i18n mm"></span>
             </button>
           </div>
           <textarea id="copy-publish-time" class="publish-textarea"></textarea>
@@ -346,13 +330,13 @@
           </h2>
           <div class="secondary">
             <span class="i18n zh">仅显示已生成的产物。</span>
-            <span class="i18n mm">အပြီးထွက်ထားတာပဲ ပြမယ်။</span>
+            <span class="i18n mm"> </span>
           </div>
         </div>
         <div id="deliverables-list" class="copy-row" style="margin-top:12px;"></div>
         <div class="muted" id="deliverables-empty" style="margin-top:8px; display:none;">
           <span class="i18n zh">暂无交付物。</span>
-          <span class="i18n mm">Deliverables မရှိသေးပါ။</span>
+          <span class="i18n mm">Deliverables </span>
         </div>
         <div class="copy-row" style="margin-top:12px;">
           <a id="edit-bundle-link" class="btn-primary" href="#" target="_blank" rel="noopener">
@@ -364,7 +348,7 @@
           <img id="qr-image" alt="QR" style="width:180px;height:180px;border:1px solid #e5e7eb;background:#fff;" />
           <div class="muted">
             <span class="i18n zh">扫码下载编辑包</span>
-            <span class="i18n mm">QR scan လုပ်ပြီး Edit Bundle ကိုဒေါင်းလုပ်ပါ</span>
+            <span class="i18n mm">QR scan  Edit Bundle </span>
           </div>
         </div>
         <div class="copy-row" style="margin-top:6px;">
@@ -398,7 +382,7 @@
           </h2>
           <div class="secondary">
             <span class="i18n zh">归档确认交付，不代表已发布。</span>
-            <span class="i18n mm">Archive က တင်ပို့မှုကို အတည်ပြုတာသာဖြစ်ပြီး ထုတ်ဝေပြီးခြင်းမဟုတ်ပါ။</span>
+            <span class="i18n mm">Archive    </span>
           </div>
         </div>
         <div class="info-row">
@@ -432,7 +416,7 @@
               <input type="checkbox" id="archive-published" />
               <span class="muted">
                 <span class="i18n zh">勾选表示已发布</span>
-                <span class="i18n mm">အမှန်ခြစ်ရင် ထုတ်ဝေပြီး</span>
+                <span class="i18n mm"> </span>
               </span>
             </div>
           </div>
@@ -666,18 +650,18 @@ function resolveLang(serverLang) {
     async function fetchPublishHub() {
       const opKey = getOpKey();
       if (!opKey) {
-        showGate(bi("请输入 OP Access Key 继续。", "OP Access Key ဖြည့်ပြီး ဆက်လုပ်ပါ။"));
+        showGate(bi("请输入 OP Access Key 继续。", "OP Access Key  "));
         return;
       }
       const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish_hub`, {
         headers: { "X-OP-KEY": opKey },
       });
       if (resp.status === 401 || resp.status === 403) {
-        showGate(bi("OP Access Key 不正确。", "OP Access Key မမှန်ပါ။"));
+        showGate(bi("OP Access Key 不正确。", "OP Access Key "));
         return;
       }
       if (!resp.ok) {
-        showGate(bi(`加载失败: HTTP ${resp.status}`, `မအောင်မြင်ပါ: HTTP ${resp.status}`));
+        showGate(bi(`加载失败: HTTP ${resp.status}`, `: HTTP ${resp.status}`));
         return;
       }
       hideGate();
@@ -722,7 +706,7 @@ function resolveLang(serverLang) {
     if (publishBtn) {
       publishBtn.addEventListener("click", async () => {
       const statusEl = document.getElementById("publish-status");
-      if (statusEl) statusEl.textContent = bi("提交中...", "တင်ပို့နေသည်...");
+      if (statusEl) statusEl.textContent = bi("提交中...", "...");
       try {
         const opKey = getOpKey();
         const headers = { "Content-Type": "application/json" };
@@ -734,13 +718,13 @@ function resolveLang(serverLang) {
         });
           if (!resp.ok) {
             const detail = await resp.text();
-            if (statusEl) statusEl.textContent = bi(`提交失败: ${resp.status} ${detail}`, `မအောင်မြင်ပါ: ${resp.status} ${detail}`);
+            if (statusEl) statusEl.textContent = bi(`提交失败: ${resp.status} ${detail}`, `: ${resp.status} ${detail}`);
             return;
           }
-          if (statusEl) statusEl.textContent = bi("已提交。", "တင်ပြီးပါပြီ။");
+          if (statusEl) statusEl.textContent = bi("已提交。", "");
           await fetchPublishHub();
         } catch (err) {
-          if (statusEl) statusEl.textContent = bi(`提交错误: ${err}`, `အမှား: ${err}`);
+          if (statusEl) statusEl.textContent = bi(`提交错误: ${err}`, `: ${err}`);
         }
       });
     }
@@ -749,7 +733,7 @@ function resolveLang(serverLang) {
     if (archiveSaveBtn) {
       archiveSaveBtn.addEventListener("click", async () => {
         const statusEl = document.getElementById("archive-save-status");
-        if (statusEl) statusEl.textContent = bi("保存中...", "သိမ်းနေသည်...");
+        if (statusEl) statusEl.textContent = bi("保存中...", "...");
         const payload = {
           archive: {
             archive_location: document.getElementById("archive-location")?.value?.trim() || "",
@@ -771,13 +755,13 @@ function resolveLang(serverLang) {
           });
           if (!resp.ok) {
             const detail = await resp.text();
-            if (statusEl) statusEl.textContent = bi(`保存失败: ${resp.status} ${detail}`, `မအောင်မြင်ပါ: ${resp.status} ${detail}`);
+            if (statusEl) statusEl.textContent = bi(`保存失败: ${resp.status} ${detail}`, `: ${resp.status} ${detail}`);
             return;
           }
-          if (statusEl) statusEl.textContent = bi("已保存。", "သိမ်းပြီးပါပြီ။");
+          if (statusEl) statusEl.textContent = bi("已保存。", "");
           await fetchPublishHub();
         } catch (err) {
-          if (statusEl) statusEl.textContent = bi(`保存错误: ${err}`, `အမှား: ${err}`);
+          if (statusEl) statusEl.textContent = bi(`保存错误: ${err}`, `: ${err}`);
         }
       });
     }
@@ -795,7 +779,7 @@ function resolveLang(serverLang) {
         const input = document.getElementById("op-key-input");
         const value = input ? input.value.trim() : "";
         if (!value) {
-          showGate(bi("需要 OP Access Key。", "OP Access Key လိုအပ်သည်။"));
+          showGate(bi("需要 OP Access Key。", "OP Access Key "));
           return;
         }
         setOpKey(value);
@@ -832,11 +816,12 @@ function resolveLang(serverLang) {
       }
 
       if (!getOpKey()) {
-        showGate(bi("请输入 OP Access Key 继续。", "OP Access Key ဖြည့်ပြီး ဆက်လုပ်ပါ။"));
+        showGate(bi("请输入 OP Access Key 继续。", "OP Access Key  "));
         return;
       }
       fetchPublishHub().catch(() => {});
     });
   </script>
+  <script src="/static/js/i18n_v185.js"></script>
 </body>
 </html>

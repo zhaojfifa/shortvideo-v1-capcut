@@ -89,10 +89,11 @@
 </head>
 <body>
   <header>
-    <h1>Task Board <span class="muted t-secondary">/ Task Board</span></h1>
+    <h1 data-i18n="ui.tasks.board">任务看板</h1>
+    {% include "_lang_tabs.html" %}
     <div class="actions">
-      <a class="btn" href="/tasks/new">New task <span class="muted t-secondary">/ New task</span></a>
-      <button id="refresh-btn" type="button">Refresh <span class="muted t-secondary">/ Refresh</span></button>
+      <a class="btn" href="/tasks/new" data-i18n="ui.tasks.new">新建任务</a>
+      <button id="refresh-btn" type="button">刷新</button>
     </div>
   </header>
 
@@ -103,16 +104,16 @@
       <thead>
         <tr>
           <th>ID</th>
-          <th>Title <span class="muted t-secondary">/ Title</span></th>
-          <th>Category <span class="muted t-secondary">/ Category</span></th>
-          <th>Lang <span class="muted t-secondary">/ Language</span></th>
-          <th>Platform <span class="muted t-secondary">/ Platform</span></th>
-          <th>Account <span class="muted t-secondary">/ Account</span></th>
-          <th>Status <span class="muted t-secondary">/ Status</span></th>
-          <th>Last Step <span class="muted t-secondary">/ Last step</span></th>
-          <th>Pack <span class="muted t-secondary">/ Pack</span></th>
-          <th>Created <span class="muted t-secondary">/ Created</span></th>
-          <th>JSON <span class="muted t-secondary">(Engineering)</span></th>
+          <th>Title</th>
+          <th>Category</th>
+          <th>Lang</th>
+          <th>Platform</th>
+          <th>Account</th>
+          <th>Status</th>
+          <th>Last Step</th>
+          <th>Pack</th>
+          <th>Created</th>
+          <th>JSON</th>
         </tr>
       </thead>
       <tbody id="task-rows"></tbody>
@@ -160,7 +161,7 @@
     function platformLabel(code) {
       if (!code) return "";
       const lower = String(code).toLowerCase();
-      if (lower === "douyin") return "抖音 / ဒေါ်ယင်";
+      if (lower === "douyin") return "抖音 / ";
       if (lower === "xhs") return "小红书 / 小红书";
       if (lower === "tk" || lower === "tiktok") return "TikTok / TikTok";
       if (lower === "fb" || lower === "facebook") return "Facebook / Facebook";
@@ -242,6 +243,7 @@
     document.getElementById("refresh-btn").addEventListener("click", loadTasks);
     document.addEventListener("DOMContentLoaded", loadTasks);
   </script>
+  <script src="/static/js/i18n_v185.js"></script>
 </body>
 </html>
 

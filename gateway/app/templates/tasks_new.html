@@ -87,32 +87,30 @@
 <body>
   <div class="page">
     <header>
-      <h1>{{ t_primary("new_suitcase_task") }}</h1>
-      {% if ui_show_secondary %}
-        <div class="muted t-secondary">{{ t_secondary("new_suitcase_task") }}</div>
-      {% endif %}
-      <a href="/tasks">返回任务看板 <span class="muted t-secondary">/ တာဝန်စာရင်းသို့ ပြန်ရန်</span></a>
+      <h1 data-i18n="ui.tasks.new">新建任务</h1>
+      {% include "_lang_tabs.html" %}
+      <a href="/tasks" data-i18n="ui.tasks.board">任务看板</a>
     </header>
 
     <main class="card">
       <form id="task-form">
         <div class="field">
-          <label for="source_url">来源链接 <span class="muted t-secondary">/ အရင်းအမြစ် URL</span> *</label>
-          <input id="source_url" name="source_url" type="text" autocomplete="off" required placeholder="粘贴来源链接 (Douyin/XHS/TK/FB) / အရင်းအမြစ် URL ကို ထည့်ပါ" />
+          <label for="source_url">来源链接 *</label>
+          <input id="source_url" name="source_url" type="text" autocomplete="off" required placeholder="粘贴来源链接 (Douyin/XHS/TK/FB)" />
         </div>
 
         <div class="row">
           <div class="field">
-            <label for="platform">平台 <span class="muted t-secondary">/ ပလက်ဖောင်း</span></label>
+            <label for="platform">平台</label>
             <select id="platform" name="platform">
-              <option value="douyin" selected>抖音 / ဒေါ်ယင်</option>
-              <option value="xhs">小红书 / 小红书</option>
-              <option value="tiktok">TikTok / TikTok</option>
-              <option value="fb">Facebook / Facebook</option>
+              <option value="douyin" selected>抖音</option>
+              <option value="xhs">小红书</option>
+              <option value="tiktok">TikTok</option>
+              <option value="fb">Facebook</option>
             </select>
           </div>
           <div class="field">
-            <label for="account_id">账号 <span class="muted t-secondary">/ အကောင့်</span></label>
+            <label for="account_id">账号</label>
             <select id="account_id" name="account_id">
               <option value="suitcase_mm_1">Suitcase MM #1</option>
             </select>
@@ -121,31 +119,31 @@
         </div>
 
         <div class="field">
-          <label>视频类型 <span class="muted t-secondary">/ ဗီဒီယိုအမျိုးအစား</span></label>
-          <div class="muted t-secondary">选择业务意图 / အသုံးပြုရည်ရွယ်ချက်ကို ရွေးပါ</div>
+          <label>视频类型</label>
+          <div class="muted t-secondary">选择业务意图</div>
           <div class="radio-group" style="margin-top:6px;">
-            <label class="radio"><input type="radio" name="video_type" value="review" checked /> 对比测评 / နှိုင်းယှဉ်သုံးသပ်</label>
-            <label class="radio"><input type="radio" name="video_type" value="scenario" /> 场景使用 / အခြေအနေအသုံးပြု</label>
+            <label class="radio"><input type="radio" name="video_type" value="review" checked /> 对比测评</label>
+            <label class="radio"><input type="radio" name="video_type" value="scenario" /> 场景使用</label>
           </div>
         </div>
 
         <div class="field">
-          <label>风格预设 <span class="muted t-secondary">/ စတိုင်</span></label>
-          <div class="muted t-secondary">定义节奏与剪辑意图 / အမြန်နှုန်းနှင့်剪辑ရည်ရွယ်ချက်</div>
+          <label>风格预设</label>
+          <div class="muted t-secondary">定义节奏与剪辑意图</div>
           <div class="radio-group" style="margin-top:6px;">
-            <label class="radio"><input type="radio" name="style_preset" value="review_brief" checked /> 短评快节奏 / အတိုပြန်လည်သုံးသပ်</label>
-            <label class="radio"><input type="radio" name="style_preset" value="scenario_story" /> 情景叙事 / ဇာတ်လမ်းပုံစံ</label>
+            <label class="radio"><input type="radio" name="style_preset" value="review_brief" checked /> 短评快节奏</label>
+            <label class="radio"><input type="radio" name="style_preset" value="scenario_story" /> 情景叙事</label>
           </div>
         </div>
 
         <div class="field">
-          <label for="title">标题（可选） <span class="muted t-secondary">/ ခေါင်းစဉ် (ရွေးချယ်)</span></label>
-          <input id="title" name="title" type="text" placeholder="可选标题 / ခေါင်းစဉ် (ရွေးချယ်)" />
+          <label for="title">标题（可选）</label>
+          <input id="title" name="title" type="text" placeholder="可选标题" />
         </div>
 
         <div class="field">
-          <label for="note">备注 / 运营提示 <span class="muted t-secondary">/ မှတ်ချက်</span></label>
-          <textarea id="note" name="note" placeholder="给运营备注 / အော်ပရေးရှင်းမှတ်ချက်"></textarea>
+          <label for="note">备注 / 运营提示</label>
+          <textarea id="note" name="note" placeholder="给运营备注"></textarea>
         </div>
 
         <div class="field" id="pipeline-tools">
@@ -165,16 +163,16 @@
 
         <div class="summary" id="summary-block">
           <div class="summary-grid">
-            <div class="summary-item"><strong>平台 <span class="muted t-secondary">/ ပလက်ဖောင်း</span></strong><span id="summary-platform">-</span></div>
-            <div class="summary-item"><strong>账号 <span class="muted t-secondary">/ အကောင့်</span></strong><span id="summary-account">-</span></div>
-            <div class="summary-item"><strong>视频类型 <span class="muted t-secondary">/ ဗီဒီယိုအမျိုးအစား</span></strong><span id="summary-video">-</span></div>
-            <div class="summary-item"><strong>风格 <span class="muted t-secondary">/ စတိုင်</span></strong><span id="summary-style">-</span></div>
-            <div class="summary-item"><strong>语种 <span class="muted t-secondary">/ ဘာသာ</span></strong><span id="summary-lang">缅语 (MM) / မြန်မာ (MM)</span></div>
+            <div class="summary-item"><strong>平台</strong><span id="summary-platform">-</span></div>
+            <div class="summary-item"><strong>账号</strong><span id="summary-account">-</span></div>
+            <div class="summary-item"><strong>视频类型</strong><span id="summary-video">-</span></div>
+            <div class="summary-item"><strong>风格</strong><span id="summary-style">-</span></div>
+            <div class="summary-item"><strong>语种</strong><span id="summary-lang">缅语 (MM)</span></div>
           </div>
         </div>
 
-        <button class="btn-primary" type="submit">创建并运行 <span class="muted t-secondary">/ တာဝန်ဖန်တီးပြီး စတင်</span></button>
-        <div class="muted t-secondary" style="margin-top: 6px;">Auto-category: Suitcase · Language: Burmese · UI: Chinese <span class="muted t-secondary">/ Auto category · Language · UI</span></div>
+        <button class="btn-primary" type="submit">创建并运行</button>
+        <div class="muted t-secondary" style="margin-top: 6px;">Auto-category: Suitcase · Language: Burmese · UI: Chinese</div>
       </form>
 
       <div style="margin-top: 12px;">
@@ -207,11 +205,11 @@
 
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
-      resultEl.textContent = "提交中... / တင်နေသည်...";
+      resultEl.textContent = "提交中...";
 
       const rawSource = document.getElementById("source_url").value.trim();
       if (!rawSource) {
-        alert("必须填写来源链接 / အရင်းအမြစ် URL လိုအပ်သည်");
+        alert("必须填写来源链接");
         resultEl.textContent = "";
         return;
       }
@@ -272,6 +270,7 @@
       }
     });
   </script>
+  <script src="/static/js/i18n_v185.js"></script>
 </body>
 </html>
 
