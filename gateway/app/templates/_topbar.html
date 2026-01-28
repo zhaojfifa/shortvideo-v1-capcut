@@ -1,4 +1,4 @@
-ï»¿<div class="topbar">
+<div class="topbar">
   <div class="topbar-left">
     <h1 data-i18n="{{ title_key }}">{{ title_text }}</h1>
     {% if subtitle_text %}
@@ -6,12 +6,24 @@
     {% endif %}
   </div>
   <div class="topbar-mid">
-    {{ mid_html | safe }}
+    <div class="nav-segment">
+      <a class="nav-item {% if active_nav == 'tasks' %}active{% endif %}" href="/tasks">ÈÎÎñ</a>
+      <a class="nav-item {% if active_nav == 'tools' %}active{% endif %}" href="/tools/hub">¹¤¾ß</a>
+    </div>
   </div>
   <div class="topbar-right">
     {% include "_lang_tabs.html" %}
     <div class="actions">
-      {{ actions_html | safe }}
+      {% if secondary_label %}
+        {% if secondary_href %}
+          <a class="btn-ghost" href="{{ secondary_href }}" {% if secondary_id %}id="{{ secondary_id }}"{% endif %}>{{ secondary_label }}</a>
+        {% else %}
+          <button type="button" class="btn-ghost" {% if secondary_id %}id="{{ secondary_id }}"{% endif %}>{{ secondary_label }}</button>
+        {% endif %}
+      {% endif %}
+      {% if primary_label %}
+        <a class="btn-primary" href="{{ primary_href }}">{{ primary_label }}</a>
+      {% endif %}
     </div>
   </div>
 </div>

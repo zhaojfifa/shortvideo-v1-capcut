@@ -20,3 +20,11 @@
 
 .option-item{display:flex;gap:8px;align-items:flex-start;}
 .option-item .opt-text{white-space:normal;line-height:1.25;}
+.nav-segment{display:flex;gap:6px;padding:4px;border-radius:999px;background:#eef2ff;}
+.nav-segment .nav-item{padding:6px 12px;border-radius:999px;text-decoration:none;color:#1f2937;font-size:12px;font-weight:600;}
+.nav-segment .nav-item.active{background:#111827;color:#fff;}
+
+.btn-primary{background:#2563eb;color:#fff;padding:8px 12px;border-radius:8px;text-decoration:none;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;}
+.btn-primary:hover{background:#1d4ed8;}
+.btn-ghost{background:#e5e7eb;color:#111827;padding:8px 12px;border-radius:8px;text-decoration:none;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;border:0;cursor:pointer;}
+.btn-ghost:hover{background:#d1d5db;}

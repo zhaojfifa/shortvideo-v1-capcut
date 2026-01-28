@@ -147,14 +147,15 @@
 <body>
   <div class="page workbench">
     <div class="card header-card">
-      <div class="header-row">
-        <a class="back-link back-button btn-secondary" href="/tasks" data-i18n="ui.tasks.board">任务看板</a>
-        {% include "_lang_tabs.html" %}
+{% set title_key = "ui.workbench.title" %}
+{% set title_text = "工作台" %}
+{% set subtitle_text = "任务ID: " ~ task.task_id %}
+{% set active_nav = "tasks" %}
+{% set secondary_label = "任务看板" %}
+{% set secondary_href = "/tasks" %}
+{% include "_topbar.html" %}
+      <div class="info-row" style="margin-top:8px;">
         <div id="status-badge" class="status-pill">{{ task.status }}</div>
-      </div>
-      <div class="header-row">
-        <h1 data-i18n="ui.workbench.title">工作台</h1>
-        <div class="muted">Task ID: {{ task.task_id }}</div>
       </div>
       <div class="meta-grid">
         <div class="meta-item"><strong>Task ID <span class="muted t-secondary">/ 任务ID</span></strong><span>{{ task.task_id }}</span></div>
