@@ -16,8 +16,8 @@
 </head>
 <body>
   <div class="card">
-    <h2>运营登录</h2>
-    <div class="muted">请输入 Operator 名与访问密钥（OP_ACCESS_KEY）。支持 admin/operator。</div>
+    <h2>{{ t("auth.login.title") }}</h2>
+    <div class="muted">{{ t("auth.login.desc") }}</div>
 
     <div id="err" class="error">Invalid key</div>
 
@@ -27,7 +27,7 @@
     <label>Key</label>
     <input id="key" placeholder="OP_ACCESS_KEY" />
 
-    <button id="btn">登录</button>
+    <button id="btn">{{ t("auth.login.button") }}</button>
   </div>
 
 <script>

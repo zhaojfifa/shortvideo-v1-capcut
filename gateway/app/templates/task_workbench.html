@@ -148,29 +148,29 @@
   <div class="page workbench">
     <div class="card header-card">
 {% set title_key = "ui.workbench.title" %}
-{% set title_text = "工作台" %}
-{% set subtitle_text = "任务ID: " ~ task.task_id %}
+{% set title_text = t("page.workbench.title") %}
+{% set subtitle_text = t("page.workbench.subtitle", task_id=task.task_id) %}
 {% set active_nav = "tasks" %}
-{% set secondary_label = "任务看板" %}
+{% set secondary_label = t("action.back_tasks") %}
 {% set secondary_href = "/tasks" %}
 {% include "_topbar.html" %}
       <div class="info-row" style="margin-top:8px;">
         <div id="status-badge" class="status-pill">{{ task.status }}</div>
       </div>
       <div class="meta-grid">
-        <div class="meta-item"><strong>Task ID <span class="muted t-secondary">/ 任务ID</span></strong><span>{{ task.task_id }}</span></div>
-        <div class="meta-item"><strong>Platform <span class="muted t-secondary">/ 平台</span></strong><span>{{ task.platform or '-' }}</span></div>
-        <div class="meta-item"><strong>Account <span class="muted t-secondary">/ 账号</span></strong><span>{{ task.account_id or '-' }}</span></div>
-        <div class="meta-item"><strong>Category <span class="muted t-secondary">/ 分类</span></strong><span>{{ task.category_key or '-' }}</span></div>
-        <div class="meta-item"><strong>Language <span class="muted t-secondary">/ 语种</span></strong><span>{{ task.content_lang or '-' }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.task_id") }}</strong><span>{{ task.task_id }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.platform") }}</strong><span>{{ task.platform or '-' }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.account") }}</strong><span>{{ task.account_id or '-' }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.category") }}</strong><span>{{ task.category_key or '-' }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.language") }}</strong><span>{{ task.content_lang or '-' }}</span></div>
         {% set pipeline = task.pipeline_config or {} %}
         {% set subtitles_mode = pipeline.get("subtitles_mode", "whisper+gemini") %}
         {% set dub_mode = pipeline.get("dub_mode", "auto-fallback") %}
-        <div class="meta-item"><strong>Pipeline <span class="muted t-secondary">/ 工具</span></strong><span>Subtitles: {{ subtitles_mode }} · Dub: {{ dub_mode }}</span></div>
-        <div class="meta-item"><strong>Status <span class="muted t-secondary">/ 状态</span></strong><span>{{ task.status }}</span></div>
-        <div class="meta-item"><strong>Created <span class="muted t-secondary">/ 创建时间</span></strong><span>{{ task.created_at }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.pipeline") }}</strong><span>Subtitles: {{ subtitles_mode }} · Dub: {{ dub_mode }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.status") }}</strong><span>{{ task.status }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.created") }}</strong><span>{{ task.created_at }}</span></div>
         <div class="meta-item">
-          <strong>Source URL <span class="muted t-secondary">/ 来源</span></strong>
+          <strong>{{ t("workbench.meta.source_url") }}</strong>
           {% if task_view.source_url_open %}
             <div><a href="{{ task_view.source_url_open }}" target="_blank" rel="noopener">Open source link</a></div>
           {% else %}
@@ -182,47 +182,47 @@
 
     <div class="panel">
       <div class="section-title">
-        <h2>交付物 <span class="muted t-secondary">/ </span></h2>
-        <div class="secondary">运营可下载交付物 /  </div>
+        <h2>{{ t("workbench.deliverables") }}</h2>
+        <div class="secondary">{{ t("workbench.deliverables.subtitle") }}</div>
       </div>
       <div class="section-grid deliverables-grid">
         <div class="deliverable-card primary">
-          <div class="deliverable-title">剪辑包 <span class="muted t-secondary">/ </span></div>
+          <div class="deliverable-title">{{ t("workbench.pack") }}</div>
           <div class="deliverable-actions">
-            <a id="pack-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/pack" target="_blank" rel="noopener">下载 / </a>
-            <span id="pack-status" class="muted t-secondary">未就绪 / </span>
+            <a id="pack-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/pack" target="_blank" rel="noopener">{{ t("action.download") }}</a>
+            <span id="pack-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
-          <div class="muted t-secondary" style="margin-top:6px;">下载将跳转到对象存储链接 / 302  </div>
+          <div class="muted" style="margin-top:6px;">{{ t("workbench.deliverables.subtitle") }}</div>
         </div>
         <div class="deliverable-card">
-          <div class="deliverable-title">场景包 <span class="muted t-secondary">/  (Scenes)</span></div>
+          <div class="deliverable-title">{{ t("workbench.scenes") }}</div>
           <div class="deliverable-actions">
-            <a id="scenes-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">下载 Scenes.zip / Scenes.zip </a>
-            <span id="scenes-status" class="muted t-secondary">未就绪 / </span>
+            <a id="scenes-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">{{ t("workbench.scenes_download") }}</a>
+            <span id="scenes-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
-          <div class="muted t-secondary" style="margin-top:6px;">下载 → 解压 → 打开视频与字幕 /  →  →  </div>
+          <div class="muted" style="margin-top:6px;">{{ t("workbench.scenes_desc") }}</div>
         </div>
         <div class="deliverable-card">
-          <div class="deliverable-title">视频 <span class="muted t-secondary">/ </span></div>
+          <div class="deliverable-title">{{ t("workbench.video") }}</div>
           <div class="deliverable-actions">
             <a id="raw-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/raw" target="_blank" rel="noopener">raw.mp4</a>
-            <span id="video-status" class="muted t-secondary">未就绪 / </span>
+            <span id="video-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
         </div>
         <div class="deliverable-card">
-          <div class="deliverable-title">缅文字幕 <span class="muted t-secondary">/ </span></div>
+          <div class="deliverable-title">{{ t("workbench.mm_subtitles") }}</div>
           <div class="deliverable-actions">
             <a id="mm-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/subs_mm" target="_blank" rel="noopener">mm.srt</a>
             <a id="mm-txt-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/mm_txt" target="_blank" rel="noopener">mm.txt</a>
             <a id="origin-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/subs_origin" target="_blank" rel="noopener">origin.srt</a>
-            <span id="subs-status" class="muted t-secondary">未就绪 / </span>
+            <span id="subs-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
         </div>
         <div class="deliverable-card">
-          <div class="deliverable-title">缅语配音 <span class="muted t-secondary">/ </span></div>
+          <div class="deliverable-title">{{ t("workbench.mm_audio") }}</div>
           <div class="deliverable-actions">
             <a id="audio-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/audio_mm" target="_blank" rel="noopener">mm_audio</a>
-            <span id="audio-status" class="muted t-secondary">未就绪 / </span>
+            <span id="audio-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
           <audio id="audio-preview" controls style="display:none; width: 100%; margin-top:6px;"></audio>
         </div>
@@ -231,24 +231,24 @@
 
     <div class="panel">
       <div class="section-title">
-        <h2>场景切片</h2>
-        <div class="secondary">用于运营复用的场景切片。</div>
+        <h2>{{ t("workbench.scenes_section") }}</h2>
+        <div class="secondary">{{ t("workbench.scenes_desc") }}</div>
       </div>
       <div class="section-grid" style="margin-top:12px;">
         <div class="field">
-          <label>说明</label>
+          <label>{{ t("workbench.scenes_action") }}</label>
           <div class="muted" style="white-space:pre-wrap;">
-生成场景切片会按字幕时间切分视频并打包为 Scenes.zip。点击“生成场景切片”，状态就绪后下载 Scenes.zip。无需打开或编辑 JSON。Scenes.zip 不影响 Pack.zip，两个包用途不同。
+{{ t("workbench.scenes_help") }}
           </div>
         </div>
         <div class="field">
-          <label>操作</label>
+          <label>{{ t("workbench.scenes_action") }}</label>
           <div class="action-row" style="margin-top:8px; flex-wrap:wrap; gap:8px;">
-            <button id="btn-scenes" class="btn-primary">生成场景切片</button>
-            <a id="btn-scenes-download" class="btn-secondary disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">下载 Scenes.zip</a>
-            <span id="scenes-step-status" class="muted">未就绪</span>
+            <button id="btn-scenes" class="btn-primary">{{ t("workbench.scenes_generate") }}</button>
+            <a id="btn-scenes-download" class="btn-secondary disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">{{ t("workbench.scenes_download") }}</a>
+            <span id="scenes-step-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
-          <div id="scenes-error" class="muted t-secondary" style="margin-top:6px;"></div>
+          <div id="scenes-error" class="muted" style="margin-top:6px;"></div>
         </div>
       </div>
     </div>
@@ -256,32 +256,32 @@
     
     <div class="panel">
       <div class="section-title">
-        <h2>Publish Hub <span class="muted t-secondary">/ 发布中心</span></h2>
-        <div class="secondary">Publish is moved to a standalone hub page.</div>
+        <h2>{{ t("workbench.publish_hub") }}</h2>
+        <div class="secondary">{{ t("workbench.publish_hint") }}</div>
       </div>
       <div class="action-row" style="margin-top:12px; flex-wrap:wrap; gap:8px;">
-        <a class="btn-primary" href="/tasks/{{ task.task_id }}/publish">Open Publish Hub <span class="muted t-secondary">/ 打开发布中心</span></a>
+        <a class="btn-primary" href="/tasks/{{ task.task_id }}/publish">{{ t("workbench.publish_open") }}</a>
       </div>
     </div>
 <div class="panel">
       <div class="section-title">
-        <h2>流程 <span class="muted t-secondary">/ </span></h2>
-        <div class="secondary">运营流程视图 / </div>
+        <h2>{{ t("workbench.steps") }}</h2>
+        <div class="secondary">{{ t("workbench.steps.subtitle") }}</div>
       </div>
       <div class="section-grid steps-grid">
         <div class="step-card">
-          <h3>步骤1 - 解析与下载 <span class="muted t-secondary">/ </span></h3>
-          <p class="muted t-secondary">调用 /api/tasks/{id}/parse / /api/tasks/{id}/parse  </p>
+          <h3>{{ t("workbench.step.parse.title") }}</h3>
+          <p class="muted">{{ t("workbench.step.parse.desc") }}</p>
           <div class="action-row">
-            <button id="btn-parse" class="btn-primary">运行解析 <span class="muted t-secondary">/ </span></button>
-            <span id="parse-status" class="muted t-secondary">未解析 / </span>
+            <button id="btn-parse" class="btn-primary">{{ t("workbench.step.parse.run") }}</button>
+            <span id="parse-status" class="muted">{{ t("workbench.status.not_parsed") }}</span>
           </div>
         </div>
         <div class="step-card">
-          <h3>步骤3 - 缅语配音 <span class="muted">/ </span></h3>
+          <h3>{{ t("workbench.step.dub.title") }}</h3>
           <div class="form-grid">
             <div class="field">
-              <label for="voice-id">音色 <span class="muted">/ </span></label>
+              <label for="voice-id">{{ t("workbench.step.dub.voice") }}</label>
               <select id="voice-id">
                 <option value="mm_female_1">mm_female_1</option>
                 <option value="mm_male_1">mm_male_1</option>
@@ -289,7 +289,7 @@
               </select>
             </div>
             <div class="field">
-              <label for="dub-provider">引擎 <span class="muted">/ </span></label>
+              <label for="dub-provider">{{ t("workbench.step.dub.engine") }}</label>
               <select id="dub-provider">
                 <option value="edge-tts">edge-tts</option>
                 <option value="lovo">lovo</option>
@@ -297,39 +297,39 @@
             </div>
           </div>
           <div class="action-row" style="margin-top:8px;">
-            <button id="btn-dub" class="btn-primary">生成配音 <span class="muted t-secondary">/ </span></button>
-            <span id="dub-status" class="muted">未就绪 / </span>
+            <button id="btn-dub" class="btn-primary">{{ t("workbench.step.dub.run") }}</button>
+            <span id="dub-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
         </div>
         <div class="step-card">
-          <h3>步骤4 - 打包 <span class="muted">/ </span></h3>
-          <p class="muted">生成本任务剪辑包 /  </p>
+          <h3>{{ t("workbench.step.pack.title") }}</h3>
+          <p class="muted">{{ t("workbench.step.pack.desc") }}</p>
           <div class="action-row">
-            <button id="btn-pack" class="btn-primary">生成剪辑包 <span class="muted t-secondary">/ </span></button>
-            <span id="pack-step-status" class="muted">未就绪 / </span>
+            <button id="btn-pack" class="btn-primary">{{ t("workbench.step.pack.run") }}</button>
+            <span id="pack-step-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
         </div>
         <div class="step-card step-wide">
-          <h3>步骤2 - 字幕 <span class="muted">/ </span></h3>
-          <p class="muted">调用 /api/tasks/{id}/subtitles 生成字幕 / /api/tasks/{id}/subtitles  </p>
+          <h3>{{ t("workbench.step.subtitles.title") }}</h3>
+          <p class="muted">{{ t("workbench.step.subtitles.desc") }}</p>
           <div class="action-row">
-            <button id="btn-subtitles" class="btn-primary">生成字幕 <span class="muted t-secondary">/ </span></button>
-            <span id="subs-step-status" class="muted t-secondary">未就绪 / </span>
+            <button id="btn-subtitles" class="btn-primary">{{ t("workbench.step.subtitles.run") }}</button>
+            <span id="subs-step-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
           <details id="subs-compare" style="margin-top:10px;">
-            <summary>对比字幕 <span class="muted t-secondary">/ </span></summary>
+            <summary>{{ t("workbench.compare") }}</summary>
             <div style="margin-top:12px; display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
               <div>
                 <div class="copy-row" style="justify-content:space-between;">
-                  <label style="margin:0;">原始 <span class="muted t-secondary">/ </span></label>
-                  <button type="button" id="btn-copy-origin" class="copy-btn">复制 / </button>
+                  <label style="margin:0;">{{ t("workbench.compare.origin") }}</label>
+                  <button type="button" id="btn-copy-origin" class="copy-btn">{{ t("action.copy") }}</button>
                 </div>
                 <pre id="origin-text" class="output"></pre>
               </div>
               <div>
                 <div class="copy-row" style="justify-content:space-between;">
-                  <label style="margin:0;">缅文 <span class="muted t-secondary">/ </span></label>
-                  <button type="button" id="btn-copy-mm" class="copy-btn">复制 / </button>
+                  <label style="margin:0;">{{ t("workbench.compare.mm") }}</label>
+                  <button type="button" id="btn-copy-mm" class="copy-btn">{{ t("action.copy") }}</button>
                 </div>
                 <pre id="mm-text" class="output"></pre>
               </div>
@@ -337,10 +337,10 @@
 
             <div style="margin-top:12px;">
               <div class="copy-row" style="justify-content:space-between;">
-                <label for="mm-edit" style="margin:0;">缅文编辑 (用于配音) <span class="muted t-secondary">/  </span></label>
+                <label for="mm-edit" style="margin:0;">{{ t("workbench.edit.mm") }}</label>
                 <div class="copy-row">
-                  <button type="button" id="btn-load-edited" class="copy-btn">重置 / Reset</button>
-                  <button type="button" id="btn-save-edited" class="copy-btn">保存 / Save</button>
+                  <button type="button" id="btn-load-edited" class="copy-btn">{{ t("action.reset") }}</button>
+                  <button type="button" id="btn-save-edited" class="copy-btn">{{ t("action.save") }}</button>
                 </div>
               </div>
               <textarea id="mm-edit" rows="6" style="width:100%; margin-top:8px;"></textarea>
@@ -352,13 +352,13 @@
     </div>
 
     <details class="panel" id="debug-panel">
-      <summary>Logs &amp; Debug <span class="muted t-secondary">/ 日志与调试</span></summary>
+      <summary>{{ t("workbench.logs") }}</summary>
       <div style="margin-top:12px;">
-        <h3 style="margin:0 0 8px;">Logs <span class="muted t-secondary">/ 日志</span></h3>
+        <h3 style="margin:0 0 8px;">{{ t("workbench.logs.title") }}</h3>
         <pre id="log-output" class="output-log">Ready.</pre>
       </div>
       <div style="margin-top:12px;">
-        <h3 style="margin:0 0 8px;">Engineering details <span class="muted t-secondary">/ 工程信息</span></h3>
+        <h3 style="margin:0 0 8px;">{{ t("workbench.logs.engineering") }}</h3>
         <div class="env-grid">
           <div class="env-card"><div class="env-label"><span>Workspace</span></div><div class="env-value">{{ env_summary.workspace_root }}</div></div>
           <div class="env-card"><div class="env-label"><span>Douyin API</span></div><div class="env-value">{{ env_summary.douyin_api_base }}</div></div>
@@ -373,11 +373,11 @@
         </div>
         <div style="margin-top:10px;" class="section-grid">
           <div class="field">
-            <label>Origin Subtitles <span class="muted t-secondary">/ 工程用</span></label>
+            <label>{{ t("workbench.origin_subtitles") }}</label>
             <div class="muted t-secondary">See deliverables above.</div>
           </div>
           <div class="field">
-            <label>Source URL (raw) <span class="muted t-secondary">/ 原始文本</span></label>
+            <label>{{ t("workbench.source_url_raw") }}</label>
             <div class="muted t-secondary" style="white-space:pre-wrap; word-break:break-word;">{{ task.source_url or '-' }}</div>
           </div>
         </div>
@@ -470,11 +470,11 @@
       setDownloadLink("scenes-link", hasScenes ? taskEndpoint(taskId, "scenes") : null);
       setDownloadLink("btn-scenes-download", hasScenes ? taskEndpoint(taskId, "scenes") : null);
 
-      setStatusText("video-status", hasRaw, "已就绪 / ", "未就绪 / ");
-      setStatusText("subs-status", hasMmSrt || hasMmTxt, "已就绪 / ", "未就绪 / ");
-      setStatusText("audio-status", hasAudio, "已就绪 / ", "未就绪 / ");
-      setStatusText("pack-status", hasPack, "已就绪 / ", "未就绪 / ");
-      setStatusText("scenes-status", hasScenes, "已就绪 / ", "未就绪 / ");
+      setStatusText("video-status", hasRaw, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
+      setStatusText("subs-status", hasMmSrt || hasMmTxt, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
+      setStatusText("audio-status", hasAudio, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
+      setStatusText("pack-status", hasPack, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
+      setStatusText("scenes-status", hasScenes, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
 
       const audioEl = document.getElementById("audio-preview");
       if (audioEl) {
@@ -494,10 +494,10 @@
       const hasAudio = !!data.mm_audio_path;
       const hasPack = !!data.pack_path;
 
-      setStatusText("parse-status", hasRaw, "已解析 / ", "未解析 / ");
-      setStatusText("subs-step-status", hasSubs, "已就绪 / ", "未就绪 / ");
-      setStatusText("dub-status", hasAudio, "已就绪 / ", "未就绪 / ");
-      setStatusText("pack-step-status", hasPack, "已就绪 / ", "未就绪 / ");
+      setStatusText("parse-status", hasRaw, window.__V185_I18N__.t("workbench.status.parsed"), window.__V185_I18N__.t("workbench.status.not_parsed"));
+      setStatusText("subs-step-status", hasSubs, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
+      setStatusText("dub-status", hasAudio, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
+      setStatusText("pack-step-status", hasPack, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
     }
 
     function renderScenesStatus(data) {
@@ -505,14 +505,14 @@
       const statusEl = document.getElementById("scenes-step-status");
       const errorEl = document.getElementById("scenes-error");
       const map = {
-        queued: "处理中… / …",
-        running: "处理中… / …",
-        ready: "已就绪 / ",
-        error: `失败：${data.scenes_error || "unknown"} / ：${data.scenes_error || "unknown"}`,
-        already_ready: "已就绪 / ",
+        queued: window.__V185_I18N__.t("workbench.status.processing"),
+        running: window.__V185_I18N__.t("workbench.status.processing"),
+        ready: window.__V185_I18N__.t("workbench.status.ready"),
+        error: window.__V185_I18N__.t("workbench.status.error", { error: data.scenes_error || "unknown" }),
+        already_ready: window.__V185_I18N__.t("workbench.status.ready"),
       };
       if (statusEl) {
-        statusEl.textContent = map[status] || "未就绪 / ";
+        statusEl.textContent = map[status] || window.__V185_I18N__.t("workbench.status.not_ready");
       }
       if (errorEl) {
         errorEl.textContent = status === "error" ? (data.scenes_error || "") : "";
@@ -738,7 +738,7 @@
         body: JSON.stringify({}),
       });
       if (resp.status === 202) {
-        appendLog("Subtitles queued; polling status... / 已排队，轮询状态... /  ...");
+        appendLog(window.__V185_I18N__.t("workbench.notice.subtitles_queued"));
         startSubtitlesPolling();
         await refreshTaskState();
         return;
@@ -755,7 +755,7 @@
       const taskId = window.currentTask.task_id;
       const subsReady = window.currentTask.subtitles_status === "ready" || !!window.currentTask.mm_srt_path;
       if (!subsReady) {
-        appendLog("Please generate subtitles first / 请先生成字幕 /   ");
+        appendLog(window.__V185_I18N__.t("workbench.notice.subtitles_first"));
         return;
       }
       const voiceId = document.getElementById("voice-id").value;
@@ -773,7 +773,7 @@
         body: JSON.stringify(payload),
       });
       if (resp.status === 202) {
-        appendLog("Dub queued; polling status... / 已排队，轮询状态... /  ...");
+        appendLog(window.__V185_I18N__.t("workbench.notice.dub_queued"));
         startDubPolling();
         await refreshTaskState();
         return;
@@ -807,7 +807,7 @@
       const taskId = window.currentTask.task_id;
       const subsReady = window.currentTask.subtitles_status === "ready" || !!window.currentTask.mm_srt_path;
       if (!subsReady) {
-        appendLog("Please generate subtitles first / 请先生成字幕 /   ");
+        appendLog(window.__V185_I18N__.t("workbench.notice.subtitles_first"));
         return;
       }
       appendLog(`Calling /api/tasks/${taskId}/scenes...`);

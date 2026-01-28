@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>任务看板 - ShortVideo</title>
+  <title>{{ t("page.tasks.board.title") }} - ShortVideo</title>
   <link rel="stylesheet" href="/static/tasks_board.css">
   <link rel="stylesheet" href="/static/css/ui_v185.css">
   <style>
@@ -116,8 +116,8 @@
   <div class="page tasks-board">
     <div class="card">
       {% set title_key = "ui.tasks.board" %}
-{% set title_text = "任务看板" %}
-{% set subtitle_text = "已加载 " ~ (tasks | length) ~ " 个任务" %}
+{% set title_text = t("page.tasks.board.title") %}
+{% set subtitle_text = t("page.tasks.board.subtitle", count=(tasks | length)) %}
 {% set active_nav = "tasks" %}
 {% set primary_label = t_primary("new_suitcase_task") %}
 {% set primary_href = "/tasks/new" %}
@@ -427,12 +427,12 @@
       other: { primary: "{{ t_primary('category_other') }}", secondary: "{{ t_secondary('category_other') }}" },
     };
     const PLATFORM_LABELS = {
-      douyin: { primary: "抖音", secondary: "" },
-      tk: { primary: "TikTok", secondary: "TikTok" },
-      tiktok: { primary: "TikTok", secondary: "TikTok" },
-      xhs: { primary: "小红书", secondary: "小红书" },
-      fb: { primary: "Facebook", secondary: "Facebook" },
-      facebook: { primary: "Facebook", secondary: "Facebook" },
+      douyin: { primary: "{{ t('label.platform_douyin') }}", secondary: "" },
+      tk: { primary: "{{ t('label.platform_tiktok') }}", secondary: "" },
+      tiktok: { primary: "{{ t('label.platform_tiktok') }}", secondary: "" },
+      xhs: { primary: "{{ t('label.platform_xhs') }}", secondary: "" },
+      fb: { primary: "{{ t('label.platform_fb') }}", secondary: "" },
+      facebook: { primary: "{{ t('label.platform_fb') }}", secondary: "" },
     };
     const COUNT_LABELS = {
       primary: "{{ t_primary('task_count') }}",
@@ -734,7 +734,6 @@
   <script src="/static/js/i18n_v185.js"></script>
 </body>
 </html>
-
 
 
 

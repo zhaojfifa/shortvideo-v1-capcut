@@ -159,16 +159,15 @@
   <div class="page publish">
     <div class="card">
 {% set title_key = "ui.publish.title" %}
-{% set title_text = "发布中心" %}
-{% set subtitle_text = "任务ID: " ~ task.task_id %}
+{% set title_text = t("page.publish.title") %}
+{% set subtitle_text = t("page.publish.subtitle", task_id=task.task_id) %}
 {% set active_nav = "tasks" %}
-{% set secondary_label = "任务看板" %}
+{% set secondary_label = t("action.back_tasks") %}
 {% set secondary_href = "/tasks" %}
 {% include "_topbar.html" %}
 <div class="info-row" style="margin-top:10px;">
         <div class="info-pill">
-          <span class="i18n zh">下载码</span>
-          <span class="i18n mm"></span>
+          <span>{{ t("publish.download_code") }}</span>
           : <span id="download-code">{{ task.task_id[:6]|upper }}</span>
         </div>
       </div>
@@ -176,20 +175,13 @@
 
     <div class="card" id="op-gate" style="display:none;">
       <div class="section-title">
-        <h2>
-          <span class="i18n zh">运营门禁</span>
-          <span class="i18n mm">OP </span>
-        </h2>
-        <div class="secondary">
-          <span class="i18n zh">请输入 OP Access Key 以加载发布数据。</span>
-          <span class="i18n mm">OP Access Key  Publish Hub  </span>
-        </div>
+        <h2>{{ t("publish.gate.title") }}</h2>
+        <div class="secondary">{{ t("publish.gate.desc") }}</div>
       </div>
       <div class="copy-row" style="margin-top:10px;">
         <input id="op-key-input" class="publish-textarea" placeholder="OP access key" />
         <button type="button" class="btn-primary" id="op-key-save">
-          <span class="i18n zh">解锁</span>
-          <span class="i18n mm"></span>
+          {{ t("action.unlock") }}
         </button>
         <span id="op-key-status" class="muted"></span>
       </div>
@@ -199,20 +191,16 @@
       <div class="card">
         <div class="tabs" role="tablist">
           <button class="tab-btn active" data-tab="tab-sop" type="button">
-            <span class="i18n zh">SOP 指引</span>
-            <span class="i18n mm">SOP</span>
+            {{ t("publish.tab.sop") }}
           </button>
           <button class="tab-btn" data-tab="tab-copy" type="button">
-            <span class="i18n zh">文案包</span>
-            <span class="i18n mm">Copy Bundle</span>
+            {{ t("publish.tab.copy") }}
           </button>
           <button class="tab-btn" data-tab="tab-deliverables" type="button">
-            <span class="i18n zh">交付物</span>
-            <span class="i18n mm">Deliverables</span>
+            {{ t("publish.tab.deliverables") }}
           </button>
           <button class="tab-btn" data-tab="tab-archive" type="button">
-            <span class="i18n zh">归档</span>
-            <span class="i18n mm">Archive</span>
+            {{ t("publish.tab.archive") }}
           </button>
         </div>
       </div>
@@ -220,251 +208,138 @@
     <div class="tab-panel active" id="tab-sop">
       <div class="card">
         <div class="section-title">
-          <h2>
-            <span class="i18n zh">SOP 操作指引</span>
-            <span class="i18n mm">SOP </span>
-          </h2>
-          <div class="secondary">
-            <span class="i18n zh">v1.85 交付操作步骤。</span>
-            <span class="i18n mm">v1.85  </span>
-          </div>
+          <h2>{{ t("publish.sop.title") }}</h2>
+          <div class="secondary">{{ t("publish.sop.desc") }}</div>
         </div>
-        <div class="i18n zh block">1) 在交付物中下载 pack.zip 或 scenes.zip。</div>
-        <div class="i18n zh block" style="margin-top:8px;">2) 导入手机剪辑工具（如 CapCut），核对字幕与时长。</div>
-        <div class="i18n zh block" style="margin-top:8px;">3) 使用文案包填写标题/话题/评论引导。</div>
-        <div class="i18n zh block" style="margin-top:8px;">4) v1.85 仅提供编辑交付，发布包在 2.0 提供。</div>
-        <div class="i18n mm block">1) Deliverables  pack.zip  scenes.zip </div>
-        <div class="i18n mm block" style="margin-top:8px;">2)  CapCut     </div>
-        <div class="i18n mm block" style="margin-top:8px;">3) Copy Bundle  // </div>
-        <div class="i18n mm block" style="margin-top:8px;">4) v1.85  editing delivery ; Publish bundle  v2.0 </div>
+        <div class="block">{{ t("publish.sop.step1") }}</div>
+        <div class="block" style="margin-top:8px;">{{ t("publish.sop.step2") }}</div>
+        <div class="block" style="margin-top:8px;">{{ t("publish.sop.step3") }}</div>
+        <div class="block" style="margin-top:8px;">{{ t("publish.sop.step4") }}</div>
       </div>
     </div>
     <div class="tab-panel" id="tab-copy">
       <div class="card">
         <div class="section-title">
-          <h2>
-            <span class="i18n zh">文案包</span>
-            <span class="i18n mm">Copy Bundle</span>
-          </h2>
-          <div class="secondary">
-            <span class="i18n zh">运营可编辑字段，修改不会保存。</span>
-            <span class="i18n mm">   ()</span>
-          </div>
+          <h2>{{ t("publish.copy.title") }}</h2>
+          <div class="secondary">{{ t("publish.copy.desc") }}</div>
         </div>
         <div class="field" style="margin-top:10px;">
-          <label>
-            <span class="i18n zh">标题/文案</span>
-            <span class="i18n mm"></span>
-          </label>
+          <label>{{ t("publish.copy.caption") }}</label>
           <div class="copy-row">
-            <button type="button" class="copy-btn" data-copy-target="copy-caption">
-              <span class="i18n zh">复制</span>
-              <span class="i18n mm"></span>
-            </button>
+            <button type="button" class="copy-btn" data-copy-target="copy-caption">{{ t("action.copy") }}</button>
           </div>
           <textarea id="copy-caption" class="publish-textarea"></textarea>
         </div>
         <div class="field" style="margin-top:10px;">
-          <label>
-            <span class="i18n zh">话题标签</span>
-            <span class="i18n mm"></span>
-          </label>
+          <label>{{ t("publish.copy.hashtags") }}</label>
           <div class="copy-row">
-            <button type="button" class="copy-btn" data-copy-target="copy-hashtags">
-              <span class="i18n zh">复制</span>
-              <span class="i18n mm"></span>
-            </button>
+            <button type="button" class="copy-btn" data-copy-target="copy-hashtags">{{ t("action.copy") }}</button>
           </div>
           <textarea id="copy-hashtags" class="publish-textarea"></textarea>
         </div>
         <div class="field" style="margin-top:10px;">
-          <label>
-            <span class="i18n zh">评论引导</span>
-            <span class="i18n mm"></span>
-          </label>
+          <label>{{ t("publish.copy.comment") }}</label>
           <div class="copy-row">
-            <button type="button" class="copy-btn" data-copy-target="copy-comment-cta">
-              <span class="i18n zh">复制</span>
-              <span class="i18n mm"></span>
-            </button>
+            <button type="button" class="copy-btn" data-copy-target="copy-comment-cta">{{ t("action.copy") }}</button>
           </div>
           <textarea id="copy-comment-cta" class="publish-textarea"></textarea>
         </div>
         <div class="field" style="margin-top:10px;">
-          <label>
-            <span class="i18n zh">挂链文案</span>
-            <span class="i18n mm"></span>
-          </label>
+          <label>{{ t("publish.copy.link_text") }}</label>
           <div class="copy-row">
-            <button type="button" class="copy-btn" data-copy-target="copy-link-text">
-              <span class="i18n zh">复制</span>
-              <span class="i18n mm"></span>
-            </button>
+            <button type="button" class="copy-btn" data-copy-target="copy-link-text">{{ t("action.copy") }}</button>
           </div>
           <textarea id="copy-link-text" class="publish-textarea"></textarea>
         </div>
         <div class="field" style="margin-top:10px;">
-          <label>
-            <span class="i18n zh">发布时间建议</span>
-            <span class="i18n mm"></span>
-          </label>
+          <label>{{ t("publish.copy.publish_time") }}</label>
           <div class="copy-row">
-            <button type="button" class="copy-btn" data-copy-target="copy-publish-time">
-              <span class="i18n zh">复制</span>
-              <span class="i18n mm"></span>
-            </button>
+            <button type="button" class="copy-btn" data-copy-target="copy-publish-time">{{ t("action.copy") }}</button>
           </div>
           <textarea id="copy-publish-time" class="publish-textarea"></textarea>
         </div>
       </div>
     </div>
-    <div class="tab-panel" id="tab-deliverables">
+<div class="tab-panel" id="tab-deliverables">
       <div class="card">
         <div class="section-title">
-          <h2>
-            <span class="i18n zh">交付物</span>
-            <span class="i18n mm">Deliverables</span>
-          </h2>
-          <div class="secondary">
-            <span class="i18n zh">仅显示已生成的产物。</span>
-            <span class="i18n mm"> </span>
-          </div>
+          <h2>{{ t("publish.deliverables.title") }}</h2>
+          <div class="secondary">{{ t("publish.deliverables.desc") }}</div>
         </div>
         <div id="deliverables-list" class="copy-row" style="margin-top:12px;"></div>
         <div class="muted" id="deliverables-empty" style="margin-top:8px; display:none;">
-          <span class="i18n zh">暂无交付物。</span>
-          <span class="i18n mm">Deliverables </span>
+          {{ t("publish.deliverables.empty") }}
         </div>
         <div class="copy-row" style="margin-top:12px;">
-          <a id="edit-bundle-link" class="btn-primary" href="#" target="_blank" rel="noopener">
-            <span class="i18n zh">编辑包 (ZIP)</span>
-            <span class="i18n mm">Edit Bundle (ZIP)</span>
-          </a>
+          <a id="edit-bundle-link" class="btn-primary" href="#" target="_blank" rel="noopener">{{ t("publish.deliverables.bundle") }}</a>
         </div>
         <div class="copy-row" style="margin-top:12px;">
           <img id="qr-image" alt="QR" style="width:180px;height:180px;border:1px solid #e5e7eb;background:#fff;" />
-          <div class="muted">
-            <span class="i18n zh">扫码下载编辑包</span>
-            <span class="i18n mm">QR scan  Edit Bundle </span>
-          </div>
+          <div class="muted">{{ t("publish.deliverables.qr") }}</div>
         </div>
         <div class="copy-row" style="margin-top:6px;">
-          <a id="qr-link" href="#" target="_blank" rel="noopener">
-            <span class="i18n zh">打开链接</span>
-            <span class="i18n mm">Open link</span>
-          </a>
-          <button type="button" class="copy-btn" data-copy-target="qr-link">
-            <span class="i18n zh">复制链接</span>
-            <span class="i18n mm">Copy link</span>
-          </button>
+          <a id="qr-link" href="#" target="_blank" rel="noopener">{{ t("publish.deliverables.open_link") }}</a>
+          <button type="button" class="copy-btn" data-copy-target="qr-link">{{ t("publish.deliverables.copy_link") }}</button>
         </div>
         <div class="copy-row" style="margin-top:6px;">
-          <a id="short-link" href="#" target="_blank" rel="noopener">
-            <span class="i18n zh">短链</span>
-            <span class="i18n mm">Short link</span>
-          </a>
-          <button type="button" class="copy-btn" data-copy-target="short-link">
-            <span class="i18n zh">复制短链</span>
-            <span class="i18n mm">Copy short</span>
-          </button>
+          <a id="short-link" href="#" target="_blank" rel="noopener">{{ t("publish.deliverables.short_link") }}</a>
+          <button type="button" class="copy-btn" data-copy-target="short-link">{{ t("publish.deliverables.copy_short") }}</button>
         </div>
       </div>
     </div>
-    <div class="tab-panel" id="tab-archive">
+<div class="tab-panel" id="tab-archive">
       <div class="card">
         <div class="section-title">
-          <h2>
-            <span class="i18n zh">归档</span>
-            <span class="i18n mm">Archive</span>
-          </h2>
-          <div class="secondary">
-            <span class="i18n zh">归档确认交付，不代表已发布。</span>
-            <span class="i18n mm">Archive    </span>
-          </div>
+          <h2>{{ t("publish.archive.title") }}</h2>
+          <div class="secondary">{{ t("publish.archive.desc") }}</div>
         </div>
         <div class="info-row">
           <div class="info-pill">
-            <span class="i18n zh">发布时间</span>
-            <span class="i18n mm">Published at</span>
-            : <span id="published-at">-</span>
+            {{ t("publish.archive.published_at") }}: <span id="published-at">-</span>
           </div>
         </div>
         <div class="section-grid" style="margin-top:12px;">
           <div class="field">
-            <label>
-              <span class="i18n zh">归档位置</span>
-              <span class="i18n mm">Archive location</span>
-            </label>
+            <label>{{ t("publish.archive.location") }}</label>
             <input id="archive-location" class="publish-textarea" style="min-height:0;height:36px;" />
           </div>
           <div class="field">
-            <label>
-              <span class="i18n zh">状态</span>
-              <span class="i18n mm">Status</span>
-            </label>
+            <label>{{ t("publish.archive.status") }}</label>
             <input id="archive-status" class="publish-textarea" style="min-height:0;height:36px;" />
           </div>
           <div class="field">
-            <label>
-              <span class="i18n zh">已发布</span>
-              <span class="i18n mm">Published</span>
-            </label>
+            <label>{{ t("publish.archive.published") }}</label>
             <div class="copy-row">
               <input type="checkbox" id="archive-published" />
-              <span class="muted">
-                <span class="i18n zh">勾选表示已发布</span>
-                <span class="i18n mm"> </span>
-              </span>
+              <span class="muted">{{ t("publish.archive.published_hint") }}</span>
             </div>
           </div>
           <div class="field">
-            <label>
-              <span class="i18n zh">下载链接</span>
-              <span class="i18n mm">Download URL</span>
-            </label>
+            <label>{{ t("publish.archive.download_url") }}</label>
             <div class="copy-row">
               <input id="archive-download-url" class="publish-textarea" style="min-height:0;height:36px;" />
-              <a id="archive-download-link" class="btn-secondary" href="#" target="_blank" rel="noopener">
-                <span class="i18n zh">打开</span>
-                <span class="i18n mm">Open</span>
-              </a>
+              <a id="archive-download-link" class="btn-secondary" href="#" target="_blank" rel="noopener">{{ t("publish.archive.open") }}</a>
             </div>
           </div>
           <div class="field">
-            <label>
-              <span class="i18n zh">归档 Key</span>
-              <span class="i18n mm">Archive Key</span>
-            </label>
+            <label>{{ t("publish.archive.key") }}</label>
             <input id="archive-key" class="publish-textarea" style="min-height:0;height:36px;" />
           </div>
         </div>
         <div class="action-row" style="margin-top:12px;">
-          <button id="archive-save-btn" class="btn-primary">
-            <span class="i18n zh">保存归档</span>
-            <span class="i18n mm">Save</span>
-          </button>
-          <button id="publish-btn" class="btn-success">
-            <span class="i18n zh">提交归档</span>
-            <span class="i18n mm">Publish</span>
-          </button>
+          <button id="archive-save-btn" class="btn-primary">{{ t("publish.archive.save") }}</button>
+          <button id="publish-btn" class="btn-success">{{ t("publish.archive.submit") }}</button>
           <span id="archive-save-status" class="muted"></span>
         </div>
       </div>
     </div>
-    
-  <script>
+
+<script>
     const TASK_ID = "{{ task.task_id }}";
     const OP_KEY_STORAGE = "op_access_key";
     const LANG_STORAGE = "ui_lang_publish_hub";
 
         // UI language policy: show ZH + MM together in UI (English stays in code/logs only).
-    function bi(zh, mm) {
-      if (!zh && !mm) return "";
-      if (!mm) return zh;
-      if (!zh) return mm;
-      return `${zh} / ${mm}`;
-    }
-
 function resolveLang(serverLang) {
       const saved = localStorage.getItem(LANG_STORAGE);
       return saved || serverLang || "zh";
@@ -647,18 +522,18 @@ function resolveLang(serverLang) {
     async function fetchPublishHub() {
       const opKey = getOpKey();
       if (!opKey) {
-        showGate(bi("请输入 OP Access Key 继续。", "OP Access Key  "));
+        showGate(window.__V185_I18N__.t("publish.gate.need_key"));
         return;
       }
       const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish_hub`, {
         headers: { "X-OP-KEY": opKey },
       });
       if (resp.status === 401 || resp.status === 403) {
-        showGate(bi("OP Access Key 不正确。", "OP Access Key "));
+        showGate(window.__V185_I18N__.t("publish.gate.invalid_key"));
         return;
       }
       if (!resp.ok) {
-        showGate(bi(`加载失败: HTTP ${resp.status}`, `: HTTP ${resp.status}`));
+        showGate(window.__V185_I18N__.t("publish.gate.load_failed", { status: resp.status }));
         return;
       }
       hideGate();
@@ -703,7 +578,7 @@ function resolveLang(serverLang) {
     if (publishBtn) {
       publishBtn.addEventListener("click", async () => {
       const statusEl = document.getElementById("publish-status");
-      if (statusEl) statusEl.textContent = bi("提交中...", "...");
+      if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submitting");
       try {
         const opKey = getOpKey();
         const headers = { "Content-Type": "application/json" };
@@ -715,13 +590,13 @@ function resolveLang(serverLang) {
         });
           if (!resp.ok) {
             const detail = await resp.text();
-            if (statusEl) statusEl.textContent = bi(`提交失败: ${resp.status} ${detail}`, `: ${resp.status} ${detail}`);
+            if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submit_failed", { detail: `${resp.status} ${detail}` });
             return;
           }
-          if (statusEl) statusEl.textContent = bi("已提交。", "");
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submitted");
           await fetchPublishHub();
         } catch (err) {
-          if (statusEl) statusEl.textContent = bi(`提交错误: ${err}`, `: ${err}`);
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submit_error", { error: err });
         }
       });
     }
@@ -730,7 +605,7 @@ function resolveLang(serverLang) {
     if (archiveSaveBtn) {
       archiveSaveBtn.addEventListener("click", async () => {
         const statusEl = document.getElementById("archive-save-status");
-        if (statusEl) statusEl.textContent = bi("保存中...", "...");
+        if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.saving");
         const payload = {
           archive: {
             archive_location: document.getElementById("archive-location")?.value?.trim() || "",
@@ -752,13 +627,13 @@ function resolveLang(serverLang) {
           });
           if (!resp.ok) {
             const detail = await resp.text();
-            if (statusEl) statusEl.textContent = bi(`保存失败: ${resp.status} ${detail}`, `: ${resp.status} ${detail}`);
+            if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.save_failed", { detail: `${resp.status} ${detail}` });
             return;
           }
-          if (statusEl) statusEl.textContent = bi("已保存。", "");
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.saved");
           await fetchPublishHub();
         } catch (err) {
-          if (statusEl) statusEl.textContent = bi(`保存错误: ${err}`, `: ${err}`);
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.save_error", { error: err });
         }
       });
     }
@@ -776,7 +651,7 @@ function resolveLang(serverLang) {
         const input = document.getElementById("op-key-input");
         const value = input ? input.value.trim() : "";
         if (!value) {
-          showGate(bi("需要 OP Access Key。", "OP Access Key "));
+          showGate(window.__V185_I18N__.t("publish.gate.need_key"));
           return;
         }
         setOpKey(value);
@@ -813,7 +688,7 @@ function resolveLang(serverLang) {
       }
 
       if (!getOpKey()) {
-        showGate(bi("请输入 OP Access Key 继续。", "OP Access Key  "));
+        showGate(window.__V185_I18N__.t("publish.gate.need_key"));
         return;
       }
       fetchPublishHub().catch(() => {});

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>任务看板 - ShortVideo</title>
+  <title>{{ t("page.tasks.board.title") }} - ShortVideo</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
   <link rel="stylesheet" href="/static/i18n.css" />
   <link rel="stylesheet" href="/static/css/ui_v185.css">
@@ -86,33 +86,33 @@
 </head>
 <body>
   {% set title_key = "ui.tasks.board" %}
-{% set title_text = "任务看板" %}
-{% set subtitle_text = "已加载 " ~ (tasks | length) ~ " 个任务" %}
+{% set title_text = t("page.tasks.board.title") %}
+{% set subtitle_text = t("page.tasks.board.subtitle", count=(tasks | length)) %}
 {% set active_nav = "tasks" %}
-{% set primary_label = "新建任务" %}
+{% set primary_label = t("action.new_task") %}
 {% set primary_href = "/tasks/new" %}
-{% set secondary_label = "刷新" %}
+{% set secondary_label = t("action.refresh") %}
 {% set secondary_id = "refresh-btn" %}
 {% include "_topbar.html" %}
 
 
-  <div id="message" class="small">Loading tasks...</div>
+  <div id="message" class="small">{{ t("tasks.loading") }}</div>
 
   <div class="card">
     <table>
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Title</th>
-          <th>Category</th>
-          <th>Lang</th>
-          <th>Platform</th>
-          <th>Account</th>
-          <th>Status</th>
-          <th>Last Step</th>
-          <th>Pack</th>
-          <th>Created</th>
-          <th>JSON</th>
+          <th>{{ t("label.id") }}</th>
+          <th>{{ t("label.title") }}</th>
+          <th>{{ t("label.category") }}</th>
+          <th>{{ t("label.language") }}</th>
+          <th>{{ t("label.platform") }}</th>
+          <th>{{ t("label.account") }}</th>
+          <th>{{ t("label.status") }}</th>
+          <th>{{ t("label.last_step") }}</th>
+          <th>{{ t("label.pack") }}</th>
+          <th>{{ t("label.created") }}</th>
+          <th>{{ t("label.json") }}</th>
         </tr>
       </thead>
       <tbody id="task-rows"></tbody>
@@ -160,10 +160,10 @@
     function platformLabel(code) {
       if (!code) return "";
       const lower = String(code).toLowerCase();
-      if (lower === "douyin") return "抖音 / ";
-      if (lower === "xhs") return "小红书 / 小红书";
-      if (lower === "tk" || lower === "tiktok") return "TikTok / TikTok";
-      if (lower === "fb" || lower === "facebook") return "Facebook / Facebook";
+      if (lower === "douyin") return "{{ t('label.platform_douyin') }}";
+      if (lower === "xhs") return "{{ t('label.platform_xhs') }}";
+      if (lower === "tk" || lower === "tiktok") return "{{ t('label.platform_tiktok') }}";
+      if (lower === "fb" || lower === "facebook") return "{{ t('label.platform_fb') }}";
       return code;
     }
 
@@ -245,4 +245,3 @@
   <script src="/static/js/i18n_v185.js"></script>
 </body>
 </html>
-

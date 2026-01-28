@@ -1,22 +1,20 @@
 from __future__ import annotations
 
-from typing import Callable, Dict
+from typing import Dict
+from starlette.requests import Request
 
-from gateway.app.web.i18n import ENABLE_SECONDARY_UI, SECONDARY_UI_LANG, PRIMARY_UI_LANG
-from gateway.app.web.i18n import I18N, t_primary, t_secondary
+from gateway.app.i18n import get_ui_locale, t
+from gateway.app.web.i18n import i18n_payload, t_for_locale, ui_langs
 
 
-def get_template_globals() -> Dict[str, object]:
+def get_template_globals(request: Request) -> Dict[str, object]:
+    locale = get_ui_locale(request)
+    t_func = t_for_locale(locale)
     return {
-        "t_primary": t_primary,
-        "t_secondary": t_secondary,
-        "ui_primary_lang": PRIMARY_UI_LANG,
-        "ui_secondary_lang": SECONDARY_UI_LANG,
-        "ui_show_secondary": ENABLE_SECONDARY_UI,
-        "ui_langs": {
-            "primary": PRIMARY_UI_LANG,
-            "secondary": SECONDARY_UI_LANG,
-            "secondary_enabled": ENABLE_SECONDARY_UI,
-            "available": list(I18N.keys()),
-        },
+        "t": t_func,
+        "t_primary": t_func,
+        "t_secondary": lambda _key, **_kwargs: "",
+        "ui_locale": locale,
+        "i18n_payload": i18n_payload(locale),
+        "ui_langs": ui_langs(locale),
     }
