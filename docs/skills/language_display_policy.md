@@ -13,23 +13,18 @@ Standardize how UI text is presented across Workbench, Publish Hub, and Tools Hu
   - Should not dominate operator-facing UI.
 
 ## Display Rules
-1. Default pattern for operator UI is: **ZH + MM**
-   - Example: `交付物 / ပေးပို့ချက်`
-2. EN appears only when it improves cross-team clarity:
-   - Example: `交付物 / Deliverables` (acceptable for tab label)
-3. Avoid triple-language in a single label unless it is a header or a help tooltip.
-4. Tab labels must be consistent across pages:
-   - Publish Hub and Workbench should use the same label pairing style.
-5. “Toggle language” is optional; when present:
-   - Toggle switches *secondary language layer* (e.g., show/hide MM),
-   - Must not change URLs, data binding, or operator inputs.
+1. Operator UI uses tab-based locale (ZH or MM), not paired labels.
+2. EN appears only when it improves cross-team clarity.
+3. Avoid triple-language in a single label.
+4. Tab labels must be consistent across pages.
+5. Language tabs must not change URLs, data binding, or operator inputs.
 
 ## Implementation Guidance (Template-based)
-- Use paired strings and render as `Primary / Secondary`.
-- Keep the primary language stable per page (ZH recommended).
-- All key operator actions (buttons) should include ZH; MM may be secondary.
+- Use `data-i18n` keys with the locale tabs (`ui.locale`) to swap text.
+- Keep default locale as ZH; allow switching to MM via tabs.
+- Do not render paired labels in the same line.
 
 ## QA Checklist
-- No page shows mixed patterns (e.g., some tabs ZH+MM, others ZH+EN) unless explicitly justified.
-- Publish Hub: all 4 tabs follow the same pairing.
-- Workbench: key section headers match Publish Hub’s pairing style.
+- No page shows mixed-language paired labels.
+- Tabs switch locale without reload.
+- Publish Hub, Workbench, Tools Hub share the same tab locale behavior.

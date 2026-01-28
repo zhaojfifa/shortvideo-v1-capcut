@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Tool Detail</title>
+  <title>工具详情</title>
   <style>
     :root { color-scheme: light; }
     body {
@@ -64,7 +64,8 @@
 <body>
   <div class="page">
     <div class="card">
-      <a class="btn" href="/tools/hub">Back to Tools Hub</a>
+      {% include "_lang_tabs.html" %}
+      <a class="btn" href="/tools/hub" data-i18n="ui.tools.title">工具中心</a>
     </div>
     <div class="card" id="tool-header">
       <div class="muted">Loading...</div>
@@ -146,5 +147,6 @@
 
     init();
   </script>
+  <script src="/static/js/i18n_v185.js"></script>
 </body>
 </html>

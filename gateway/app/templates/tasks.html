@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>Task Board ?ShortVideo</title>
+  <title>任务看板 - ShortVideo</title>
   <link rel="stylesheet" href="/static/tasks_board.css">
   <style>
     :root { color-scheme: light; }
@@ -117,14 +117,12 @@
   </style>
 </head>
 <body class="{{ 'mobile' if is_mobile else 'desktop' }}">
+{% set ui_show_secondary = false %}
   <div class="page tasks-board">
     <div class="card">
       <div class="header">
         <div>
-          <h1>{{ t_primary("task_board") }}</h1>
-          {% if ui_show_secondary %}
-            <p class="subhead secondary">{{ t_secondary("task_board") }}</p>
-          {% endif %}
+          <h1 data-i18n="ui.tasks.board">任务看板</h1>
           <p id="task-count" class="subhead bilingual">
             <span id="task-count-primary">{{ t_primary("task_count") | replace("{count}", tasks | length) }}</span>
             {% if ui_show_secondary %}
@@ -177,6 +175,7 @@
           </div>
         </div>
         <div class="header-actions">
+          {% include "_lang_tabs.html" %}
           <a class="btn-secondary" href="/tools/hub">Tools</a>
           <a class="btn-primary" href="/tasks/new">
             {{ t_primary("new_suitcase_task") }}
@@ -470,7 +469,7 @@
       other: { primary: "{{ t_primary('category_other') }}", secondary: "{{ t_secondary('category_other') }}" },
     };
     const PLATFORM_LABELS = {
-      douyin: { primary: "抖音", secondary: "ဒေါ်ယင်" },
+      douyin: { primary: "抖音", secondary: "" },
       tk: { primary: "TikTok", secondary: "TikTok" },
       tiktok: { primary: "TikTok", secondary: "TikTok" },
       xhs: { primary: "小红书", secondary: "小红书" },
@@ -774,6 +773,7 @@
 
     // Polling is driven by the visibility handler above.
   </script>
+  <script src="/static/js/i18n_v185.js"></script>
 </body>
 </html>
 
