@@ -28,3 +28,56 @@
 .btn-primary:hover{background:#1d4ed8;}
 .btn-ghost{background:#e5e7eb;color:#111827;padding:8px 12px;border-radius:8px;text-decoration:none;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;border:0;cursor:pointer;}
 .btn-ghost:hover{background:#d1d5db;}
+/* ===== clickable nav/action emphasis (ops-friendly) ===== */
+
+/* A) segmented nav (任务/工具) */
+.nav-segment a{
+  padding: 9px 16px;
+  min-height: 36px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 999px;
+}
+.nav-segment a.active{
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+/* B) navigation buttons (返回/进入/任务看板/工具中心) */
+.btn-nav{
+  padding: 9px 14px;
+  min-height: 36px;
+  min-width: 104px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 12px;
+  border: 1px solid #e5e5e5;
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-nav:hover{ background:#f7f7f7; border-color:#d8d8d8; }
+
+/* C) primary action button (新建任务等) */
+.btn-primary-lg{
+  padding: 10px 16px;
+  min-height: 38px;
+  min-width: 116px;
+  font-size: 15px;
+  font-weight: 800;
+  border-radius: 12px;
+}
+
+/* D) language tabs should be smaller than nav/action */
+.lang-tab{
+  padding: 6px 10px;
+  min-height: 28px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 10px;
+}
