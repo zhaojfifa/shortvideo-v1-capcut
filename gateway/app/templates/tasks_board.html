@@ -85,19 +85,16 @@
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbar-left">
-      <h1 data-i18n="ui.tasks.board">任务看板</h1>
-    </div>
-    <div class="topbar-mid"></div>
-    <div class="topbar-right">
-      {% include "_lang_tabs.html" %}
-      <div class="actions">
-        <a class="btn" href="/tasks/new" data-i18n="ui.tasks.new">新建任务</a>
-        <button id="refresh-btn" type="button">刷新</button>
-      </div>
-    </div>
-  </header>
+  {% set title_key = "ui.tasks.board" %}
+{% set title_text = "任务看板" %}
+{% set subtitle_text = "已加载 " ~ (tasks | length) ~ " 个任务" %}
+{% set active_nav = "tasks" %}
+{% set primary_label = "新建任务" %}
+{% set primary_href = "/tasks/new" %}
+{% set secondary_label = "刷新" %}
+{% set secondary_id = "refresh-btn" %}
+{% include "_topbar.html" %}
+
 
   <div id="message" class="small">Loading tasks...</div>
 

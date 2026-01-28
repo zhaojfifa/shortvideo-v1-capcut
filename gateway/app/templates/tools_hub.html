@@ -119,17 +119,13 @@
 </head>
 <body>
   <div class="page">
-    <div class="card header">
-      <div>
-        <h1 data-i18n="ui.tools.title">工具中心</h1>
-        <div class="subhead">Tool Registry (SSOT)</div>
-      </div>
-      <div class="actions">
-        {% include "_lang_tabs.html" %}
-        <a class="btn" href="/tasks" data-i18n="ui.tasks.board">任务看板</a>
-      </div>
-    </div>
-
+    {% set title_key = "ui.tools.title" %}
+{% set title_text = "工具中心" %}
+{% set subtitle_text = "工具配置与入口（SSOT）" %}
+{% set active_nav = "tools" %}
+{% set secondary_label = "任务看板" %}
+{% set secondary_href = "/tasks" %}
+{% include "_topbar.html" %}
     <div class="card">
       <div class="filters">
         <div>

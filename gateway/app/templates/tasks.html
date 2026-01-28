@@ -115,23 +115,14 @@
 {% set ui_show_secondary = false %}
   <div class="page tasks-board">
     <div class="card">
-      <div class="topbar">
-        <div class="topbar-left">
-          <h1 data-i18n="ui.tasks.board">任务看板</h1>
-          <p id="task-count" class="subhead">
-            <span id="task-count-primary">{{ t_primary("task_count") | replace("{count}", tasks | length) }}</span>
-          </p>
-        </div>
-        <div class="topbar-mid">
-          <a class="btn-secondary" href="/tools/hub">Tools</a>
-        </div>
-        <div class="topbar-right">
-          {% include "_lang_tabs.html" %}
-          <div class="actions">
-            <a class="btn-primary" href="/tasks/new">{{ t_primary("new_suitcase_task") }}</a>
-          </div>
-        </div>
-      </div>
+      {% set title_key = "ui.tasks.board" %}
+{% set title_text = "任务看板" %}
+{% set subtitle_text = "已加载 " ~ (tasks | length) ~ " 个任务" %}
+{% set active_nav = "tasks" %}
+{% set primary_label = t_primary("new_suitcase_task") %}
+{% set primary_href = "/tasks/new" %}
+{% include "_topbar.html" %}
+
 
       <div class="legend">
         <span class="legend-title">{{ t_primary("legend") }}</span>

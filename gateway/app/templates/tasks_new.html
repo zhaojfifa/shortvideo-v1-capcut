@@ -87,18 +87,14 @@
 </head>
 <body>
   <div class="page">
-    <header class="topbar">
-      <div class="topbar-left">
-        <h1 data-i18n="ui.tasks.new">新建任务</h1>
-      </div>
-      <div class="topbar-mid"></div>
-      <div class="topbar-right">
-        {% include "_lang_tabs.html" %}
-        <div class="actions">
-          <a href="/tasks" data-i18n="ui.tasks.board">任务看板</a>
-        </div>
-      </div>
-    </header>
+    {% set title_key = "ui.tasks.new" %}
+{% set title_text = "新建任务" %}
+{% set subtitle_text = "粘贴链接 → 一键生成 Smart Pack + README" %}
+{% set active_nav = "tasks" %}
+{% set secondary_label = "任务看板" %}
+{% set secondary_href = "/tasks" %}
+{% include "_topbar.html" %}
+
 
     <main class="card">
       <form id="task-form">

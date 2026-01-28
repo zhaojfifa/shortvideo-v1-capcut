@@ -64,10 +64,14 @@
 </head>
 <body>
   <div class="page">
-    <div class="card">
-      {% include "_lang_tabs.html" %}
-      <a class="btn" href="/tools/hub" data-i18n="ui.tools.title">工具中心</a>
-    </div>
+    {% set title_key = "ui.tools.detail" %}
+{% set title_text = "工具详情" %}
+{% set subtitle_text = tool_id %}
+{% set active_nav = "tools" %}
+{% set secondary_label = "工具中心" %}
+{% set secondary_href = "/tools/hub" %}
+{% include "_topbar.html" %}
+
     <div class="card" id="tool-header">
       <div class="muted">Loading...</div>
     </div>

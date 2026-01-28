@@ -158,18 +158,14 @@
 <body data-lang="zh">
   <div class="page publish">
     <div class="card">
-      <div class="header-row">
-        <div>
-          <h1 data-i18n="ui.publish.title">发布中心</h1>
-          <div class="muted">Task ID: {{ task.task_id }}</div>
-        </div>
-        <div class="copy-row">
-          {% include "_lang_tabs.html" %}
-          <a class="btn-secondary" href="/tasks" data-i18n="ui.tasks.board">任务看板</a>
-          <a class="btn-primary" href="/tasks/{{ task.task_id }}" data-i18n="ui.workbench.title">???</a>
-        </div>
-      </div>
-      <div class="info-row" style="margin-top:10px;">
+{% set title_key = "ui.publish.title" %}
+{% set title_text = "发布中心" %}
+{% set subtitle_text = "任务ID: " ~ task.task_id %}
+{% set active_nav = "tasks" %}
+{% set secondary_label = "任务看板" %}
+{% set secondary_href = "/tasks" %}
+{% include "_topbar.html" %}
+<div class="info-row" style="margin-top:10px;">
         <div class="info-pill">
           <span class="i18n zh">下载码</span>
           <span class="i18n mm"></span>
