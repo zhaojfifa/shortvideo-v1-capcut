@@ -1,0 +1,17 @@
+﻿<div class="topbar">
+  <div class="topbar-left">
+    <h1 data-i18n="{{ title_key }}">{{ title_text }}</h1>
+    {% if subtitle_text %}
+      <div class="muted">{{ subtitle_text }}</div>
+    {% endif %}
+  </div>
+  <div class="topbar-mid">
+    {{ mid_html | safe }}
+  </div>
+  <div class="topbar-right">
+    {% include "_lang_tabs.html" %}
+    <div class="actions">
+      {{ actions_html | safe }}
+    </div>
+  </div>
+</div>

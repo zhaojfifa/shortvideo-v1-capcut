@@ -6,6 +6,7 @@
   <title>新建任务 - ShortVideo</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
   <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css">
   <style>
     :root { color-scheme: light; }
     body {
@@ -15,7 +16,7 @@
       color: #111827;
     }
     .page { max-width: 720px; margin: 0 auto; }
-    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    header { margin-bottom: 16px; }
     h1 { margin: 0; font-size: 1.5rem; font-weight: 700; }
     a { color: #2563eb; text-decoration: none; }
     a:hover { text-decoration: underline; }
@@ -86,10 +87,17 @@
 </head>
 <body>
   <div class="page">
-    <header>
-      <h1 data-i18n="ui.tasks.new">新建任务</h1>
-      {% include "_lang_tabs.html" %}
-      <a href="/tasks" data-i18n="ui.tasks.board">任务看板</a>
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 data-i18n="ui.tasks.new">新建任务</h1>
+      </div>
+      <div class="topbar-mid"></div>
+      <div class="topbar-right">
+        {% include "_lang_tabs.html" %}
+        <div class="actions">
+          <a href="/tasks" data-i18n="ui.tasks.board">任务看板</a>
+        </div>
+      </div>
     </header>
 
     <main class="card">
@@ -121,18 +129,30 @@
         <div class="field">
           <label>视频类型</label>
           <div class="muted t-secondary">选择业务意图</div>
-          <div class="radio-group" style="margin-top:6px;">
-            <label class="radio"><input type="radio" name="video_type" value="review" checked /> 对比测评</label>
-            <label class="radio"><input type="radio" name="video_type" value="scenario" /> 场景使用</label>
+          <div class="option-grid" style="margin-top:6px;">
+            <label class="option-item">
+              <input type="radio" name="video_type" value="review" checked />
+              <span class="opt-text">对比测评</span>
+            </label>
+            <label class="option-item">
+              <input type="radio" name="video_type" value="scenario" />
+              <span class="opt-text">场景使用</span>
+            </label>
           </div>
         </div>
 
         <div class="field">
           <label>风格预设</label>
           <div class="muted t-secondary">定义节奏与剪辑意图</div>
-          <div class="radio-group" style="margin-top:6px;">
-            <label class="radio"><input type="radio" name="style_preset" value="review_brief" checked /> 短评快节奏</label>
-            <label class="radio"><input type="radio" name="style_preset" value="scenario_story" /> 情景叙事</label>
+          <div class="option-grid" style="margin-top:6px;">
+            <label class="option-item">
+              <input type="radio" name="style_preset" value="review_brief" checked />
+              <span class="opt-text">短评快节奏</span>
+            </label>
+            <label class="option-item">
+              <input type="radio" name="style_preset" value="scenario_story" />
+              <span class="opt-text">情景叙事</span>
+            </label>
           </div>
         </div>
 
@@ -149,14 +169,29 @@
         <div class="field" id="pipeline-tools">
           <label>流水线工具</label>
           <div class="muted">仅配置字幕与配音，其它工具在 Workbench 设置。</div>
-          <div class="radio-group" style="margin-top:6px;">
-            <label class="radio"><input type="radio" name="subtitles_mode" value="whisper-only" /> Whisper only（仅 ASR 字幕）</label>
-            <label class="radio"><input type="radio" name="subtitles_mode" value="whisper+gemini" checked /> Whisper + Gemini（ASR + 翻译/润色）</label>
+          <div class="option-grid" style="margin-top:6px;">
+            <label class="option-item">
+              <input type="radio" name="subtitles_mode" value="whisper-only" />
+              <span class="opt-text">Whisper only（仅 ASR 字幕）</span>
+            </label>
+            <label class="option-item">
+              <input type="radio" name="subtitles_mode" value="whisper+gemini" checked />
+              <span class="opt-text">Whisper + Gemini（ASR + 翻译/润色）</span>
+            </label>
           </div>
-          <div class="radio-group" style="margin-top:6px;">
-            <label class="radio"><input type="radio" name="dub_mode" value="edge" /> Edge TTS</label>
-            <label class="radio"><input type="radio" name="dub_mode" value="lovo" /> LOVO</label>
-            <label class="radio"><input type="radio" name="dub_mode" value="auto-fallback" checked /> 自动兜底（优先可用）</label>
+          <div class="option-grid" style="margin-top:6px;">
+            <label class="option-item">
+              <input type="radio" name="dub_mode" value="edge" />
+              <span class="opt-text">Edge TTS</span>
+            </label>
+            <label class="option-item">
+              <input type="radio" name="dub_mode" value="lovo" />
+              <span class="opt-text">LOVO</span>
+            </label>
+            <label class="option-item">
+              <input type="radio" name="dub_mode" value="auto-fallback" checked />
+              <span class="opt-text">自动兜底（优先可用）</span>
+            </label>
           </div>
           <div class="muted" style="margin-top:6px;">更多工具（关键帧/后期/换脸/数字人/剪辑器）请在 <a href="/tools/hub">Tools Hub</a> 配置。</div>
         </div>

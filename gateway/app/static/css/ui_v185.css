@@ -1,0 +1,22 @@
+﻿/* v1.85 UI polish: topbar + language tabs + form grids */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:10px 0 14px 0;}
+.topbar-left{display:flex;align-items:baseline;gap:12px;min-width:220px;}
+.topbar-mid{display:flex;align-items:center;gap:10px;flex:1;justify-content:center;}
+.topbar-right{display:flex;align-items:center;gap:12px;justify-content:flex-end;flex-wrap:nowrap;}
+
+.lang-tabs{display:flex;gap:8px;align-items:center;}
+.lang-tab{padding:6px 10px;border:1px solid #ddd;border-radius:8px;text-decoration:none;color:inherit;font-size:12px;line-height:1;}
+.lang-tab.active{border-color:#111;font-weight:600;}
+
+.actions{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;}
+.actions .btn{white-space:nowrap;}
+
+.form-row{display:flex;gap:12px;align-items:flex-start;}
+.form-row > label{min-width:110px;white-space:nowrap;}
+.form-row .field{flex:1;min-width:0;}
+
+.option-grid{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(180px,1fr));}
+@media (max-width: 860px){ .option-grid{grid-template-columns:1fr;} }
+
+.option-item{display:flex;gap:8px;align-items:flex-start;}
+.option-item .opt-text{white-space:normal;line-height:1.25;}

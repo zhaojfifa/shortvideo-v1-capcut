@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <title>任务看板 - ShortVideo</title>
   <link rel="stylesheet" href="/static/tasks_board.css">
+  <link rel="stylesheet" href="/static/css/ui_v185.css">
   <style>
     :root { color-scheme: light; }
     body {
@@ -22,13 +23,7 @@
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
       padding: 16px;
     }
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 12px;
-    }
+    .header { margin-bottom: 12px; }
     h1 { margin: 0; font-size: 1.5rem; font-weight: 700; color: #0f172a; }
     .subhead { margin: 4px 0 0; color: #6b7280; font-size: 0.95rem; }
     .bilingual { display: flex; flex-direction: column; gap: 2px; }
@@ -120,70 +115,42 @@
 {% set ui_show_secondary = false %}
   <div class="page tasks-board">
     <div class="card">
-      <div class="header">
-        <div>
+      <div class="topbar">
+        <div class="topbar-left">
           <h1 data-i18n="ui.tasks.board">任务看板</h1>
-          <p id="task-count" class="subhead bilingual">
+          <p id="task-count" class="subhead">
             <span id="task-count-primary">{{ t_primary("task_count") | replace("{count}", tasks | length) }}</span>
-            {% if ui_show_secondary %}
-              <span id="task-count-secondary" class="secondary">{{ t_secondary("task_count") | replace("{count}", tasks | length) }}</span>
-            {% endif %}
           </p>
-          <div class="legend">
-            <span class="legend-title">
-              {{ t_primary("legend") }}
-              {% if ui_show_secondary %}
-                <span class="secondary">{{ t_secondary("legend") }}</span>
-              {% endif %}
-            </span>
-            <span class="legend-item">
-              <span class="badge-dot dot-ready"></span>
-              <span class="bilingual">
-                <span>{{ t_primary("status_ready") }}</span>
-                {% if ui_show_secondary %}
-                  <span class="secondary">{{ t_secondary("status_ready") }}</span>
-                {% endif %}
-              </span>
-            </span>
-            <span class="legend-item">
-              <span class="badge-dot dot-processing"></span>
-              <span class="bilingual">
-                <span>{{ t_primary("status_processing") }}</span>
-                {% if ui_show_secondary %}
-                  <span class="secondary">{{ t_secondary("status_processing") }}</span>
-                {% endif %}
-              </span>
-            </span>
-            <span class="legend-item">
-              <span class="badge-dot dot-pending"></span>
-              <span class="bilingual">
-                <span>{{ t_primary("status_pending") }}</span>
-                {% if ui_show_secondary %}
-                  <span class="secondary">{{ t_secondary("status_pending") }}</span>
-                {% endif %}
-              </span>
-            </span>
-            <span class="legend-item">
-              <span class="badge-dot dot-error"></span>
-              <span class="bilingual">
-                <span>{{ t_primary("status_error") }}</span>
-                {% if ui_show_secondary %}
-                  <span class="secondary">{{ t_secondary("status_error") }}</span>
-                {% endif %}
-              </span>
-            </span>
+        </div>
+        <div class="topbar-mid">
+          <a class="btn-secondary" href="/tools/hub">Tools</a>
+        </div>
+        <div class="topbar-right">
+          {% include "_lang_tabs.html" %}
+          <div class="actions">
+            <a class="btn-primary" href="/tasks/new">{{ t_primary("new_suitcase_task") }}</a>
           </div>
         </div>
-        <div class="header-actions">
-          {% include "_lang_tabs.html" %}
-          <a class="btn-secondary" href="/tools/hub">Tools</a>
-          <a class="btn-primary" href="/tasks/new">
-            {{ t_primary("new_suitcase_task") }}
-            {% if ui_show_secondary %}
-              <span class="secondary">{{ t_secondary("new_suitcase_task") }}</span>
-            {% endif %}
-          </a>
-        </div>
+      </div>
+
+      <div class="legend">
+        <span class="legend-title">{{ t_primary("legend") }}</span>
+        <span class="legend-item">
+          <span class="badge-dot dot-ready"></span>
+          <span>{{ t_primary("status_ready") }}</span>
+        </span>
+        <span class="legend-item">
+          <span class="badge-dot dot-processing"></span>
+          <span>{{ t_primary("status_processing") }}</span>
+        </span>
+        <span class="legend-item">
+          <span class="badge-dot dot-pending"></span>
+          <span>{{ t_primary("status_pending") }}</span>
+        </span>
+        <span class="legend-item">
+          <span class="badge-dot dot-error"></span>
+          <span>{{ t_primary("status_error") }}</span>
+        </span>
       </div>
 
       <div class="table-wrapper">
