@@ -12,7 +12,6 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from gateway.app.auth import (
     COOKIE_NAME,
@@ -30,12 +29,12 @@ from gateway.app.routers import admin_publish, admin_tools as admin_tools_router
 from gateway.app.routers.api_tools import router as tools_api_router
 from gateway.app.routes.auth import router as auth_router
 from gateway.app.routes.v17_pack import router as v17_pack_router
+from gateway.app.web.templates import render_template
 from gateway.routes import v1_actions
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 UI_HTML_PATH = STATIC_DIR / "ui.html"
-templates = Jinja2Templates(directory="gateway/app/templates")
 AUDIO_DIR = Path(get_settings().workspace_root).expanduser().resolve() / "audio"
 WORKSPACE_ROOT = Path(
     os.environ.get("VIDEO_WORKSPACE", "/opt/render/project/src/video_workspace")
@@ -152,12 +151,12 @@ async def auth_middleware(request: Request, call_next):
 
 @app.get("/auth/login", response_class=HTMLResponse, include_in_schema=False)
 def auth_login_page(request: Request, next: str = "/tasks"):
-    return templates.TemplateResponse("auth_login.html", {"request": request, "next": next})
+    return render_template(request, "auth_login.html", {"next": next})
 
 
 @app.get("/admin/tools", response_class=HTMLResponse, include_in_schema=False)
 def admin_tools_page(request: Request):
-    return templates.TemplateResponse("admin_tools.html", {"request": request})
+    return render_template(request, "admin_tools.html")
 
 
 @app.get("/", include_in_schema=False)

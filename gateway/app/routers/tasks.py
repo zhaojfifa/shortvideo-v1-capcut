@@ -45,7 +45,7 @@ from ..schemas import (
     TaskUpdate,
 )
 
-from gateway.app.web.templates import get_templates
+from gateway.app.web.templates import render_template
 from gateway.app.deps import get_task_repository
 from gateway.app.ports.storage_provider import get_storage_service  # 只保留这一处依赖注入入口
 
@@ -189,7 +189,6 @@ class PublishTaskRequest(BaseModel):
 
 pages_router = APIRouter()
 api_router = APIRouter(prefix="/api", tags=["tasks"])
-templates = get_templates()
 api_key_header = APIKeyHeader(name=OP_HEADER_KEY, auto_error=False)
 def _coerce_datetime(value) -> datetime:
     # Pydantic TaskDetail.created_at expects datetime, so guarantee it.
@@ -353,7 +352,7 @@ async def tasks_page(
             }
         )
 
-    return templates.TemplateResponse(
+    return render_template(
         "tasks.html",
         {"request": request, "tasks": rows, "features": get_features()},
     )
@@ -363,7 +362,7 @@ async def tasks_page(
 async def tasks_new(request: Request) -> HTMLResponse:
     """Render suitcase quick-create page."""
 
-    return templates.TemplateResponse(
+    return render_template(
         "tasks_new.html",
         {"request": request, "features": get_features()},
     )
@@ -381,7 +380,7 @@ async def pipeline_lab(request: Request) -> HTMLResponse:
         "subtitles_backend": getattr(settings, "subtitles_backend", None) or "gemini",
         "gemini_model": getattr(settings, "gemini_model", ""),
     }
-    return templates.TemplateResponse(
+    return render_template(
         "pipeline_lab.html",
         {"request": request, "env_summary": env_summary},
     )
@@ -391,7 +390,7 @@ async def pipeline_lab(request: Request) -> HTMLResponse:
 async def tools_hub_page(request: Request) -> HTMLResponse:
     """Render tools hub list page."""
 
-    return templates.TemplateResponse(
+    return render_template(
         "tools_hub.html",
         {"request": request},
     )
@@ -401,7 +400,7 @@ async def tools_hub_page(request: Request) -> HTMLResponse:
 async def tool_detail_page(request: Request, tool_id: str) -> HTMLResponse:
     """Render tool detail page."""
 
-    return templates.TemplateResponse(
+    return render_template(
         "tool_detail.html",
         {"request": request, "tool_id": tool_id},
     )
@@ -1170,7 +1169,7 @@ async def task_workbench_page(
 
     task = repo.get(task_id)
     if not task:
-        return templates.TemplateResponse(
+        return render_template(
             "task_not_found.html",
             {"request": request, "task_id": task_id},
             status_code=404,
@@ -1224,7 +1223,7 @@ async def task_workbench_page(
     }
     task_view = {"source_url_open": _extract_first_http_url(task.get("source_url"))}
 
-    return templates.TemplateResponse(
+    return render_template(
         "task_workbench.html",
         {
             "request": request,
@@ -1245,7 +1244,7 @@ async def task_publish_hub_page(
 
     task = repo.get(task_id)
     if not task:
-        return templates.TemplateResponse(
+        return render_template(
             "task_not_found.html",
             {"request": request, "task_id": task_id},
             status_code=404,
@@ -1253,7 +1252,7 @@ async def task_publish_hub_page(
 
     detail = _task_to_detail(task)
     task_json = {"task_id": detail.task_id}
-    return templates.TemplateResponse(
+    return render_template(
         "task_publish_hub.html",
         {
             "request": request,

@@ -25,3 +25,19 @@ def get_templates() -> Jinja2Templates:
     Prefer importing `templates` directly in new code.
     """
     return templates
+
+
+def render_template(
+    request: Request,
+    name: str,
+    context: dict[str, object] | None = None,
+):
+    """
+    Render a template with per-request i18n globals injected.
+    """
+    ctx: dict[str, object] = {}
+    if context:
+        ctx.update(context)
+    ctx["request"] = request
+    ctx.update(get_template_globals(request))
+    return templates.TemplateResponse(name, ctx)
