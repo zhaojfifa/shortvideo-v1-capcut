@@ -135,3 +135,38 @@
   font-weight:900;
   border-radius:12px;
 }
+
+/* v1.85 SSOT: pill buttons => rounded-rectangle + bigger text */
+:root{
+  --ui-pill-radius: 12px;
+  --ui-pill-font: 15px;
+  --ui-pill-pad-y: 10px;
+  --ui-pill-pad-x: 14px;
+}
+
+.ui-pill,
+.lang-pill,
+.nav-pill,
+.topbar .btn,
+.topbar button,
+.topbar a.buttonlike {
+  border-radius: var(--ui-pill-radius) !important;
+  font-size: var(--ui-pill-font) !important;
+  padding: var(--ui-pill-pad-y) var(--ui-pill-pad-x) !important;
+  line-height: 1.1;
+  font-weight: 600;
+}
+
+/* segmented container spacing */
+.topbar .segmented,
+.topbar .tabs,
+.topbar .lang-switch {
+  gap: 10px;
+}
+
+/* ensure active state still clear */
+.topbar .segmented .active,
+.topbar .tabs .active,
+.topbar .lang-switch .active {
+  box-shadow: 0 1px 0 rgba(0,0,0,.06);
+}

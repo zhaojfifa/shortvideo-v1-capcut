@@ -1,37 +1,43 @@
 #!/usr/bin/env python3
-import pathlib
 import re
+from pathlib import Path
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
-TPL_DIR = ROOT / "gateway" / "app" / "templates"
+CJK = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf\u3040-\u30ff\uac00-\ud7af]")
 
-CJK = re.compile(r"[\u4e00-\u9fff]")
+ROOTS = [
+    Path("gateway/app/templates"),
+    Path("gateway/app/static/js"),
+]
 
-ALLOWLIST = set(
-    [
-        # If any legacy files must be kept, list them here.
-    ]
-)
+ALLOWLIST = {
+    # If there are unavoidable exceptions, list them here.
+}
 
 
 def main() -> int:
     bad = []
-    for p in sorted(TPL_DIR.glob("*.html")):
-        if p.name in ALLOWLIST:
+    for root in ROOTS:
+        if not root.exists():
             continue
-        try:
-            s = p.read_text(encoding="utf-8")
-        except Exception as e:
-            bad.append((str(p), f"NOT_UTF8: {e}"))
-            continue
-        if CJK.search(s):
-            bad.append((str(p), "HAS_CJK"))
+        for p in root.rglob("*"):
+            if not p.is_file():
+                continue
+            if p.suffix not in {".html", ".js"}:
+                continue
+            rel = str(p)
+            if rel in ALLOWLIST:
+                continue
+            txt = p.read_text(encoding="utf-8", errors="ignore")
+            for i, line in enumerate(txt.splitlines(), 1):
+                if CJK.search(line):
+                    bad.append((rel, i, line.strip()))
     if bad:
-        print("Operator templates check failed:")
-        for f, why in bad:
-            print(f" - {f}: {why}")
+        print("Found CJK in operator templates/assets:")
+        for rel, i, line in bad[:200]:
+            print(f"- {rel}:{i}: {line}")
+        print(f"Total hits: {len(bad)}")
         return 1
-    print("OK: no CJK and all templates are UTF-8")
+    print("OK: no CJK found.")
     return 0
 
 

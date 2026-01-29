@@ -2,7 +2,10 @@
   window.__I18N__ = {{ i18n_payload | tojson | safe }};
   window.__UI_LOCALE__ = "{{ ui_locale }}";
 </script>
-<div class="lang-tabs">
-  <a href="#" data-lang-tab="zh" class="lang-btn"><span data-i18n="common.chinese">{{ t("common.chinese") }}</span></a>
-  <a href="#" data-lang-tab="mm" class="lang-btn"><span data-i18n="common.burmese">{{ t("common.burmese") }}</span></a>
+<div class="lang-tabs lang-switch">
+  {% for loc in supported_locales %}
+    <a href="#" data-lang-tab="{{ loc.code }}" class="lang-btn lang-pill ui-pill">
+      <span data-i18n="lang.{{ loc.code }}">{{ tr("lang." ~ loc.code) }}</span>
+    </a>
+  {% endfor %}
 </div>

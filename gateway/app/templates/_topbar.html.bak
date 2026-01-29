@@ -7,8 +7,8 @@
   </div>
   <div class="topbar-mid">
     <div class="nav-segment">
-      <a class="nav-item {% if active_nav == 'tasks' %}active{% endif %}" href="/tasks">{{ t("nav.tasks") }}</a>
-      <a class="nav-item {% if active_nav == 'tools' %}active{% endif %}" href="/tools/hub">{{ t("nav.tools") }}</a>
+      <a class="nav-item {% if active_nav == 'tasks' %}active{% endif %}" href="/tasks">{{ tr("nav.tasks") }}</a>
+      <a class="nav-item {% if active_nav == 'tools' %}active{% endif %}" href="/tools/hub">{{ tr("nav.tools") }}</a>
     </div>
   </div>
   <div class="topbar-right">

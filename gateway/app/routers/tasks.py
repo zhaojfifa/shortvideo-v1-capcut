@@ -353,9 +353,9 @@ async def tasks_page(
         )
 
     return render_template(
-        request,
-        "tasks.html",
-        {"tasks": rows, "features": get_features()},
+        request=request,
+        name="tasks.html",
+        ctx={"tasks": rows, "features": get_features()},
     )
 
 
@@ -364,9 +364,9 @@ async def tasks_new(request: Request) -> HTMLResponse:
     """Render suitcase quick-create page."""
 
     return render_template(
-        request,
-        "tasks_new.html",
-        {"features": get_features()},
+        request=request,
+        name="tasks_new.html",
+        ctx={"features": get_features()},
     )
 
 
@@ -383,9 +383,9 @@ async def pipeline_lab(request: Request) -> HTMLResponse:
         "gemini_model": getattr(settings, "gemini_model", ""),
     }
     return render_template(
-        request,
-        "pipeline_lab.html",
-        {"env_summary": env_summary},
+        request=request,
+        name="pipeline_lab.html",
+        ctx={"env_summary": env_summary},
     )
 
 
@@ -394,9 +394,9 @@ async def tools_hub_page(request: Request) -> HTMLResponse:
     """Render tools hub list page."""
 
     return render_template(
-        request,
-        "tools_hub.html",
-        {},
+        request=request,
+        name="tools_hub.html",
+        ctx={},
     )
 
 
@@ -405,9 +405,9 @@ async def tool_detail_page(request: Request, tool_id: str) -> HTMLResponse:
     """Render tool detail page."""
 
     return render_template(
-        request,
-        "tool_detail.html",
-        {"tool_id": tool_id},
+        request=request,
+        name="tool_detail.html",
+        ctx={"tool_id": tool_id},
     )
 
 
@@ -1175,9 +1175,9 @@ async def task_workbench_page(
     task = repo.get(task_id)
     if not task:
         resp = render_template(
-            request,
-            "task_not_found.html",
-            {"task_id": task_id},
+            request=request,
+            name="task_not_found.html",
+            ctx={"task_id": task_id},
         )
         resp.status_code = 404
         return resp
@@ -1231,9 +1231,9 @@ async def task_workbench_page(
     task_view = {"source_url_open": _extract_first_http_url(task.get("source_url"))}
 
     return render_template(
-        request,
-        "task_workbench.html",
-        {
+        request=request,
+        name="task_workbench.html",
+        ctx={
             "task": detail,
             "task_json": task_json,
             "task_view": task_view,
@@ -1252,9 +1252,9 @@ async def task_publish_hub_page(
     task = repo.get(task_id)
     if not task:
         resp = render_template(
-            request,
-            "task_not_found.html",
-            {"task_id": task_id},
+            request=request,
+            name="task_not_found.html",
+            ctx={"task_id": task_id},
         )
         resp.status_code = 404
         return resp
@@ -1262,9 +1262,9 @@ async def task_publish_hub_page(
     detail = _task_to_detail(task)
     task_json = {"task_id": detail.task_id}
     return render_template(
-        request,
-        "task_publish_hub.html",
-        {
+        request=request,
+        name="task_publish_hub.html",
+        ctx={
             "task": detail,
             "task_json": task_json,
         },

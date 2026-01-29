@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{{ t("page.tools.hub.title") }}</title>
+  <title>{{ tr("page.tools.hub.title") }}</title>
   <link rel="stylesheet" href="/static/i18n.css" />
   <link rel="stylesheet" href="/static/css/ui_v185.css">
   <style>
@@ -52,7 +52,7 @@
     .btn.disabled { opacity: 0.5; pointer-events: none; }
     .filters {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat (auto-fit, minmax(200px, 1fr));
       gap: 12px;
       align-items: end;
     }
@@ -67,7 +67,7 @@
     }
     .tool-list {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      grid-template-columns: repeat (auto-fit, minmax(280px, 1fr));
       gap: 14px;
     }
     .tool-card {
@@ -120,49 +120,49 @@
 </head>
 <body>
   <div class="page">
-    {% set topbar_title = t("ui.tools.title") %}
-{% set topbar_subtitle = t("page.tools.hub.subtitle") %}
+    {% set topbar_title = tr("ui.tools.title") %}
+{% set topbar_subtitle = tr("page.tools.hub.subtitle") %}
 {% set topbar_nav = [
-  {"label": t("common.tasks"), "href": "/tasks", "active": False},
-  {"label": t("common.tools"), "href": "/tools/hub", "active": True},
+  {"label": tr("common.tasks"), "href": "/tasks", "active": False},
+  {"label": tr("common.tools"), "href": "/tools/hub", "active": True},
 ] %}
 {% set topbar_actions = [
-  {"label": t("common.back_task_board"), "href": "/tasks", "primary": False},
+  {"label": tr("common.back_task_board"), "href": "/tasks", "primary": False},
 ] %}
 {% include "_topbar.html" %}
     <div class="card">
       <div class="filters">
         <div>
-          <label for="filter-q">{{ t("tools.filters.search") }}</label>
-          <input id="filter-q" placeholder="{{ t("tools.filters.search_placeholder") }}" />
+          <label for="filter-q">{{ tr("tools.filters.search") }}</label>
+          <input id="filter-q" placeholder="{{ tr("tools.filters.search_placeholder") }}" />
         </div>
         <div>
-          <label for="filter-category">{{ t("tools.filters.category") }}</label>
+          <label for="filter-category">{{ tr("tools.filters.category") }}</label>
           <select id="filter-category">
-            <option value="">{{ t("tools.filters.all") }}</option>
+            <option value="">{{ tr("tools.filters.all") }}</option>
           </select>
         </div>
         <div>
-          <label for="filter-capabilities">{{ t("tools.filters.capabilities") }}</label>
-          <input id="filter-capabilities" placeholder="{{ t("tools.filters.capabilities_placeholder") }}" />
+          <label for="filter-capabilities">{{ tr("tools.filters.capabilities") }}</label>
+          <input id="filter-capabilities" placeholder="{{ tr("tools.filters.capabilities_placeholder") }}" />
         </div>
         <div>
-          <label for="filter-tags">{{ t("tools.filters.tags") }}</label>
-          <input id="filter-tags" placeholder="{{ t("tools.filters.tags_placeholder") }}" />
+          <label for="filter-tags">{{ tr("tools.filters.tags") }}</label>
+          <input id="filter-tags" placeholder="{{ tr("tools.filters.tags_placeholder") }}" />
         </div>
         <div>
-          <label for="filter-level">{{ t("tools.filters.integration") }}</label>
+          <label for="filter-level">{{ tr("tools.filters.integration") }}</label>
           <select id="filter-level">
-            <option value="">{{ t("tools.filters.all") }}</option>
+            <option value="">{{ tr("tools.filters.all") }}</option>
             <option value="integrated_run">integrated_run</option>
             <option value="integrated_open">integrated_open</option>
             <option value="external_link">external_link</option>
           </select>
         </div>
         <div>
-          <label for="filter-status">{{ t("tools.filters.status") }}</label>
+          <label for="filter-status">{{ tr("tools.filters.status") }}</label>
           <select id="filter-status">
-            <option value="">{{ t("tools.filters.all") }}</option>
+            <option value="">{{ tr("tools.filters.all") }}</option>
             <option value="active">active</option>
             <option value="degraded">degraded</option>
             <option value="outage">outage</option>
@@ -173,13 +173,13 @@
         </div>
         <div>
           <label>&nbsp;</label>
-          <button id="filter-clear" class="btn">{{ t("tools.filters.clear") }}</button>
+          <button id="filter-clear" class="btn">{{ tr("tools.filters.clear") }}</button>
         </div>
       </div>
     </div>
 
     <div class="card">
-      <div id="tools-state" class="muted">{{ t("tools.loading") }}</div>
+      <div id="tools-state" class="muted">{{ tr("tools.loading") }}</div>
       <div id="tools-list" class="tool-list" style="display:none;"></div>
     </div>
   </div>
@@ -189,44 +189,44 @@
     const BUCKETS = [
       {
         key: "keyframe_det",
-        title: "{{ t('tools.bucket.keyframe.title') }}",
-        subtitle: "{{ t('tools.bucket.keyframe.subtitle') }}",
+        title: "{{ tr('tools.bucket.keyframe.title') }}",
+        subtitle: "{{ tr('tools.bucket.keyframe.subtitle') }}",
         ids: ["local:ffprobe_inspect", "local:ffmpeg_scene_split", "local:ffmpeg_keyframe_extract"],
       },
       {
         key: "post_det",
-        title: "{{ t('tools.bucket.post.title') }}",
-        subtitle: "{{ t('tools.bucket.post.subtitle') }}",
+        title: "{{ tr('tools.bucket.post.title') }}",
+        subtitle: "{{ tr('tools.bucket.post.subtitle') }}",
         ids: ["local:ffmpeg_transcode", "local:ffmpeg_burn_subtitles"],
       },
       {
         key: "voice_audio",
-        title: "{{ t('tools.bucket.voice.title') }}",
-        subtitle: "{{ t('tools.bucket.voice.subtitle') }}",
+        title: "{{ tr('tools.bucket.voice.title') }}",
+        subtitle: "{{ tr('tools.bucket.voice.subtitle') }}",
         ids: ["local:ffmpeg_audio_mix", "tts:edge_tts", "tts:lovo"],
       },
       {
         key: "editors",
-        title: "{{ t('tools.bucket.editors.title') }}",
-        subtitle: "{{ t('tools.bucket.editors.subtitle') }}",
+        title: "{{ tr('tools.bucket.editors.title') }}",
+        subtitle: "{{ tr('tools.bucket.editors.subtitle') }}",
         ids: ["editor:capcut", "editor:youcut", "editor:vn"],
       },
       {
         key: "face_swap",
-        title: "{{ t('tools.bucket.face_swap.title') }}",
-        subtitle: "{{ t('tools.bucket.face_swap.subtitle') }}",
+        title: "{{ tr('tools.bucket.face_swap.title') }}",
+        subtitle: "{{ tr('tools.bucket.face_swap.subtitle') }}",
         ids: ["vendor:akool_face_swap"],
       },
       {
         key: "avatar",
-        title: "{{ t('tools.bucket.avatar.title') }}",
-        subtitle: "{{ t('tools.bucket.avatar.subtitle') }}",
+        title: "{{ tr('tools.bucket.avatar.title') }}",
+        subtitle: "{{ tr('tools.bucket.avatar.subtitle') }}",
         ids: ["vendor:kling_motion", "vendor:heygen_avatar"],
       },
       {
         key: "gemini",
-        title: "{{ t('tools.bucket.gemini.title') }}",
-        subtitle: "{{ t('tools.bucket.gemini.subtitle') }}",
+        title: "{{ tr('tools.bucket.gemini.title') }}",
+        subtitle: "{{ tr('tools.bucket.gemini.subtitle') }}",
         ids: [
           "google:gemini_video_understanding",
           "google:veo",
@@ -238,14 +238,14 @@
 
     function splitCsv(value) {
       return value
-        .split(",")
+        .split (",")
         .map((v) => v.trim().toLowerCase())
         .filter((v) => v);
     }
 
     function matchesAny(values, needles) {
       if (!needles.length) return true;
-      const set = new Set(values.map((v) => String(v).toLowerCase()));
+      const set = new Set (values.map((v) => String(v).toLowerCase()));
       return needles.some((n) => set.has(n));
     }
 
@@ -255,7 +255,7 @@
     }
 
     function renderTool(tool) {
-      const div = document.createElement("div");
+      const div = document.createElement ("div");
       div.className = "tool-card";
       const name = nameFor(tool);
       const toolId = tool.tool_id || "";
@@ -282,14 +282,14 @@
         <div class="actions">
           <a class="btn ${access.entry_url ? "primary" : "disabled"}" href="${access.entry_url || "#"}" target="_blank" rel="noopener">Open</a>
           <a class="btn ${access.docs_url ? "" : "disabled"}" href="${access.docs_url || "#"}" target="_blank" rel="noopener">Docs</a>
-          <a class="btn" href="/tools/${encodeURIComponent(toolId)}">Details</a>
+          <a class="btn" href="/tools/${encodeURIComponent (toolId)}">Details</a>
         </div>
       `;
       return div;
     }
 
     function sortTools(tools) {
-      return tools.slice().sort((a, b) => {
+      return tools.slice().sort ((a, b) => {
         const aUi = a.ui || {};
         const bUi = b.ui || {};
         const aw = Number(aUi.sort_weight || 0);
@@ -304,14 +304,14 @@
 
     function groupByBuckets(tools) {
       const toolMap = new Map(tools.map((t) => [t.tool_id, t]));
-      const filteredIds = new Set(tools.map((t) => t.tool_id));
-      const seen = new Set();
+      const filteredIds = new Set (tools.map((t) => t.tool_id));
+      const seen = new Set ();
       const groups = [];
 
       BUCKETS.forEach((bucket) => {
         const items = bucket.ids
           .filter((id) => filteredIds.has(id))
-          .map((id) => toolMap.get(id))
+          .map((id) => toolMap.get (id))
           .filter(Boolean);
         items.forEach((item) => seen.add(item.tool_id));
         if (items.length) {
@@ -326,15 +326,15 @@
       const remaining = tools.filter((t) => !seen.has(t.tool_id));
       if (remaining.length) {
         groups.push({
-          title: "{{ t('tools.bucket.other.title') }}",
-          subtitle: "{{ t('tools.bucket.other.subtitle') }}",
+          title: "{{ tr('tools.bucket.other.title') }}",
+          subtitle: "{{ tr('tools.bucket.other.subtitle') }}",
           items: sortTools(remaining),
         });
       }
       return groups;
     }
 
-    function renderList(tools) {
+    function renderList (tools) {
       const list = document.getElementById("tools-list");
       const stateEl = document.getElementById("tools-state");
       if (!list || !stateEl) return;
@@ -349,9 +349,9 @@
       const groups = groupByBuckets(tools);
       list.style.display = "block";
       groups.forEach((group) => {
-        const section = document.createElement("div");
+        const section = document.createElement ("div");
         section.className = "group";
-        const header = document.createElement("div");
+        const header = document.createElement ("div");
         header.className = "group-header";
         header.innerHTML = `
           <div>
@@ -360,7 +360,7 @@
           </div>
           <div class="group-count">${group.items.length} tools</div>
         `;
-        const grid = document.createElement("div");
+        const grid = document.createElement ("div");
         grid.className = "tool-list";
         group.items.forEach((tool) => grid.appendChild(renderTool(tool)));
         section.appendChild(header);
@@ -399,7 +399,7 @@
         return true;
       });
 
-      renderList(filtered);
+      renderList (filtered);
     }
 
     function bindFilters() {
@@ -427,16 +427,16 @@
     function populateFilters(tools) {
       const categorySelect = document.getElementById("filter-category");
       if (!categorySelect) return;
-      const categories = Array.from(new Set(tools.map((t) => t.category).filter(Boolean))).sort();
+      const categories = Array.from(new Set (tools.map((t) => t.category).filter(Boolean))).sort ();
       categories.forEach((c) => {
-        const option = document.createElement("option");
+        const option = document.createElement ("option");
         option.value = c;
         option.textContent = c;
         categorySelect.appendChild(option);
       });
     }
 
-    async function init() {
+    async function init () {
       const stateEl = document.getElementById("tools-state");
       try {
         const resp = await fetch("/api/tools");
@@ -445,7 +445,7 @@
         state.tools = data.items || [];
         populateFilters(state.tools);
         bindFilters();
-        renderList(state.tools);
+        renderList (state.tools);
       } catch (err) {
         if (stateEl) {
           stateEl.innerHTML = `<span class="error">Failed to load tools: ${err}</span>`;
@@ -453,7 +453,7 @@
       }
     }
 
-    init();
+    init ();
   </script>
   <script src="/static/js/i18n_v185.js"></script>
 </body>

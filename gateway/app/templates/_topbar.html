@@ -13,7 +13,7 @@
     {% if topbar_nav %}
       <div class="segmented">
         {% for item in topbar_nav %}
-          <a class="segmented-item {% if item.active %}active{% endif %}" href="{{ item.href }}">
+          <a class="segmented-item nav-pill ui-pill {% if item.active %}active{% endif %}" href="{{ item.href }}">
             {{ item.label }}
           </a>
         {% endfor %}
@@ -26,7 +26,7 @@
     {% if topbar_actions %}
       <div class="topbar-actions">
         {% for a in topbar_actions %}
-          <a class="btn {% if a.primary %}btn-primary{% else %}btn-ghost{% endif %}" href="{{ a.href }}">
+          <a class="btn ui-pill {% if a.primary %}btn-primary{% else %}btn-ghost{% endif %}" href="{{ a.href }}">
             {{ a.label }}
           </a>
         {% endfor %}

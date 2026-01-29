@@ -44,17 +44,20 @@
     return "zh";
   }
 
-  const FALLBACK_CHAIN = {
-    mm: ["mm", "zh"],
-    zh: ["zh"],
-    en: ["en"],
-  };
+  function getFallbacks() {
+    const payload = getPayload();
+    return payload.fallbacks || {
+      mm: ["mm", "zh"],
+      zh: ["zh"],
+    };
+  }
 
-  function t(key, vars) {
+  function tr(key, vars) {
     const payload = getPayload();
     const locale = resolveLocale();
     const dict = payload.dict || {};
-    const chain = FALLBACK_CHAIN[locale] || [locale, "zh"];
+    const fallbacks = getFallbacks();
+    const chain = fallbacks[locale] || [locale, "zh"];
     let text;
     for (const loc of chain) {
       const table = dict[loc] || {};
@@ -64,7 +67,7 @@
       }
     }
     if (!text) {
-      text = `【MISSING:${key}】`;
+      text = `⟦${key}⟧`;
     }
     if (vars && typeof text === "string") {
       Object.keys(vars).forEach((k) => {
@@ -78,15 +81,15 @@
     document.documentElement.setAttribute("data-locale", locale);
     document.querySelectorAll("[data-i18n]").forEach((el) => {
       const key = el.getAttribute("data-i18n");
-      el.textContent = t(key);
+      el.textContent = tr(key);
     });
     document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
       const key = el.getAttribute("data-i18n-placeholder");
-      el.setAttribute("placeholder", t(key));
+      el.setAttribute("placeholder", tr(key));
     });
     document.querySelectorAll("[data-i18n-title]").forEach((el) => {
       const key = el.getAttribute("data-i18n-title");
-      el.setAttribute("title", t(key));
+      el.setAttribute("title", tr(key));
     });
   }
 
@@ -105,7 +108,7 @@
     });
   }
 
-  window.__V185_I18N__ = { t };
+  window.__V185_I18N__ = { tr, t: tr };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);

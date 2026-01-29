@@ -1,21 +1,18 @@
 ﻿from __future__ import annotations
 
 import os
-from typing import Any, Dict
+from typing import Any, Dict, List
 from starlette.requests import Request
 
-SUPPORTED_UI_LOCALES = ["zh", "mm"]
-DEFAULT_UI_LOCALE = os.getenv("DEFAULT_UI_LOCALE", "zh").strip().lower() or "zh"
-STRICT_OPERATOR_LOCALE = os.getenv("STRICT_OPERATOR_LOCALE", "true").lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
+SUPPORTED_LOCALES = ["zh", "mm"]
+DEFAULT_LOCALE = os.getenv("DEFAULT_UI_LOCALE", "zh").strip().lower() or "zh"
+LOCALE_LABELS = {
+    "zh": "Chinese",
+    "mm": "Burmese",
 }
-FALLBACK_CHAIN = {
+LOCALE_FALLBACKS = {
     "mm": ["mm", "zh"],
     "zh": ["zh"],
-    "en": ["en"],
 }
 
 I18N_DICT: Dict[str, Dict[str, str]] = {
@@ -91,6 +88,8 @@ I18N_DICT: Dict[str, Dict[str, str]] = {
         "status.ready": "已就绪",
         "status.processing": "处理中",
         "status.pending": "排队中",
+        "status.queued": "排队中",
+        "status.failed": "失败",
         "status.error": "失败",
         "status.unknown": "未知",
         "status.not_ready": "未就绪",
@@ -149,12 +148,17 @@ I18N_DICT: Dict[str, Dict[str, str]] = {
         "label.submit.error.missing_link": "必须填写来源链接",
         "tasks.loading": "加载任务中…",
         "tasks.loaded": "已加载 {n} 个任务",
+        "tasks.loaded_n": "已加载 {n} 个任务",
         "tasks.no_tasks": "暂无任务",
         "tasks.load_failed": "加载失败: {error}",
         "tasks.delete_confirm": "确认删除该任务？",
         "tasks.deleting": "删除中…",
         "tasks.delete_failed": "删除失败: {error}",
         "tasks.legend": "图例",
+        "tasks.legend.ready": "已就绪",
+        "tasks.legend.processing": "处理中",
+        "tasks.legend.queued": "排队中",
+        "tasks.legend.failed": "失败",
         "tasks.status.ready": "已就绪",
         "tasks.status.processing": "处理中",
         "tasks.status.queued": "排队中",
@@ -338,15 +342,22 @@ I18N_DICT: Dict[str, Dict[str, str]] = {
         "auth.login.invalid": "密钥错误",
     },
     "mm": {
-        "ui.tasks.board": "လုပ်ငန်းစာရင်း",
+        "ui.tasks.board": "တာဝန်ဘုတ်",
         "ui.tools.title": "ကိရိယာများ",
-        "ui.workbench.title": "လုပ်ငန်းလုပ်ဆောင်မှု",
+        "ui.workbench.title": "လုပ်ငန်းခွင်",
         "common.tasks": "လုပ်ငန်း",
         "common.tools": "ကိရိယာ",
         "common.new_task": "လုပ်ငန်းအသစ်",
         "common.back_task_board": "← လုပ်ငန်းစာရင်း",
         "common.chinese": "中文",
         "common.burmese": "မြန်မာ",
+        "common.open": "ဖွင့်",
+        "common.download": "ဒေါင်းလုပ်",
+        "common.delete": "ဖျက်",
+        "common.details": "အသေးစိတ်",
+        "common.docs": "စာတမ်း",
+        "common.clear_filters": "စစ်ထုတ်မှုဖျက်",
+        "common.search": "ရှာဖွေ",
         "lang.zh": "Chinese",
         "lang.mm": "Burmese",
         "id": "ID",
@@ -389,91 +400,98 @@ I18N_DICT: Dict[str, Dict[str, str]] = {
         "page.workbench.subtitle": "Task ID: {task_id}",
         "page.publish.title": "Publish Hub",
         "page.publish.subtitle": "Task ID: {task_id}",
-        "action.new_task": "New Task",
-        "action.refresh": "Refresh",
-        "action.back_tasks": "Task Board",
-        "action.back_tools": "Tools Hub",
-        "action.open": "Open",
-        "action.download": "Download",
-        "action.copy": "Copy",
-        "action.save": "Save",
-        "action.submit": "Submit",
-        "action.unlock": "Unlock",
-        "action.create": "Create & Run",
-        "action.reset": "Reset",
-        "action.run": "Run",
+        "action.new_task": "လုပ်ငန်းအသစ်",
+        "action.refresh": "ပြန်စစ်",
+        "action.back_tasks": "လုပ်ငန်းစာရင်း",
+        "action.back_tools": "ကိရိယာများ",
+        "action.open": "ဖွင့်",
+        "action.download": "ဒေါင်းလုပ်",
+        "action.copy": "ကူးယူ",
+        "action.save": "သိမ်းဆည်း",
+        "action.submit": "တင်သွင်း",
+        "action.unlock": "ဖွင့်",
+        "action.create": "ဖန်တီးပြီး လုပ်ဆောင်",
+        "action.reset": "ပြန်စရန်",
+        "action.run": "လုပ်ဆောင်",
         "action.download": "ဒေါင်းလုပ်",
         "action.open": "ဖွင့်",
         "action.delete": "ဖျက်",
         "action.json": "JSON",
-        "status.ready": "Ready",
-        "status.processing": "Processing",
-        "status.pending": "Queued",
-        "status.error": "Failed",
+        "status.ready": "အဆင်သင့်",
+        "status.processing": "လုပ်ဆောင်နေ",
+        "status.pending": "စောင့်ဆိုင်း",
+        "status.queued": "စောင့်ဆိုင်း",
+        "status.failed": "မအောင်မြင်",
+        "status.error": "မအောင်မြင်",
         "status.unknown": "Unknown",
         "status.not_ready": "Not ready",
         "label.id": "ID",
-        "label.platform": "Platform",
-        "label.source": "Source",
-        "label.title": "Title",
-        "label.category": "Category",
-        "label.category_other": "Other",
-        "label.language": "Language",
-        "label.status": "Status",
-        "label.last_step": "Last step",
-        "label.created": "Created",
-        "label.pack": "Pack",
-        "label.publish": "Publish",
-        "label.detail": "Detail",
-        "label.downloads": "Downloads",
+        "label.platform": "ပလက်ဖောင်း",
+        "label.source": "အရင်းအမြစ်",
+        "label.title": "ခေါင်းစဉ်",
+        "label.category": "အမျိုးအစား",
+        "label.category_other": "အခြား",
+        "label.language": "ဘာသာ",
+        "label.status": "အခြေအနေ",
+        "label.last_step": "နောက်ဆုံး အဆင့်",
+        "label.created": "ဖန်တီးချိန်",
+        "label.pack": "ပက်ကေ့ခ်",
+        "label.publish": "ထုတ်ဝေ",
+        "label.detail": "အသေးစိတ်",
+        "label.downloads": "ဒေါင်းလုပ်များ",
         "label.json": "JSON",
-        "label.task_id": "Task ID",
-        "label.account": "Account",
-        "label.video_type": "Video type",
-        "label.style_preset": "Style preset",
-        "label.style": "Style",
-        "label.note": "Note",
-        "label.pipeline_tools": "Pipeline tools",
-        "label.subtitles_mode": "Subtitles/Translate",
-        "label.dub_mode": "Dub",
-        "label.source_url": "Source URL",
-        "label.source_url.placeholder": "Paste source URL (Douyin/XHS/TK/FB)",
+        "label.task_id": "တာဝန် ID",
+        "label.account": "အကောင့်",
+        "label.video_type": "ဗီဒီယိုအမျိုးအစား",
+        "label.style_preset": "စတိုင် ပရီဆက်",
+        "label.style": "စတိုင်",
+        "label.note": "မှတ်ချက်",
+        "label.pipeline_tools": "လမ်းကြောင်းကိရိယာများ",
+        "label.subtitles_mode": "စာတန်းထိုး/ဘာသာပြန်",
+        "label.dub_mode": "အသံဖမ်း",
+        "label.source_url": "အရင်းအမြစ် လင့်ခ်",
+        "label.source_url.placeholder": "အရင်းအမြစ် လင့်ခ်ကူးထည့်ပါ (Douyin/XHS/TK/FB)",
         "label.platform_douyin": "Douyin",
         "label.platform_tiktok": "TikTok",
         "label.platform_xhs": "XHS",
         "label.platform_fb": "Facebook",
-        "label.video_type.review": "Review",
-        "label.video_type.scenario": "Scenario",
-        "label.video_type.hint": "Select business intent",
-        "label.style.fast": "Fast review",
-        "label.style.story": "Story",
-        "label.style_preset.hint": "Define tempo and edit intent",
-        "label.title.optional": "Title (optional)",
-        "label.title.placeholder": "Optional title",
-        "label.note.placeholder": "Ops notes",
-        "label.pipeline_hint": "Configure subtitles & dub only. Other tools in Workbench.",
-        "label.more_tools": "More tools in Tools Hub.",
-        "label.summary": "Summary",
-        "label.lang.mm": "Burmese (MM)",
+        "label.video_type.review": "သုံးသပ်ချက်",
+        "label.video_type.scenario": "ဇာတ်လမ်းဆန်",
+        "label.video_type.hint": "လုပ်ငန်း ရည်ရွယ်ချက်ရွေးပါ",
+        "label.style.fast": "မြန်မြန် သုံးသပ်",
+        "label.style.story": "ဇာတ်လမ်း",
+        "label.style_preset.hint": "စတိုင်နှင့် စုစည်းပုံ သတ်မှတ်ပါ",
+        "label.title.optional": "ခေါင်းစဉ် (ရွေးချယ်ရန်)",
+        "label.title.placeholder": "ရွေးချယ်ရန် ခေါင်းစဉ်",
+        "label.note.placeholder": "အော်ပရေတာ မှတ်ချက်",
+        "label.pipeline_hint": "စာတန်းထိုး/အသံဖမ်းသာ သတ်မှတ်ပါ။ အခြားကိရိယာများကို Workbench မှာ။",
+        "label.more_tools": "နောက်ထပ် ကိရိယာများကို Tools Hub မှာ။",
+        "label.summary": "အနှစ်ချုပ်",
+        "label.lang.mm": "မြန်မာ (MM)",
         "label.subtitles_mode.whisper_only": "Whisper only (ASR only)",
         "label.subtitles_mode.whisper_gemini": "Whisper + Gemini (ASR + translate)",
         "label.dub_mode.edge": "Edge TTS",
         "label.dub_mode.lovo": "LOVO",
         "label.dub_mode.auto": "Auto fallback",
-        "label.auto_category_hint": "Auto-category: Suitcase · Language: Burmese · UI: Chinese",
-        "label.submit.status.submitting": "Submitting...",
-        "label.submit.status.created": "Task {task_id} created, status: {status}",
-        "label.submit.status.failed": "Request failed: {error}",
-        "label.submit.error.missing_link": "Source URL is required",
+        "label.auto_category_hint": "အော်တို အမျိုးအစား: Suitcase · ဘာသာ: Burmese · UI: Chinese",
+        "label.submit.status.submitting": "တင်နေသည်…",
+        "label.submit.status.created": "တာဝန် {task_id} ဖန်တီးပြီး၊ အခြေအနေ: {status}",
+        "label.submit.status.failed": "တင်မရပါ: {error}",
+        "label.submit.error.missing_link": "အရင်းအမြစ် လင့်ခ် မဖြစ်မနေလိုအပ်ပါသည်",
         "tasks.loading": "လုပ်ငန်းများ စစ်ဆေးနေသည်…",
         "tasks.loaded": "လုပ်ငန်း {n} ခု ဖွင့်ထားသည်",
+        "tasks.loaded_n": "တာဝန် {n} ခု တင်ပြီး",
         "tasks.no_tasks": "လုပ်ငန်း မရှိသေးပါ",
         "tasks.load_failed": "ဖွင့်မရပါ: {error}",
         "tasks.delete_confirm": "ဒီလုပ်ငန်းကို ဖျက်မလား?",
         "tasks.deleting": "ဖျက်နေသည်…",
         "tasks.delete_failed": "ဖျက်မရပါ: {error}",
-        "tasks.legend": "အခြေအနေ",
-        "tasks.status.ready": "ပြီးစီး",
+        "tasks.legend": "Legend",
+        "tasks.legend.ready": "အဆင်သင့်",
+        "tasks.legend.processing": "လုပ်ဆောင်နေ",
+        "tasks.legend.queued": "စောင့်ဆိုင်း",
+        "tasks.legend.failed": "မအောင်မြင်",
+        "tasks.status.ready": "အဆင်သင့်",
         "tasks.status.processing": "လုပ်ဆောင်နေ",
         "tasks.status.queued": "စောင့်ဆိုင်း",
         "tasks.status.failed": "မအောင်မြင်",
@@ -624,9 +642,9 @@ I18N_DICT: Dict[str, Dict[str, str]] = {
         "tools.detail.load_failed": "ဖွင့်မရပါ: {error}",
         "tools.empty": "ကိရိယာ မတွေ့ပါ",
         "tools.error": "ဖွင့်မရပါ",
-        "tools.actions.open": "Open",
-        "tools.actions.docs": "Docs",
-        "tools.actions.details": "Details",
+        "tools.actions.open": "ဖွင့်",
+        "tools.actions.docs": "စာတမ်း",
+        "tools.actions.details": "အသေးစိတ်",
         "tools.bucket.keyframe.title": "Keyframe / Deterministic",
         "tools.bucket.keyframe.subtitle": "Shot selection, scene split, keyframes",
         "tools.bucket.post.title": "Post delivery",
@@ -663,35 +681,49 @@ def get_ui_locale(request: Any) -> str:
     if not hasattr(request, "query_params") or not hasattr(request, "cookies"):
         return "zh"
     q = request.query_params.get("ui_locale", "").strip().lower()
-    if q in SUPPORTED_UI_LOCALES:
+    if q in SUPPORTED_LOCALES:
         return q
     cookie = request.cookies.get("ui_locale", "").strip().lower()
-    if cookie in SUPPORTED_UI_LOCALES:
+    if cookie in SUPPORTED_LOCALES:
         return cookie
-    if DEFAULT_UI_LOCALE in SUPPORTED_UI_LOCALES:
-        return DEFAULT_UI_LOCALE
+    if DEFAULT_LOCALE in SUPPORTED_LOCALES:
+        return DEFAULT_LOCALE
     return "zh"
 
 
-def t(key: str, locale: str, **kwargs: Any) -> str:
-    chain = FALLBACK_CHAIN.get(locale, [locale, "zh"])
-    text = None
+def get_supported_locales() -> List[Dict[str, str]]:
+    return [{"code": code, "label": LOCALE_LABELS.get(code, code)} for code in SUPPORTED_LOCALES]
+
+
+def _resolve_text(locale: str, key: str) -> str:
+    chain = LOCALE_FALLBACKS.get(locale, [locale, "zh"])
     for loc in chain:
         text = I18N_DICT.get(loc, {}).get(key)
         if text:
-            break
-    if text is None:
-        text = f"【MISSING:{key}】"
-    try:
-        return text.format(**kwargs)
-    except Exception:
-        return text
+            return text
+    return f"⟦{key}⟧"
+
+
+def get_translator(locale: str):
+    def _tr(key: str, **kwargs: Any) -> str:
+        text = _resolve_text(locale, key)
+        try:
+            return text.format(**kwargs)
+        except Exception:
+            return text
+
+    return _tr
+
+
+def t(key: str, locale: str, **kwargs: Any) -> str:
+    return get_translator(locale)(key, **kwargs)
 
 
 def build_i18n_payload(locale: str) -> Dict[str, object]:
     return {
         "locale": locale,
-        "supported": SUPPORTED_UI_LOCALES,
+        "supported": SUPPORTED_LOCALES,
         "dict": I18N_DICT,
-        "strict": STRICT_OPERATOR_LOCALE,
+        "fallbacks": LOCALE_FALLBACKS,
+        "labels": LOCALE_LABELS,
     }
