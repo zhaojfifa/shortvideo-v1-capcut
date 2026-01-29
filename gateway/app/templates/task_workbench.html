@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Task Workbench - {{ task.task_id }}</title>
+  <title>{{ t("page.workbench.title") }} - {{ task.task_id }}</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
   <link rel="stylesheet" href="/static/pipeline_lab.css" />
   <link rel="stylesheet" href="/static/i18n.css" />
@@ -147,12 +147,15 @@
 <body>
   <div class="page workbench">
     <div class="card header-card">
-{% set title_key = "ui.workbench.title" %}
-{% set title_text = t("page.workbench.title") %}
-{% set subtitle_text = t("page.workbench.subtitle", task_id=task.task_id) %}
-{% set active_nav = "tasks" %}
-{% set secondary_label = t("action.back_tasks") %}
-{% set secondary_href = "/tasks" %}
+{% set topbar_title = t("ui.workbench.title") %}
+{% set topbar_subtitle = t("page.workbench.subtitle", task_id=task.task_id) %}
+{% set topbar_nav = [
+  {"label": t("common.tasks"), "href": "/tasks", "active": True},
+  {"label": t("common.tools"), "href": "/tools/hub", "active": False},
+] %}
+{% set topbar_actions = [
+  {"label": t("common.back_task_board"), "href": "/tasks", "primary": False},
+] %}
 {% include "_topbar.html" %}
       <div class="info-row" style="margin-top:8px;">
         <div id="status-badge" class="status-pill">{{ task.status }}</div>
@@ -166,15 +169,15 @@
         {% set pipeline = task.pipeline_config or {} %}
         {% set subtitles_mode = pipeline.get("subtitles_mode", "whisper+gemini") %}
         {% set dub_mode = pipeline.get("dub_mode", "auto-fallback") %}
-        <div class="meta-item"><strong>{{ t("workbench.meta.pipeline") }}</strong><span>Subtitles: {{ subtitles_mode }} · Dub: {{ dub_mode }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.pipeline") }}</strong><span>{{ t("tasks.subtitles") }}: {{ subtitles_mode }} · {{ t("tasks.dub") }}: {{ dub_mode }}</span></div>
         <div class="meta-item"><strong>{{ t("workbench.meta.status") }}</strong><span>{{ task.status }}</span></div>
         <div class="meta-item"><strong>{{ t("workbench.meta.created") }}</strong><span>{{ task.created_at }}</span></div>
         <div class="meta-item">
           <strong>{{ t("workbench.meta.source_url") }}</strong>
           {% if task_view.source_url_open %}
-            <div><a href="{{ task_view.source_url_open }}" target="_blank" rel="noopener">Open source link</a></div>
+            <div><a href="{{ task_view.source_url_open }}" target="_blank" rel="noopener">{{ t("action.open") }}</a></div>
           {% else %}
-            <div class="muted t-secondary">No clickable URL detected.</div>
+            <div class="muted t-secondary">{{ t("workbench.source_url.empty") }}</div>
           {% endif %}
         </div>
       </div>
@@ -385,6 +388,7 @@
     </details>
   </div>
 
+  <script src="/static/js/i18n_v185.js"></script>
   <script>
     window.__FEATURES__ = {{ features | tojson | safe }};
     window.currentTask = {{ task_json | tojson | safe }};
@@ -1021,7 +1025,6 @@
       });
     }
   </script>
-  <script src="/static/js/i18n_v185.js"></script>
 </body>
 </html>
 

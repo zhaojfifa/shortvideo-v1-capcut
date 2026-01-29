@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ t("page.tools.detail.title") }}</title>
+  <link rel="stylesheet" href="/static/i18n.css" />
   <link rel="stylesheet" href="/static/css/ui_v185.css">
   <style>
     :root { color-scheme: light; }
@@ -64,12 +65,15 @@
 </head>
 <body>
   <div class="page">
-    {% set title_key = "ui.tools.detail" %}
-{% set title_text = t("page.tools.detail.title") %}
-{% set subtitle_text = tool_id %}
-{% set active_nav = "tools" %}
-{% set secondary_label = t("action.back_tools") %}
-{% set secondary_href = "/tools/hub" %}
+    {% set topbar_title = t("page.tools.detail.title") %}
+{% set topbar_subtitle = tool_id %}
+{% set topbar_nav = [
+  {"label": t("common.tasks"), "href": "/tasks", "active": False},
+  {"label": t("common.tools"), "href": "/tools/hub", "active": True},
+] %}
+{% set topbar_actions = [
+  {"label": t("common.back_task_board"), "href": "/tasks", "primary": False},
+] %}
 {% include "_topbar.html" %}
 
     <div class="card" id="tool-header">
@@ -78,6 +82,7 @@
     <div class="card" id="tool-body" style="display:none;"></div>
   </div>
 
+  <script src="/static/js/i18n_v185.js"></script>
   <script>
     const TOOL_ID = "{{ tool_id }}";
 
@@ -152,6 +157,5 @@
 
     init();
   </script>
-  <script src="/static/js/i18n_v185.js"></script>
 </body>
 </html>

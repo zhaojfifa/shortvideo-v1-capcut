@@ -15,6 +15,9 @@ Flow: Task -> Pack -> Download URL
 - Download pack: `GET /v1/tasks/{task_id}/pack` (redirects to a presigned URL)
 - Expected ZIP layout: `deliver/packs/<task_id>/...` (see pack spec)
 
+## Ops checks
+- Operator templates no-CJK + UTF-8: `python scripts/check_no_cjk_in_operator_templates.py`
+
 ## Quick links
 - `docs/overview.md`
 - `docs/v1.8/ops_baseline.md`

@@ -7,3 +7,100 @@ body {
   font-size: 0.88em;
   color: #6b7280;
 }
+
+/* Topbar layout */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 8px 0 16px;
+}
+.topbar-left {
+  min-width: 240px;
+}
+.topbar-title {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.topbar-subtitle {
+  font-size: 14px;
+  opacity: 0.75;
+  margin-top: 4px;
+}
+
+.topbar-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Segmented control (Tasks/Tools) -> rounded rectangle + bigger text */
+.segmented {
+  display: inline-flex;
+  background: #f2f4f7;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 6px;
+  gap: 6px;
+}
+.segmented-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+  min-width: 84px;
+}
+.segmented-item.active {
+  background: #111827;
+  color: #ffffff;
+}
+
+/* Language tabs: smaller, less prominent */
+.lang-tabs {
+  display: inline-flex;
+  gap: 8px;
+}
+.lang-tabs .lang-btn {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.lang-tabs .lang-btn.active {
+  background: #111827;
+  color: #ffffff;
+}
+
+/* Action buttons: larger + clear primary */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  text-decoration: none;
+  border: 1px solid #d1d5db;
+}
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+.btn-ghost {
+  background: #fff;
+  color: #111827;
+}

@@ -85,14 +85,15 @@
   </style>
 </head>
 <body>
-  {% set title_key = "ui.tasks.board" %}
-{% set title_text = t("page.tasks.board.title") %}
-{% set subtitle_text = t("page.tasks.board.subtitle", count=(tasks | length)) %}
-{% set active_nav = "tasks" %}
-{% set primary_label = t("action.new_task") %}
-{% set primary_href = "/tasks/new" %}
-{% set secondary_label = t("action.refresh") %}
-{% set secondary_id = "refresh-btn" %}
+  {% set topbar_title = t("ui.tasks.board") %}
+{% set topbar_subtitle = t("tasks.loaded", n=(tasks | length)) %}
+{% set topbar_nav = [
+  {"label": t("common.tasks"), "href": "/tasks", "active": True},
+  {"label": t("common.tools"), "href": "/tools/hub", "active": False},
+] %}
+{% set topbar_actions = [
+  {"label": t("common.new_task"), "href": "/tasks/new", "primary": True},
+] %}
 {% include "_topbar.html" %}
 
 

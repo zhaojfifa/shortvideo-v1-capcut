@@ -12,9 +12,23 @@ STRICT_OPERATOR_LOCALE = os.getenv("STRICT_OPERATOR_LOCALE", "true").lower() in 
     "yes",
     "on",
 }
+FALLBACK_CHAIN = {
+    "mm": ["mm", "zh"],
+    "zh": ["zh"],
+    "en": ["en"],
+}
 
 I18N_DICT: Dict[str, Dict[str, str]] = {
     "zh": {
+        "ui.tasks.board": "任务看板",
+        "ui.tools.title": "工具中心",
+        "ui.workbench.title": "工作台",
+        "common.tasks": "任务",
+        "common.tools": "工具",
+        "common.new_task": "新建任务",
+        "common.back_task_board": "← 任务看板",
+        "common.chinese": "中文",
+        "common.burmese": "缅甸语",
         "lang.zh": "中文",
         "lang.mm": "缅文",
         "id": "ID",
@@ -70,6 +84,10 @@ I18N_DICT: Dict[str, Dict[str, str]] = {
         "action.create": "创建并运行",
         "action.reset": "重置",
         "action.run": "运行",
+        "action.download": "下载",
+        "action.open": "打开",
+        "action.delete": "删除",
+        "action.json": "JSON",
         "status.ready": "已就绪",
         "status.processing": "处理中",
         "status.pending": "排队中",
@@ -129,6 +147,33 @@ I18N_DICT: Dict[str, Dict[str, str]] = {
         "label.submit.status.created": "已创建任务 {task_id}, 状态: {status}",
         "label.submit.status.failed": "请求失败: {error}",
         "label.submit.error.missing_link": "必须填写来源链接",
+        "tasks.loading": "加载任务中…",
+        "tasks.loaded": "已加载 {n} 个任务",
+        "tasks.no_tasks": "暂无任务",
+        "tasks.load_failed": "加载失败: {error}",
+        "tasks.delete_confirm": "确认删除该任务？",
+        "tasks.deleting": "删除中…",
+        "tasks.delete_failed": "删除失败: {error}",
+        "tasks.legend": "图例",
+        "tasks.status.ready": "已就绪",
+        "tasks.status.processing": "处理中",
+        "tasks.status.queued": "排队中",
+        "tasks.status.failed": "失败",
+        "tasks.table.id": "ID",
+        "tasks.table.platform": "平台",
+        "tasks.table.source": "来源",
+        "tasks.table.title": "标题",
+        "tasks.table.category": "分类",
+        "tasks.table.language": "语种",
+        "tasks.table.status": "状态",
+        "tasks.table.created": "创建时间",
+        "tasks.table.pack": "剪辑包",
+        "tasks.table.publish": "发布",
+        "tasks.table.detail": "详情",
+        "tasks.publish_hub": "发布中心",
+        "tasks.subtitles": "字幕",
+        "tasks.dub": "配音",
+        "tasks.pack_unavailable": "未就绪",
         "workbench.deliverables": "交付物",
         "workbench.deliverables.subtitle": "运营可下载交付物",
         "workbench.pack": "剪辑包",
@@ -154,6 +199,7 @@ I18N_DICT: Dict[str, Dict[str, str]] = {
         "workbench.meta.status": "状态",
         "workbench.meta.created": "创建时间",
         "workbench.meta.source_url": "来源",
+        "workbench.source_url.empty": "未检测到可点击链接。",
         "workbench.steps": "流程",
         "workbench.steps.subtitle": "运营流程视图",
         "workbench.step.parse.title": "步骤1 - 解析与下载",
@@ -240,12 +286,24 @@ I18N_DICT: Dict[str, Dict[str, str]] = {
         "publish.status.saved": "已保存。",
         "publish.status.save_error": "保存错误: {error}",
         "tools.filters.search": "搜索",
+        "tools.filters.search_placeholder": "名称、tool id、描述",
         "tools.filters.category": "分类",
         "tools.filters.capabilities": "能力 (逗号)",
+        "tools.filters.capabilities_placeholder": "能力 (逗号)",
         "tools.filters.tags": "标签 (逗号)",
+        "tools.filters.tags_placeholder": "标签 (逗号)",
         "tools.filters.integration": "集成级别",
         "tools.filters.status": "状态",
+        "tools.filters.all": "全部",
         "tools.filters.clear": "清除筛选",
+        "tools.loading": "加载中",
+        "tools.detail.description": "简介",
+        "tools.detail.capabilities": "能力",
+        "tools.detail.tags": "标签",
+        "tools.detail.steps": "步骤",
+        "tools.detail.links": "链接",
+        "tools.detail.not_found": "工具未找到",
+        "tools.detail.load_failed": "加载失败: {error}",
         "tools.empty": "没有匹配的工具",
         "tools.error": "加载失败",
         "tools.actions.open": "打开",
@@ -273,8 +331,22 @@ I18N_DICT: Dict[str, Dict[str, str]] = {
         "auth.login.title": "运营登录",
         "auth.login.desc": "请输入 Operator 名与访问密钥（OP_ACCESS_KEY）。支持 admin/operator。",
         "auth.login.button": "登录",
+        "auth.login.operator_label": "账号",
+        "auth.login.operator_placeholder": "ops / admin",
+        "auth.login.key_label": "密钥",
+        "auth.login.key_placeholder": "OP_ACCESS_KEY",
+        "auth.login.invalid": "密钥错误",
     },
     "mm": {
+        "ui.tasks.board": "လုပ်ငန်းစာရင်း",
+        "ui.tools.title": "ကိရိယာများ",
+        "ui.workbench.title": "လုပ်ငန်းလုပ်ဆောင်မှု",
+        "common.tasks": "လုပ်ငန်း",
+        "common.tools": "ကိရိယာ",
+        "common.new_task": "လုပ်ငန်းအသစ်",
+        "common.back_task_board": "← လုပ်ငန်းစာရင်း",
+        "common.chinese": "中文",
+        "common.burmese": "မြန်မာ",
         "lang.zh": "Chinese",
         "lang.mm": "Burmese",
         "id": "ID",
@@ -330,6 +402,10 @@ I18N_DICT: Dict[str, Dict[str, str]] = {
         "action.create": "Create & Run",
         "action.reset": "Reset",
         "action.run": "Run",
+        "action.download": "ဒေါင်းလုပ်",
+        "action.open": "ဖွင့်",
+        "action.delete": "ဖျက်",
+        "action.json": "JSON",
         "status.ready": "Ready",
         "status.processing": "Processing",
         "status.pending": "Queued",
@@ -389,6 +465,33 @@ I18N_DICT: Dict[str, Dict[str, str]] = {
         "label.submit.status.created": "Task {task_id} created, status: {status}",
         "label.submit.status.failed": "Request failed: {error}",
         "label.submit.error.missing_link": "Source URL is required",
+        "tasks.loading": "လုပ်ငန်းများ စစ်ဆေးနေသည်…",
+        "tasks.loaded": "လုပ်ငန်း {n} ခု ဖွင့်ထားသည်",
+        "tasks.no_tasks": "လုပ်ငန်း မရှိသေးပါ",
+        "tasks.load_failed": "ဖွင့်မရပါ: {error}",
+        "tasks.delete_confirm": "ဒီလုပ်ငန်းကို ဖျက်မလား?",
+        "tasks.deleting": "ဖျက်နေသည်…",
+        "tasks.delete_failed": "ဖျက်မရပါ: {error}",
+        "tasks.legend": "အခြေအနေ",
+        "tasks.status.ready": "ပြီးစီး",
+        "tasks.status.processing": "လုပ်ဆောင်နေ",
+        "tasks.status.queued": "စောင့်ဆိုင်း",
+        "tasks.status.failed": "မအောင်မြင်",
+        "tasks.table.id": "ID",
+        "tasks.table.platform": "ပလက်ဖောင်း",
+        "tasks.table.source": "အရင်းအမြစ်",
+        "tasks.table.title": "ခေါင်းစဉ်",
+        "tasks.table.category": "အမျိုးအစား",
+        "tasks.table.language": "ဘာသာ",
+        "tasks.table.status": "အခြေအနေ",
+        "tasks.table.created": "ဖန်တီးချိန်",
+        "tasks.table.pack": "ပက်ကေ့ခ်",
+        "tasks.table.publish": "ထုတ်ဝေ",
+        "tasks.table.detail": "အသေးစိတ်",
+        "tasks.publish_hub": "ထုတ်ဝေစင်တာ",
+        "tasks.subtitles": "စာတန်းထိုး",
+        "tasks.dub": "အသံဖမ်း",
+        "tasks.pack_unavailable": "မရှိသေးပါ",
         "workbench.deliverables": "Deliverables",
         "workbench.deliverables.subtitle": "Ops deliverables for download",
         "workbench.pack": "Pack",
@@ -414,6 +517,7 @@ I18N_DICT: Dict[str, Dict[str, str]] = {
         "workbench.meta.status": "Status",
         "workbench.meta.created": "Created",
         "workbench.meta.source_url": "Source URL",
+        "workbench.source_url.empty": "လင့်ခ် မတွေ့ပါ။",
         "workbench.steps": "Pipeline",
         "workbench.steps.subtitle": "Ops workflow view",
         "workbench.step.parse.title": "Step 1 - Parse & Download",
@@ -499,15 +603,27 @@ I18N_DICT: Dict[str, Dict[str, str]] = {
         "publish.status.save_failed": "Save failed: {detail}",
         "publish.status.saved": "Saved.",
         "publish.status.save_error": "Save error: {error}",
-        "tools.filters.search": "Search",
-        "tools.filters.category": "Category",
-        "tools.filters.capabilities": "Capabilities (comma)",
-        "tools.filters.tags": "Tags (comma)",
-        "tools.filters.integration": "Integration",
-        "tools.filters.status": "Status",
-        "tools.filters.clear": "Clear filters",
-        "tools.empty": "No tools match filters",
-        "tools.error": "Load failed",
+        "tools.filters.search": "ရှာဖွေရန်",
+        "tools.filters.search_placeholder": "နာမည်၊ tool id၊ ဖော်ပြချက်",
+        "tools.filters.category": "အမျိုးအစား",
+        "tools.filters.capabilities": "စွမ်းရည် (comma)",
+        "tools.filters.capabilities_placeholder": "စွမ်းရည် (comma)",
+        "tools.filters.tags": "တက်ဂ် (comma)",
+        "tools.filters.tags_placeholder": "တက်ဂ် (comma)",
+        "tools.filters.integration": "ချိတ်ဆက်မှု",
+        "tools.filters.status": "အခြေအနေ",
+        "tools.filters.all": "အားလုံး",
+        "tools.filters.clear": "စစ်ထုတ်မှုဖျက်",
+        "tools.loading": "တင်နေသည်…",
+        "tools.detail.description": "ဖော်ပြချက်",
+        "tools.detail.capabilities": "စွမ်းရည်",
+        "tools.detail.tags": "တက်ဂ်",
+        "tools.detail.steps": "အဆင့်များ",
+        "tools.detail.links": "လင့်ခ်များ",
+        "tools.detail.not_found": "ကိရိယာ မတွေ့ပါ",
+        "tools.detail.load_failed": "ဖွင့်မရပါ: {error}",
+        "tools.empty": "ကိရိယာ မတွေ့ပါ",
+        "tools.error": "ဖွင့်မရပါ",
         "tools.actions.open": "Open",
         "tools.actions.docs": "Docs",
         "tools.actions.details": "Details",
@@ -533,11 +649,19 @@ I18N_DICT: Dict[str, Dict[str, str]] = {
         "auth.login.title": "Operator Login",
         "auth.login.desc": "Enter operator name and OP_ACCESS_KEY. Supports admin/operator.",
         "auth.login.button": "Login",
+        "auth.login.operator_label": "အကောင့်",
+        "auth.login.operator_placeholder": "ops / admin",
+        "auth.login.key_label": "ကီး",
+        "auth.login.key_placeholder": "OP_ACCESS_KEY",
+        "auth.login.invalid": "ကီး မမှန်ပါ",
     },
 }
 
 
-def get_ui_locale(request: Request) -> str:
+def get_ui_locale(request: Any) -> str:
+    # Defensive: avoid 500 if caller passes wrong type.
+    if not hasattr(request, "query_params") or not hasattr(request, "cookies"):
+        return "zh"
     q = request.query_params.get("ui_locale", "").strip().lower()
     if q in SUPPORTED_UI_LOCALES:
         return q
@@ -550,14 +674,14 @@ def get_ui_locale(request: Request) -> str:
 
 
 def t(key: str, locale: str, **kwargs: Any) -> str:
-    table = I18N_DICT.get(locale, {})
-    text = table.get(key)
+    chain = FALLBACK_CHAIN.get(locale, [locale, "zh"])
+    text = None
+    for loc in chain:
+        text = I18N_DICT.get(loc, {}).get(key)
+        if text:
+            break
     if text is None:
-        if STRICT_OPERATOR_LOCALE and locale == "mm":
-            return f"?MISSING:{key}"
-        text = I18N_DICT.get("zh", {}).get(key)
-    if text is None:
-        text = key
+        text = f"【MISSING:{key}】"
     try:
         return text.format(**kwargs)
     except Exception:

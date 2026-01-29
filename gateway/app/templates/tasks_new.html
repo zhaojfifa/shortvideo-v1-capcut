@@ -87,12 +87,15 @@
 </head>
 <body>
   <div class="page">
-    {% set title_key = "ui.tasks.new" %}
-{% set title_text = t("page.tasks.new.title") %}
-{% set subtitle_text = t("page.tasks.new.subtitle") %}
-{% set active_nav = "tasks" %}
-{% set secondary_label = t("action.back_tasks") %}
-{% set secondary_href = "/tasks" %}
+    {% set topbar_title = t("page.tasks.new.title") %}
+{% set topbar_subtitle = t("page.tasks.new.subtitle") %}
+{% set topbar_nav = [
+  {"label": t("common.tasks"), "href": "/tasks", "active": True},
+  {"label": t("common.tools"), "href": "/tools/hub", "active": False},
+] %}
+{% set topbar_actions = [
+  {"label": t("common.back_task_board"), "href": "/tasks", "primary": False},
+] %}
 {% include "_topbar.html" %}
 
 
@@ -109,8 +112,8 @@
             <select id="platform" name="platform">
               <option value="douyin" selected>{{ t("label.platform_douyin") }}</option>
               <option value="xhs">{{ t("label.platform_xhs") }}</option>
-              <option value="tiktok">TikTok</option>
-              <option value="fb">Facebook</option>
+              <option value="tiktok">{{ t("label.platform_tiktok") }}</option>
+              <option value="fb">{{ t("label.platform_fb") }}</option>
             </select>
           </div>
           <div class="field">
@@ -189,7 +192,7 @@
               <span class="opt-text">{{ t("label.dub_mode.auto") }}</span>
             </label>
           </div>
-          <div class="muted" style="margin-top:6px;">{{ t("label.more_tools") }} <a href="/tools/hub">Tools Hub</a>.</div>
+          <div class="muted" style="margin-top:6px;">{{ t("label.more_tools") }} <a href="/tools/hub">{{ t("common.tools") }}</a>.</div>
         </div>
 
         <div class="summary" id="summary-block">
@@ -212,6 +215,7 @@
     </main>
   </div>
 
+  <script src="/static/js/i18n_v185.js"></script>
   <script>
     window.__FEATURES__ = {{ features | tojson | safe }};
     const form = document.getElementById("task-form");
@@ -306,6 +310,5 @@
       }
     });
   </script>
-  <script src="/static/js/i18n_v185.js"></script>
 </body>
 </html>

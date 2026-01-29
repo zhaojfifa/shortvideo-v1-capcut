@@ -44,12 +44,28 @@
     return "zh";
   }
 
+  const FALLBACK_CHAIN = {
+    mm: ["mm", "zh"],
+    zh: ["zh"],
+    en: ["en"],
+  };
+
   function t(key, vars) {
     const payload = getPayload();
     const locale = resolveLocale();
-    const table = (payload.dict && payload.dict[locale]) || {};
-    const zh = (payload.dict && payload.dict.zh) || {};
-    let text = table[key] || zh[key] || key;
+    const dict = payload.dict || {};
+    const chain = FALLBACK_CHAIN[locale] || [locale, "zh"];
+    let text;
+    for (const loc of chain) {
+      const table = dict[loc] || {};
+      if (table[key]) {
+        text = table[key];
+        break;
+      }
+    }
+    if (!text) {
+      text = `【MISSING:${key}】`;
+    }
     if (vars && typeof text === "string") {
       Object.keys(vars).forEach((k) => {
         text = text.replace(new RegExp(`\\{${k}\\}`, "g"), String(vars[k]));

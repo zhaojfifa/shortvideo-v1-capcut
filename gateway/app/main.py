@@ -151,7 +151,16 @@ async def auth_middleware(request: Request, call_next):
 
 @app.get("/auth/login", response_class=HTMLResponse, include_in_schema=False)
 def auth_login_page(request: Request, next: str = "/tasks"):
-    return render_template(request, "auth_login.html", {"next": next})
+    return render_template(
+        request,
+        "auth_login.html",
+        {
+            "next": next,
+            "topbar_title": None,
+            "topbar_nav": None,
+            "topbar_actions": None,
+        },
+    )
 
 
 @app.get("/admin/tools", response_class=HTMLResponse, include_in_schema=False)

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <title>{{ t("page.tasks.board.title") }} - ShortVideo</title>
   <link rel="stylesheet" href="/static/tasks_board.css">
+  <link rel="stylesheet" href="/static/i18n.css" />
   <link rel="stylesheet" href="/static/css/ui_v185.css">
   <style>
     :root { color-scheme: light; }
@@ -115,105 +116,107 @@
 {% set ui_show_secondary = false %}
   <div class="page tasks-board">
     <div class="card">
-      {% set title_key = "ui.tasks.board" %}
-{% set title_text = t("page.tasks.board.title") %}
-{% set subtitle_text = t("page.tasks.board.subtitle", count=(tasks | length)) %}
-{% set active_nav = "tasks" %}
-{% set primary_label = t_primary("new_suitcase_task") %}
-{% set primary_href = "/tasks/new" %}
+      {% set topbar_title = t("ui.tasks.board") %}
+{% set topbar_subtitle = t("tasks.loaded", n=(tasks | length)) %}
+{% set topbar_nav = [
+  {"label": t("common.tasks"), "href": "/tasks", "active": True},
+  {"label": t("common.tools"), "href": "/tools/hub", "active": False},
+] %}
+{% set topbar_actions = [
+  {"label": t("common.new_task"), "href": "/tasks/new", "primary": True},
+] %}
 {% include "_topbar.html" %}
 
 
       <div class="legend">
-        <span class="legend-title">{{ t_primary("legend") }}</span>
+        <span class="legend-title">{{ t("tasks.legend") }}</span>
         <span class="legend-item">
           <span class="badge-dot dot-ready"></span>
-          <span>{{ t_primary("status_ready") }}</span>
+          <span>{{ t("tasks.status.ready") }}</span>
         </span>
         <span class="legend-item">
           <span class="badge-dot dot-processing"></span>
-          <span>{{ t_primary("status_processing") }}</span>
+          <span>{{ t("tasks.status.processing") }}</span>
         </span>
         <span class="legend-item">
           <span class="badge-dot dot-pending"></span>
-          <span>{{ t_primary("status_pending") }}</span>
+          <span>{{ t("tasks.status.queued") }}</span>
         </span>
         <span class="legend-item">
           <span class="badge-dot dot-error"></span>
-          <span>{{ t_primary("status_error") }}</span>
+          <span>{{ t("tasks.status.failed") }}</span>
         </span>
       </div>
 
       <div class="table-wrapper">
-        {% set delete_label_primary = t_primary("delete") %}
-        {% set delete_label = delete_label_primary if delete_label_primary != "delete" else "Delete" %}
+        {% set delete_label = t("action.delete") %}
         <table class="tasks-table">
           <thead>
             <tr>
               <th class="bilingual">
-                <span>{{ t_primary("id") }}</span>
+                <span>{{ t("tasks.table.id") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ t_secondary("id") }}</span>
+                  <span class="secondary">{{ t_secondary("tasks.table.id") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ t_primary("platform") }}</span>
+                <span>{{ t("tasks.table.platform") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ t_secondary("platform") }}</span>
+                  <span class="secondary">{{ t_secondary("tasks.table.platform") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ t_primary("source") }}</span>
+                <span>{{ t("tasks.table.source") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ t_secondary("source") }}</span>
+                  <span class="secondary">{{ t_secondary("tasks.table.source") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ t_primary("title") }}</span>
+                <span>{{ t("tasks.table.title") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ t_secondary("title") }}</span>
+                  <span class="secondary">{{ t_secondary("tasks.table.title") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ t_primary("category") }}</span>
+                <span>{{ t("tasks.table.category") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ t_secondary("category") }}</span>
+                  <span class="secondary">{{ t_secondary("tasks.table.category") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ t_primary("lang") }}</span>
+                <span>{{ t("tasks.table.language") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ t_secondary("lang") }}</span>
+                  <span class="secondary">{{ t_secondary("tasks.table.language") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ t_primary("status") }}</span>
+                <span>{{ t("tasks.table.status") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ t_secondary("status") }}</span>
+                  <span class="secondary">{{ t_secondary("tasks.table.status") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ t_primary("created") }}</span>
+                <span>{{ t("tasks.table.created") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ t_secondary("created") }}</span>
+                  <span class="secondary">{{ t_secondary("tasks.table.created") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ t_primary("pack") }}</span>
+                <span>{{ t("tasks.table.pack") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ t_secondary("pack") }}</span>
+                  <span class="secondary">{{ t_secondary("tasks.table.pack") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ t_primary("publish") }}</span>
+                <span>{{ t("tasks.table.publish") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ t_secondary("publish") }}</span>
+                  <span class="secondary">{{ t_secondary("tasks.table.publish") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ t_primary("detail") }}</span>
+                <span>{{ t("tasks.table.detail") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ t_secondary("detail") }}</span>
+                  <span class="secondary">{{ t_secondary("tasks.table.detail") }}</span>
                 {% endif %}
               </th>
             </tr>
@@ -222,15 +225,15 @@
             {% for t in tasks %}
               {% set status = (t.status or "unknown")|lower %}
               {% if status == "ready" %}
-                {% set status_key = "status_ready" %}
+                {% set status_key = "tasks.status.ready" %}
               {% elif status == "processing" %}
-                {% set status_key = "status_processing" %}
+                {% set status_key = "tasks.status.processing" %}
               {% elif status == "pending" %}
-                {% set status_key = "status_pending" %}
+                {% set status_key = "tasks.status.queued" %}
               {% elif status == "error" %}
-                {% set status_key = "status_error" %}
+                {% set status_key = "tasks.status.failed" %}
               {% else %}
-                {% set status_key = "status_unknown" %}
+                {% set status_key = "tasks.status.failed" %}
               {% endif %}
               {% if status == "ready" %}
                 {% set badge = "badge badge-ready" %}
@@ -292,8 +295,8 @@
               {% endif %}
 
               <tr>
-                <td class="truncate" data-label="{{ t_primary('id') }} / {{ t_secondary('id') }}" title="{{ t.task_id }}"><a href="/tasks/{{ t.task_id }}">{{ t.task_id }}</a></td>
-                <td data-label="{{ t_primary('platform') }} / {{ t_secondary('platform') }}">
+                <td class="truncate" data-label="{{ t('tasks.table.id') }}" title="{{ t.task_id }}"><a href="/tasks/{{ t.task_id }}">{{ t.task_id }}</a></td>
+                <td data-label="{{ t('tasks.table.platform') }}">
                   <div class="bilingual">
                     <span>{{ platform_label_primary }}</span>
                     {% if ui_show_secondary %}
@@ -301,15 +304,15 @@
                     {% endif %}
                   </div>
                 </td>
-                <td class="truncate" data-label="{{ t_primary('source') }} / {{ t_secondary('source') }}" title="{{ t.source_url }}">
+                <td class="truncate" data-label="{{ t('tasks.table.source') }}" title="{{ t.source_url }}">
                   {% if t.source_url %}
                     <span class="source-text">{{ t.source_url }}</span>
                   {% else %}
                     -
                   {% endif %}
                 </td>
-                <td class="truncate" data-label="{{ t_primary('title') }} / {{ t_secondary('title') }}" title="{{ t.title }}">{{ t.title or "" }}</td>
-                <td data-label="{{ t_primary('category') }} / {{ t_secondary('category') }}">
+                <td class="truncate" data-label="{{ t('tasks.table.title') }}" title="{{ t.title }}">{{ t.title or "" }}</td>
+                <td data-label="{{ t('tasks.table.category') }}">
                   <div class="bilingual">
                     <span>{{ cat_label_primary }}</span>
                     {% if ui_show_secondary %}
@@ -317,8 +320,8 @@
                     {% endif %}
                   </div>
                 </td>
-                <td data-label="{{ t_primary('lang') }} / {{ t_secondary('lang') }}">{{ lang_label or "-" }}</td>
-                <td data-label="{{ t_primary('status') }} / {{ t_secondary('status') }}">
+                <td data-label="{{ t('tasks.table.language') }}">{{ lang_label or "-" }}</td>
+                <td data-label="{{ t('tasks.table.status') }}">
                   <div class="bilingual">
                     <span class="{{ badge }}">{{ t_primary(status_key) }}</span>
                     {% if ui_show_secondary %}
@@ -326,37 +329,37 @@
                     {% endif %}
                   </div>
                 </td>
-                <td data-label="{{ t_primary('created') }} / {{ t_secondary('created') }}">{{ t.created_at }}</td>
-                <td data-label="{{ t_primary('pack') }} / {{ t_secondary('pack') }}">
+                <td data-label="{{ t('tasks.table.created') }}">{{ t.created_at }}</td>
+                <td data-label="{{ t('tasks.table.pack') }}">
                   {% if features.allow_pack_download %}
                     <div class="action-item">
-                      <a href="/v1/tasks/{{ t.task_id }}/pack" target="_blank" rel="noopener">{{ t_primary("download") }}</a>
+                      <a href="/v1/tasks/{{ t.task_id }}/pack" target="_blank" rel="noopener">{{ t("action.download") }}</a>
                       {% if ui_show_secondary %}
                         <span class="secondary">{{ t_secondary("download") }}</span>
                       {% endif %}
                     </div>
                   {% else %}
-                    ?
+                    {{ t("tasks.pack_unavailable") }}
                   {% endif %}
                 </td>
-                <td data-label="{{ t_primary('publish') }} / {{ t_secondary('publish') }}">
+                <td data-label="{{ t('tasks.table.publish') }}">
                   <div class="action-item">
-                    <a href="/tasks/{{ t.task_id }}/publish">{{ t_primary("publish") }}</a>
+                    <a href="/tasks/{{ t.task_id }}/publish">{{ t("tasks.publish_hub") }}</a>
                     {% if ui_show_secondary %}
                       <span class="secondary">{{ t_secondary("publish") }}</span>
                     {% endif %}
                   </div>
                 </td>
-                <td data-label="{{ t_primary('detail') }} / {{ t_secondary('detail') }}">
+                <td data-label="{{ t('tasks.table.detail') }}">
                   <div class="action-stack">
-                                        <div class="action-item">
-                      <a href="/tasks/{{ t.task_id }}/publish">Publish Hub</a>
+                    <div class="action-item">
+                      <a href="/tasks/{{ t.task_id }}/publish">{{ t("tasks.publish_hub") }}</a>
                       {% if ui_show_secondary %}
-                        <span class="secondary">Publish Hub</span>
+                        <span class="secondary">{{ t("tasks.publish_hub") }}</span>
                       {% endif %}
                     </div>
 <div class="action-item">
-                      <a href="/tasks/{{ t.task_id }}">{{ t_primary("open") }}</a>
+                      <a href="/tasks/{{ t.task_id }}">{{ t("action.open") }}</a>
                       {% if ui_show_secondary %}
                         <span class="secondary">{{ t_secondary("open") }}</span>
                       {% endif %}
@@ -365,21 +368,21 @@
                     {% set subtitles_mode = pipeline.get("subtitles_mode", "whisper+gemini") %}
                     {% set dub_mode = pipeline.get("dub_mode", "auto-fallback") %}
                     <div class="action-item">
-                      <span class="muted">Subtitles: {{ subtitles_mode }}</span>
+                      <span class="muted">{{ t("tasks.subtitles") }}: {{ subtitles_mode }}</span>
                     </div>
                     <div class="action-item">
-                      <span class="muted">Dub: {{ dub_mode }}</span>
+                      <span class="muted">{{ t("tasks.dub") }}: {{ dub_mode }}</span>
                     </div>
                     <div class="action-item">
                       <button type="button"
                               class="link-button danger"
                               data-action="delete"
                               data-task-id="{{ t.task_id }}">
-                        {{ delete_label }}
+                        {{ t("action.delete") }}
                       </button>
                     </div>
                     <div class="action-item">
-                      <a href="/api/tasks/{{ t.task_id }}" target="_blank" rel="noopener">{{ t_primary("json") }}</a>
+                      <a href="/api/tasks/{{ t.task_id }}" target="_blank" rel="noopener">{{ t("action.json") }}</a>
                       {% if ui_show_secondary %}
                         <span class="secondary">{{ t_secondary("json") }}</span>
                       {% endif %}
@@ -394,6 +397,7 @@
     </div>
   </div>
 
+  <script src="/static/js/i18n_v185.js"></script>
   <script>
     window.__FEATURES__ = {{ features | tojson | safe }};
     const initialTasks = {{ tasks | tojson | safe }};
@@ -402,24 +406,25 @@
     const countPrimaryEl = document.getElementById("task-count-primary");
     const countSecondaryEl = document.getElementById("task-count-secondary");
     const showSecondary = {{ "true" if ui_show_secondary else "false" }};
+    const I18N = window.__V185_I18N__ || { t: (key, vars) => key };
     const LABELS = {
-      id: "{{ t_primary('id') }} / {{ t_secondary('id') }}",
-      platform: "{{ t_primary('platform') }} / {{ t_secondary('platform') }}",
-      source: "{{ t_primary('source') }} / {{ t_secondary('source') }}",
-      title: "{{ t_primary('title') }} / {{ t_secondary('title') }}",
-      category: "{{ t_primary('category') }} / {{ t_secondary('category') }}",
-      lang: "{{ t_primary('lang') }} / {{ t_secondary('lang') }}",
-      status: "{{ t_primary('status') }} / {{ t_secondary('status') }}",
-      created: "{{ t_primary('created') }} / {{ t_secondary('created') }}",
-      pack: "{{ t_primary('pack') }} / {{ t_secondary('pack') }}",
-      detail: "{{ t_primary('detail') }} / {{ t_secondary('detail') }}",
+      id: "{{ t('tasks.table.id') }}",
+      platform: "{{ t('tasks.table.platform') }}",
+      source: "{{ t('tasks.table.source') }}",
+      title: "{{ t('tasks.table.title') }}",
+      category: "{{ t('tasks.table.category') }}",
+      lang: "{{ t('tasks.table.language') }}",
+      status: "{{ t('tasks.table.status') }}",
+      created: "{{ t('tasks.table.created') }}",
+      pack: "{{ t('tasks.table.pack') }}",
+      detail: "{{ t('tasks.table.detail') }}",
     };
     const STATUS_LABELS = {
-      ready: { primary: "{{ t_primary('status_ready') }}", secondary: "{{ t_secondary('status_ready') }}" },
-      processing: { primary: "{{ t_primary('status_processing') }}", secondary: "{{ t_secondary('status_processing') }}" },
-      pending: { primary: "{{ t_primary('status_pending') }}", secondary: "{{ t_secondary('status_pending') }}" },
-      error: { primary: "{{ t_primary('status_error') }}", secondary: "{{ t_secondary('status_error') }}" },
-      unknown: { primary: "{{ t_primary('status_unknown') }}", secondary: "{{ t_secondary('status_unknown') }}" },
+      ready: { primary: "{{ t('tasks.status.ready') }}", secondary: "" },
+      processing: { primary: "{{ t('tasks.status.processing') }}", secondary: "" },
+      pending: { primary: "{{ t('tasks.status.queued') }}", secondary: "" },
+      error: { primary: "{{ t('tasks.status.failed') }}", secondary: "" },
+      unknown: { primary: "{{ t('tasks.status.failed') }}", secondary: "" },
     };
     const CATEGORY_LABELS = {
       suitcase: { primary: "{{ t_primary('category_suitcase') }}", secondary: "{{ t_secondary('category_suitcase') }}" },
@@ -434,11 +439,9 @@
       fb: { primary: "{{ t('label.platform_fb') }}", secondary: "" },
       facebook: { primary: "{{ t('label.platform_fb') }}", secondary: "" },
     };
-    const COUNT_LABELS = {
-      primary: "{{ t_primary('task_count') }}",
-      secondary: "{{ t_secondary('task_count') }}",
-    };
+    const COUNT_LABEL = "{{ t('tasks.loaded', n='{n}') }}";
     const DELETE_LABEL = "{{ delete_label }}";
+    const EMPTY_LABEL = "{{ t('tasks.no_tasks') }}";
 
     function statusBadgeClass(status) {
       if (status === "ready") return "badge badge-ready";
@@ -513,8 +516,8 @@
         emptyCell.className = "empty muted";
         emptyCell.innerHTML = `
           <div class="bilingual">
-            <span>{{ t_primary("no_tasks") }}</span>
-            ${showSecondary ? `<span class="secondary">{{ t_secondary("no_tasks") }}</span>` : ""}
+            <span>${EMPTY_LABEL}</span>
+            ${showSecondary ? `<span class="secondary"></span>` : ""}
           </div>
         `;
         emptyRow.appendChild(emptyCell);
@@ -565,22 +568,22 @@
             <td data-label="${LABELS.pack}">${
               (allowPackDownload)
                 ? `<div class="action-item">
-                    <a href="/v1/tasks/${t.task_id}/pack" target="_blank" rel="noopener">{{ t_primary("download") }}</a>
+                    <a href="/v1/tasks/${t.task_id}/pack" target="_blank" rel="noopener">{{ t("action.download") }}</a>
                     ${showSecondary ? `<span class="secondary">{{ t_secondary("download") }}</span>` : ""}
                   </div>`
-                : "–"
+                : I18N.t("tasks.pack_unavailable")
             }</td>
             <td data-label="${LABELS.detail}">
               <div class="action-stack">
                 <div class="action-item">
-                  <a href="/tasks/${t.task_id}">{{ t_primary("open") }}</a>
+                  <a href="/tasks/${t.task_id}">{{ t("action.open") }}</a>
                   ${showSecondary ? `<span class="secondary">{{ t_secondary("open") }}</span>` : ""}
                 </div>
                 <div class="action-item">
-                  <span class="muted">Subtitles: ${subtitlesMode}</span>
+                  <span class="muted">${I18N.t("tasks.subtitles")}: ${subtitlesMode}</span>
                 </div>
                 <div class="action-item">
-                  <span class="muted">Dub: ${dubMode}</span>
+                  <span class="muted">${I18N.t("tasks.dub")}: ${dubMode}</span>
                 </div>
                 <div class="action-item">
                   <button type="button"
@@ -591,7 +594,7 @@
                   </button>
                 </div>
                 <div class="action-item">
-                  <a href="/api/tasks/${t.task_id}" target="_blank" rel="noopener">{{ t_primary("json") }}</a>
+                  <a href="/api/tasks/${t.task_id}" target="_blank" rel="noopener">{{ t("action.json") }}</a>
                   ${showSecondary ? `<span class="secondary">{{ t_secondary("json") }}</span>` : ""}
                 </div>
               </div>
@@ -604,10 +607,10 @@
       enhanceSourceLinks();
       const count = tasks.length;
       if (countPrimaryEl) {
-        countPrimaryEl.textContent = COUNT_LABELS.primary.replace("{count}", count);
+        countPrimaryEl.textContent = COUNT_LABEL.replace("{n}", count);
       }
       if (countSecondaryEl) {
-        countSecondaryEl.textContent = COUNT_LABELS.secondary.replace("{count}", count);
+        countSecondaryEl.textContent = "";
       }
     }
 
@@ -640,7 +643,7 @@
 
       tasksInFlight = true;
       if (countPrimaryEl) {
-        countPrimaryEl.textContent = "Loading tasks…";
+        countPrimaryEl.textContent = I18N.t("tasks.loading");
       }
       if (countSecondaryEl) {
         countSecondaryEl.textContent = "";
@@ -659,7 +662,7 @@
       } catch (err) {
         console.error(err);
         if (countPrimaryEl) {
-          countPrimaryEl.textContent = `Failed to load tasks: ${err.message}`;
+          countPrimaryEl.textContent = I18N.t("tasks.load_failed", { error: err.message });
         }
         if (countSecondaryEl) {
           countSecondaryEl.textContent = "";
@@ -697,11 +700,11 @@
       event.preventDefault();
       const taskId = button.dataset.taskId;
       if (!taskId) return;
-      const confirmed = window.confirm("Delete this task?");
+      const confirmed = window.confirm(I18N.t("tasks.delete_confirm"));
       if (!confirmed) return;
       const originalText = button.textContent;
       button.disabled = true;
-      button.textContent = "Deleting...";
+      button.textContent = I18N.t("tasks.deleting");
       try {
         const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}?delete_assets=false`, {
           method: "DELETE",
@@ -718,7 +721,7 @@
         }
       } catch (err) {
         console.error(err);
-        window.alert(`Delete failed: ${err.message}`);
+        window.alert(I18N.t("tasks.delete_failed", { error: err.message }));
       } finally {
         button.disabled = false;
         button.textContent = originalText;
@@ -731,7 +734,6 @@
 
     // Polling is driven by the visibility handler above.
   </script>
-  <script src="/static/js/i18n_v185.js"></script>
 </body>
 </html>
 
