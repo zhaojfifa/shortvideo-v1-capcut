@@ -8,6 +8,8 @@ from gateway.app.web.i18n import i18n_payload, t_for_locale, ui_langs
 
 
 def get_template_globals(request: Request) -> Dict[str, object]:
+    if not isinstance(request, Request):
+        raise TypeError(f"get_template_globals expects Request, got {type(request)}: {request!r}")
     locale = get_ui_locale(request)
     t_func = t_for_locale(locale)
     return {
