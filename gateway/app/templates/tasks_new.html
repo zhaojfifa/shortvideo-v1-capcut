@@ -102,7 +102,7 @@
     <main class="card">
       <form id="task-form">
         <div class="field">
-          <label>{{ t("tasks.new.source_mode.url") }} / {{ t("tasks.new.source_mode.local") }}</label>
+          <label>{{ t("tasks.new.source_mode") }}</label>
           <div class="radio-group">
             <label class="radio">
               <input type="radio" name="source_mode" value="url" checked />
@@ -286,9 +286,12 @@
 
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
-      resultEl.textContent = window.__V185_I18N__.t("label.submit.status.submitting");
-
       const mode = getSourceMode();
+      resultEl.textContent =
+        mode === "local"
+          ? window.__V185_I18N__.t("tasks.new.local_upload.uploading")
+          : window.__V185_I18N__.t("label.submit.status.submitting");
+
       const platform = document.getElementById("platform").value;
       const account_id = document.getElementById("account_id").value;
       const account_name = document.getElementById("account_name").value;
@@ -304,13 +307,14 @@
         if (mode === "local") {
           const file = localFileInput?.files?.[0];
           if (!file) {
-            alert(window.__V185_I18N__.t("tasks.new.local_upload.error_no_file"));
+            alert(window.__V185_I18N__.t("tasks.new.local_upload.error"));
             resultEl.textContent = "";
             return;
           }
           const formData = new FormData();
           formData.append("file", file);
           formData.append("platform", platform);
+          formData.append("account", account_id);
           formData.append("account_id", account_id);
           formData.append("account_name", account_name);
           formData.append("video_type", video_type);
@@ -367,7 +371,7 @@
 
         if (!res.ok) {
           if (mode === "local") {
-            resultEl.textContent = `${window.__V185_I18N__.t("tasks.new.local_upload.error_upload_failed")} (${res.status})`;
+            resultEl.textContent = `${window.__V185_I18N__.t("tasks.new.local_upload.error")} (${res.status})`;
           } else {
             resultEl.textContent = `Error ${res.status}: ${text}`;
           }
@@ -385,7 +389,7 @@
         setTimeout(() => { window.location.href = redirectUrl; }, 800);
       } catch (err) {
         if (mode === "local") {
-          resultEl.textContent = window.__V185_I18N__.t("tasks.new.local_upload.error_upload_failed");
+          resultEl.textContent = window.__V185_I18N__.t("tasks.new.local_upload.error");
         } else {
           resultEl.textContent = window.__V185_I18N__.t("label.submit.status.failed", {
             error: err.message,

@@ -1415,6 +1415,7 @@ def create_task_local_upload(
     file: UploadFile = File(...),
     category: str | None = Form(default=None),
     language: str | None = Form(default=None),
+    account: str | None = Form(default=None),
     platform: str | None = Form(default=None),
     account_id: str | None = Form(default=None),
     account_name: str | None = Form(default=None),
@@ -1438,14 +1439,18 @@ def create_task_local_upload(
     max_mb = int(os.getenv("MAX_LOCAL_UPLOAD_MB", "200"))
     max_bytes = max_mb * 1024 * 1024
 
-    inputs_path = task_base_dir(task_id) / "inputs" / "raw.mp4"
     raw_file_path = raw_path(task_id)
     _save_upload_to_paths(
         upload=file,
-        inputs_path=inputs_path,
+        inputs_path=raw_file_path,
         raw_path_target=raw_file_path,
         max_bytes=max_bytes,
     )
+
+    if account and not account_id:
+        account_id = account
+    if account and not account_name:
+        account_name = account
 
     platform_value = platform or "local"
     task_payload = {
