@@ -5,6 +5,7 @@ export PATH="$PWD/.render/bin:$PATH"
 
 echo "[preflight] ffmpeg:"
 ffmpeg -version | head -n 2 || true
+python -c "import multipart; print('[preflight] python-multipart OK')" || true
 
 DISK_ROOT="${DISK_ROOT:-/var/data}"
 mkdir -p "$DISK_ROOT/cache" "$DISK_ROOT/models"
