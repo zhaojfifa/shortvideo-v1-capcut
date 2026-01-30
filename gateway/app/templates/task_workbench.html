@@ -181,6 +181,19 @@
           {% endif %}
         </div>
       </div>
+      <div class="info-row" style="margin-top:10px;">
+        <div class="info-pill">
+          {% if subtitle_detection and subtitle_detection.status == "ok" %}
+            {% if subtitle_detection.has_subtitle_stream %}
+              {{ t("tasks.workbench.subtitles.soft_detected") }}
+            {% else %}
+              {{ t("tasks.workbench.subtitles.none_detected_hint") }}
+            {% endif %}
+          {% else %}
+            {{ t("tasks.workbench.subtitles.unknown") }}
+          {% endif %}
+        </div>
+      </div>
     </div>
 
     <div class="panel">

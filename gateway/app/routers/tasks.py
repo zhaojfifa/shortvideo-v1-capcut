@@ -854,6 +854,71 @@ def _ensure_mp3_audio(src_path: Path, dst_path: Path) -> Path:
     return dst_path
 
 
+def _subtitle_cache_path(task_id: str) -> Path:
+    return task_base_dir(task_id) / "subtitle_streams.json"
+
+
+def _detect_subtitle_streams(raw_file: Path) -> dict[str, Any]:
+    if not raw_file.exists():
+        return {"status": "unknown", "reason": "raw_missing"}
+
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        return {"status": "unknown", "reason": "ffprobe_missing"}
+
+    cmd = [
+        ffprobe,
+        "-v",
+        "error",
+        "-print_format",
+        "json",
+        "-show_streams",
+        str(raw_file),
+    ]
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if proc.returncode != 0:
+        return {"status": "unknown", "reason": "ffprobe_failed"}
+
+    try:
+        payload = json.loads(proc.stdout or "{}")
+    except json.JSONDecodeError:
+        return {"status": "unknown", "reason": "ffprobe_bad_json"}
+
+    streams = payload.get("streams", []) or []
+    subtitle_streams = [s for s in streams if s.get("codec_type") == "subtitle"]
+    minimal_streams = [
+        {
+            "index": s.get("index"),
+            "codec_name": s.get("codec_name"),
+            "codec_type": s.get("codec_type"),
+            "tags": s.get("tags") or {},
+        }
+        for s in subtitle_streams
+    ]
+    return {
+        "status": "ok",
+        "has_subtitle_stream": bool(subtitle_streams),
+        "subtitle_streams": minimal_streams,
+    }
+
+
+def _get_subtitle_detection(task_id: str) -> dict[str, Any]:
+    cache_path = _subtitle_cache_path(task_id)
+    if cache_path.exists():
+        try:
+            return json.loads(cache_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    raw_file = raw_path(task_id)
+    result = _detect_subtitle_streams(raw_file)
+    try:
+        cache_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+    return result
+
+
 def _resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
     task_id = str(task.get("task_id") or task.get("id"))
     raw_url = _task_endpoint(task_id, "raw") if task.get("raw_path") else None
@@ -1229,6 +1294,7 @@ async def task_workbench_page(
         "published_at": detail.published_at,
     }
     task_view = {"source_url_open": _extract_first_http_url(task.get("source_url"))}
+    subtitle_detection = _get_subtitle_detection(task_id)
 
     return render_template(
         request=request,
@@ -1237,6 +1303,7 @@ async def task_workbench_page(
             "task": detail,
             "task_json": task_json,
             "task_view": task_view,
+            "subtitle_detection": subtitle_detection,
             "env_summary": env_summary,
             "features": get_features(),
         },
