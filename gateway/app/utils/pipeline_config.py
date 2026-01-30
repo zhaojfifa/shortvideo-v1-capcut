@@ -16,6 +16,9 @@ _EXTRA_KEYS = {
     "audio_codecs",
     "has_audio",
     "has_hard_subtitles",
+    "no_subtitles",
+    "no_dub",
+    "dub_skip_reason",
 }
 
 

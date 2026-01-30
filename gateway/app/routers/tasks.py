@@ -989,6 +989,7 @@ def _task_to_detail(task: dict) -> TaskDetail:
     status = task.get("status") or "pending"
     if status != "error" and paths.get("pack_path"):
         status = "ready"
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
 
     payload = {
         "task_id": str(task.get("task_id") or task.get("id")),
@@ -1044,7 +1045,9 @@ def _task_to_detail(task: dict) -> TaskDetail:
         "assignee": task.get("assignee"),
         "ops_notes": task.get("ops_notes"),
         "selected_tool_ids": _normalize_selected_tool_ids(task.get("selected_tool_ids")),
-        "pipeline_config": parse_pipeline_config(task.get("pipeline_config")),
+        "pipeline_config": pipeline_config,
+        "no_dub": pipeline_config.get("no_dub") == "true",
+        "dub_skip_reason": pipeline_config.get("dub_skip_reason"),
     }
 
     allowed = _model_allowed_fields(TaskDetail)
@@ -1275,6 +1278,8 @@ async def task_workbench_page(
         "ui_lang": detail.ui_lang,
         "source_url": detail.source_url,
         "pipeline_config": detail.pipeline_config,
+        "no_dub": detail.no_dub,
+        "dub_skip_reason": detail.dub_skip_reason,
         "raw_path": detail.raw_path,
         "origin_srt_path": detail.origin_srt_path,
         "mm_srt_path": detail.mm_srt_path,
@@ -2077,6 +2082,41 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
 
         # 核心：SSOT dubbing
         await run_dub_step_ssot(task_adapter)
+
+        task_after = repo.get(task_id) or {}
+        pipeline_config = parse_pipeline_config(task_after.get("pipeline_config"))
+        no_dub_flag = pipeline_config.get("no_dub") == "true"
+        no_dub_note = (task_base_dir(task_id) / "dub" / "no_dub.txt").exists()
+        if no_dub_flag or no_dub_note:
+            audio_key = task_after.get("mm_audio_key") or task_after.get("mm_audio_path")
+            audio_sha256 = None
+            if not audio_key:
+                audio_path = (
+                    workspace.mm_audio_mp3_path
+                    if workspace.mm_audio_mp3_path.exists()
+                    else workspace.mm_audio_path
+                )
+                if audio_path.exists():
+                    audio_key = AUDIO_MM_KEY_TEMPLATE.format(task_id=task_id)
+                    storage = get_storage_service()
+                    storage.upload_file(str(audio_path), audio_key, content_type="audio/mpeg")
+                    audio_sha256 = _sha256_file(audio_path)
+            repo.upsert(
+                task_id,
+                {
+                    "mm_audio_path": audio_key,
+                    "mm_audio_key": audio_key,
+                    "dub_provider": provider,
+                    "last_step": "dubbing",
+                    "voice_id": final_voice_id,
+                    "dub_status": "ready",
+                    "dub_error": None,
+                },
+            )
+            stored = repo.get(task_id)
+            detail = _task_to_detail(stored)
+            detail.audio_sha256 = audio_sha256
+            return detail
 
         audio_path = (
             workspace.mm_audio_mp3_path

@@ -161,6 +161,8 @@ class TaskDetail(TaskSummary):
     stale: Optional[bool] = None
     stale_reason: Optional[str] = None
     stale_for_seconds: Optional[int] = None
+    no_dub: Optional[bool] = None
+    dub_skip_reason: Optional[str] = None
 
 
 class DubResponse(TaskDetail):

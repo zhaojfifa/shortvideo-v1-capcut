@@ -21,6 +21,7 @@ from gateway.app.core.workspace import (
     deliver_pack_zip_path,
     raw_path,
     relative_to_workspace,
+    task_base_dir,
     translated_srt_path,
 )
 from gateway.app.db import SessionLocal
@@ -147,6 +148,104 @@ def _ensure_mp3_audio(src_path: Path, dst_path: Path) -> Path:
     if p.returncode != 0 or not dst_path.exists() or dst_path.stat().st_size == 0:
         raise PackError(f"ffmpeg mp3 conversion failed: {p.stderr[-800:]}")
     return dst_path
+
+
+def _clean_text_for_dub(text: str) -> str:
+    return re.sub(r"[\W_]+", "", text or "", flags=re.UNICODE)
+
+
+def _write_no_dub_note(task_id: str, reason: str) -> Path:
+    note_path = task_base_dir(task_id) / "dub" / "no_dub.txt"
+    note_path.parent.mkdir(parents=True, exist_ok=True)
+    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    note_path.write_text(f"{ts} reason={reason}\n", encoding="utf-8")
+    return note_path
+
+
+def _ensure_silent_wav(path: Path) -> None:
+    if path.exists() and path.stat().st_size > 0:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg:
+        cmd = [
+            ffmpeg,
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=channel_layout=mono:sample_rate=24000",
+            "-t",
+            "0.2",
+            "-q:a",
+            "9",
+            "-acodec",
+            "pcm_s16le",
+            str(path),
+        ]
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if proc.returncode == 0 and path.exists():
+            return
+    # Fallback: create empty placeholder
+    path.write_bytes(b"")
+
+
+def _skip_dub_ready(req: DubRequest, workspace: Workspace, reason: str, provider: str | None) -> dict:
+    _write_no_dub_note(req.task_id, reason)
+    audio_path = workspace.mm_audio_primary_path
+    _ensure_silent_wav(audio_path)
+
+    audio_key = None
+    try:
+        mp3_path = _ensure_mp3_audio(audio_path, workspace.mm_audio_mp3_path)
+        key_template = AUDIO_MM_KEY_TEMPLATE.format(task_id=req.task_id)
+        storage = get_storage_service()
+        uploaded_key = storage.upload_file(
+            str(mp3_path),
+            key_template,
+            content_type="audio/mpeg",
+        )
+        if uploaded_key:
+            audio_key = uploaded_key
+    except Exception as exc:  # pragma: no cover
+        logger.warning("DUB3_SKIP upload failed: %s", exc)
+
+    if audio_key:
+        _update_task(
+            req.task_id,
+            mm_audio_path=audio_key,
+            mm_audio_key=audio_key,
+            last_step="dub",
+            dub_status="ready",
+            dub_error=None,
+        )
+    else:
+        _update_task(
+            req.task_id,
+            last_step="dub",
+            dub_status="ready",
+            dub_error=None,
+        )
+
+    _update_pipeline_config(req.task_id, {"no_dub": "true", "dub_skip_reason": reason})
+
+    logger.info(
+        "DUB3_SKIP",
+        extra={
+            "task_id": req.task_id,
+            "step": "dub",
+            "stage": "DUB3_SKIP",
+            "dub_provider": provider,
+            "reason": reason,
+        },
+    )
+    return {
+        "task_id": req.task_id,
+        "voice_id": req.voice_id,
+        "audio_mm_url": f"/v1/tasks/{req.task_id}/audio_mm",
+        "no_dub": True,
+        "dub_skip_reason": reason,
+    }
 
 
 def _maybe_fill_missing_for_pack(*, raw_path: Path, audio_path: Path, subs_path: Path) -> None:
@@ -379,33 +478,50 @@ async def run_dub_step(req: DubRequest):
         },
     )
 
+    pipeline_config = {}
+    db = SessionLocal()
     try:
-        if not mm_exists:
-            detail = "translated subtitles not found; run /api/tasks/{task_id}/subtitles first"
-            _update_task(req.task_id, dub_status="error", dub_error=detail)
-            raise HTTPException(status_code=400, detail=detail)
+        task = db.query(models.Task).filter(models.Task.id == req.task_id).first()
+        if task:
+            pipeline_config = parse_pipeline_config(task.pipeline_config)
+    finally:
+        db.close()
 
-        override_text = (req.mm_text or "").strip()
-        mm_text = override_text or (workspace.read_mm_srt_text() or "")
-        logger.info(
-            "DUB3_TEXT_SOURCE",
-            extra={
-                "task_id": req.task_id,
-                "step": "dub",
-                "stage": "DUB3_TEXT_SOURCE",
-                "dub_provider": provider,
-                "voice_id": req.voice_id,
-                "text_source": "override" if override_text else "mm_srt",
-                "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
-                "text_len": len(mm_text or ""),
-            },
-        )
-        if not mm_text.strip():
-            detail = "translated subtitles file is empty; please rerun /api/tasks/{task_id}/subtitles"
-            _update_task(req.task_id, dub_status="error", dub_error=detail)
-            raise HTTPException(status_code=400, detail=detail)
+    if pipeline_config.get("no_subtitles") == "true":
+        return _skip_dub_ready(req, workspace, "no_subtitles", provider)
 
-        step_timeout_sec = _env_int("DUB_STEP_TIMEOUT_SEC", 900)
+    mm_txt_path = workspace.mm_txt_path
+    if not mm_txt_path.exists():
+        return _skip_dub_ready(req, workspace, "mm_txt_missing", provider)
+    try:
+        mm_txt_text = mm_txt_path.read_text(encoding="utf-8")
+    except Exception:
+        return _skip_dub_ready(req, workspace, "mm_txt_missing", provider)
+    if mm_txt_text.strip() == "NO_SUBTITLES":
+        return _skip_dub_ready(req, workspace, "no_subtitles_marker", provider)
+    if not mm_txt_text.strip():
+        return _skip_dub_ready(req, workspace, "mm_txt_empty", provider)
+
+    override_text = (req.mm_text or "").strip()
+    mm_text = override_text or mm_txt_text
+    logger.info(
+        "DUB3_TEXT_SOURCE",
+        extra={
+            "task_id": req.task_id,
+            "step": "dub",
+            "stage": "DUB3_TEXT_SOURCE",
+            "dub_provider": provider,
+            "voice_id": req.voice_id,
+            "text_source": "override" if override_text else "mm_srt",
+            "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+            "text_len": len(mm_text or ""),
+        },
+    )
+    if not mm_text.strip() or not _clean_text_for_dub(mm_text):
+        return _skip_dub_ready(req, workspace, "mm_text_empty", provider)
+
+    step_timeout_sec = _env_int("DUB_STEP_TIMEOUT_SEC", 900)
+    try:
         result = await asyncio.wait_for(
             synthesize_voice(
                 task_id=req.task_id,
@@ -418,31 +534,15 @@ async def run_dub_step(req: DubRequest):
             timeout=step_timeout_sec,
         )
     except asyncio.TimeoutError:
-        _update_task(req.task_id, dub_status="error", dub_error="timeout")
-        raise HTTPException(status_code=504, detail="dub timeout")
+        return _skip_dub_ready(req, workspace, "tts_failed:timeout", provider)
     except asyncio.CancelledError:
-        _update_task(req.task_id, dub_status="error", dub_error="cancelled")
-        raise
+        return _skip_dub_ready(req, workspace, "tts_failed:cancelled", provider)
     except DubbingError as exc:
-        _update_task(req.task_id, dub_status="error", dub_error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _skip_dub_ready(req, workspace, f"tts_failed:{str(exc)[:80]}", provider)
     except HTTPException as exc:
-        _update_task(
-            req.task_id,
-            dub_status="error",
-            dub_error=f"{exc.status_code}: {exc.detail}",
-        )
-        logger.error(
-            "Dubbing failed",
-            extra={
-                "task_id": req.task_id,
-                "step": "dub",
-                "phase": "exception",
-                "provider": provider,
-            },
-            exc_info=True,
-        )
-        raise
+        return _skip_dub_ready(req, workspace, f"tts_failed:{exc.status_code}", provider)
+    except Exception as exc:  # pragma: no cover
+        return _skip_dub_ready(req, workspace, f"tts_failed:{str(exc)[:80]}", provider)
 
     # synthesize_voice 可能返回 dict 或其他对象，这里做防御性解析
     audio_path_value = result.get("audio_path") if isinstance(result, dict) else None

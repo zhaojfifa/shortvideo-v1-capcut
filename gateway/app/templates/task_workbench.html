@@ -312,6 +312,7 @@
             <button id="btn-dub" class="btn-primary">{{ t("workbench.step.dub.run") }}</button>
             <span id="dub-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
+          <div id="dub-hint" class="muted" style="margin-top:6px;"></div>
         </div>
         <div class="step-card">
           <h3>{{ t("workbench.step.pack.title") }}</h3>
@@ -528,11 +529,26 @@
       const hasSubs = data.subtitles_status === "ready" || !!(data.mm_srt_path || data.origin_srt_path);
       const hasAudio = !!data.mm_audio_path;
       const hasPack = !!data.pack_path;
+      const isNoDub = data.no_dub === true;
 
       setStatusText("parse-status", hasRaw, window.__V185_I18N__.t("workbench.status.parsed"), window.__V185_I18N__.t("workbench.status.not_parsed"));
       setStatusText("subs-step-status", hasSubs, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
-      setStatusText("dub-status", hasAudio, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
+      if (isNoDub) {
+        setStatusText("dub-status", true, window.__V185_I18N__.t("workbench.dub.skipped"), window.__V185_I18N__.t("workbench.dub.skipped"));
+      } else {
+        setStatusText("dub-status", hasAudio, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
+      }
       setStatusText("pack-step-status", hasPack, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
+
+      const dubHint = document.getElementById("dub-hint");
+      if (dubHint) {
+        if (isNoDub) {
+          const reason = data.dub_skip_reason ? ` (${data.dub_skip_reason})` : "";
+          dubHint.textContent = window.__V185_I18N__.t("workbench.dub.skipped_reason") + reason;
+        } else {
+          dubHint.textContent = "";
+        }
+      }
     }
 
     function applyLocalIngestUI() {
