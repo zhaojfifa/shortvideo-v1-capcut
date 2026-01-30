@@ -49,3 +49,5 @@ PY
 else
   echo "[preflight] faster-whisper model already warmed: ${MODEL_NAME}"
 fi
+
+python -c "import multipart; print('python-multipart OK', multipart.__version__)"

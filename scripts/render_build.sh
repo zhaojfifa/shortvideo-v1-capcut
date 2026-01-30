@@ -27,3 +27,4 @@ cp -f "$FFDIR/ffmpeg" "$FFDIR/ffprobe" .render/bin/
 chmod +x .render/bin/ffmpeg .render/bin/ffprobe
 
 echo "[build] ffmpeg installed at .render/bin"
+python -c "import multipart; print('multipart:', multipart.__version__)"
