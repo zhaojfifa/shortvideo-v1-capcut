@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import logging
 import re
@@ -20,6 +21,7 @@ from gateway.app.core.subtitle_utils import preview_lines, segments_to_srt
 from gateway.app.core.workspace import (
     Workspace,
     audio_wav_path,
+    raw_clean_path,
     relative_to_workspace,
     subs_dir,
 )
@@ -75,6 +77,101 @@ def _compute_asr_timeout_sec(audio_sec: float | None) -> int:
 
     dynamic = int(ceil(audio_sec * rtf + slack))
     return max(min_sec, min(dynamic, max_sec))
+
+
+def _probe_streams(video_path: Path) -> dict:
+    if not video_path.exists():
+        return {
+            "status": "missing",
+            "has_audio": None,
+            "has_subtitle_stream": None,
+            "subtitle_codecs": [],
+            "audio_codecs": [],
+        }
+
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        return {
+            "status": "no_ffprobe",
+            "has_audio": None,
+            "has_subtitle_stream": None,
+            "subtitle_codecs": [],
+            "audio_codecs": [],
+        }
+
+    cmd = [
+        ffprobe,
+        "-v",
+        "error",
+        "-print_format",
+        "json",
+        "-show_streams",
+        str(video_path),
+    ]
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if proc.returncode != 0:
+        return {
+            "status": "ffprobe_failed",
+            "has_audio": None,
+            "has_subtitle_stream": None,
+            "subtitle_codecs": [],
+            "audio_codecs": [],
+        }
+    try:
+        payload = json.loads(proc.stdout or "{}")
+    except json.JSONDecodeError:
+        return {
+            "status": "ffprobe_bad_json",
+            "has_audio": None,
+            "has_subtitle_stream": None,
+            "subtitle_codecs": [],
+            "audio_codecs": [],
+        }
+
+    streams = payload.get("streams", []) or []
+    audio_codecs = [
+        s.get("codec_name")
+        for s in streams
+        if s.get("codec_type") == "audio" and s.get("codec_name")
+    ]
+    subtitle_codecs = [
+        s.get("codec_name")
+        for s in streams
+        if s.get("codec_type") == "subtitle" and s.get("codec_name")
+    ]
+    return {
+        "status": "ok",
+        "has_audio": bool(audio_codecs),
+        "has_subtitle_stream": bool(subtitle_codecs),
+        "subtitle_codecs": subtitle_codecs,
+        "audio_codecs": audio_codecs,
+    }
+
+
+def _strip_subtitle_streams(src: Path, dst: Path) -> bool:
+    if not src.exists():
+        return False
+    if dst.exists() and dst.stat().st_size > 0:
+        return True
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return False
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-i",
+        str(src),
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a?",
+        "-c",
+        "copy",
+        str(dst),
+    ]
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    return proc.returncode == 0 and dst.exists() and dst.stat().st_size > 0
 
 
 def _srt_to_txt(srt_text: str) -> str:
@@ -243,6 +340,34 @@ async def generate_subtitles(
 
     workspace = Workspace(task_id)
     target_lang = target_lang or "my"
+    probe_result: dict = {
+        "status": "unknown",
+        "has_audio": None,
+        "has_subtitle_stream": None,
+        "subtitle_codecs": [],
+        "audio_codecs": [],
+    }
+    clean_generated = False
+    raw_for_asr: Path | None = None
+
+    if workspace.raw_video_exists():
+        raw_source = workspace.raw_video_path
+        probe_result = _probe_streams(raw_source)
+        if probe_result.get("has_audio") is False:
+            raise HTTPException(
+                status_code=422,
+                detail="No audio track; cannot ASR. If the video has hard subtitles, v1.85 cannot remove them automatically.",
+            )
+        clean_path = raw_clean_path(task_id)
+        if clean_path.exists() and clean_path.stat().st_size > 0:
+            clean_generated = True
+            raw_for_asr = clean_path
+        elif probe_result.get("has_subtitle_stream") is True:
+            clean_generated = _strip_subtitle_streams(raw_source, clean_path)
+            if clean_generated:
+                raw_for_asr = clean_path
+        if raw_for_asr is None:
+            raw_for_asr = raw_source
 
     if backend == "gemini":
         try:
@@ -258,7 +383,7 @@ async def generate_subtitles(
             detected_lang = None
             if workspace.raw_video_exists():
                 wav_path = audio_wav_path(task_id)
-                raw_path = workspace.raw_video_path
+                raw_path = raw_for_asr or workspace.raw_video_path
                 raw_size = raw_path.stat().st_size if raw_path.exists() else None
                 log_stage(
                     "SUB2_WAV_EXTRACT_START",
@@ -329,7 +454,10 @@ async def generate_subtitles(
                 segments = _parse_srt_to_segments(origin_srt_text)
 
             if not segments:
-                raise HTTPException(status_code=502, detail="Whisper transcription returned empty segments")
+                raise HTTPException(
+                    status_code=502,
+                    detail="ASR produced empty result (silent/low-volume audio). Please check audio track or replace video.",
+                )
 
             origin_text = segments_to_srt(segments, "origin")
             translations: dict[int, str] = {}
@@ -472,6 +600,8 @@ async def generate_subtitles(
                 "segments_json": scenes_payload,
                 "origin_preview": build_preview(origin_text),
                 "mm_preview": build_preview(mm_text),
+                "stream_probe": probe_result,
+                "clean_video_generated": clean_generated,
             }
         except Exception as exc:
             log_stage("SUB2_FAIL", error=str(exc))
@@ -495,13 +625,16 @@ async def generate_subtitles(
             )
 
         try:
-            return await subtitles_openai.generate_with_openai(
+            result = await subtitles_openai.generate_with_openai(
                 task_id=task_id,
                 target_lang=target_lang,
                 force=force,
                 translate_enabled=translate_enabled,
                 use_ffmpeg_extract=use_ffmpeg_extract,
             )
+            result["stream_probe"] = probe_result
+            result["clean_video_generated"] = clean_generated
+            return result
         except subtitles_openai.SubtitleError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

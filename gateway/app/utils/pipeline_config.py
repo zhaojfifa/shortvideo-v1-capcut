@@ -8,6 +8,15 @@ DEFAULT_DUB_MODE = "auto-fallback"
 
 _SUBTITLES_MODES = {"whisper-only", "whisper+gemini"}
 _DUB_MODES = {"edge", "lovo", "auto-fallback"}
+_EXTRA_KEYS = {
+    "ingest_mode",
+    "subtitle_stream",
+    "clean_video_generated",
+    "subtitle_codecs",
+    "audio_codecs",
+    "has_audio",
+    "has_hard_subtitles",
+}
 
 
 def _pick(value: Any, allowed: set[str], default: str) -> str:
@@ -34,10 +43,15 @@ def normalize_pipeline_config(value: Any) -> dict[str, str]:
 
     subtitles_mode = _pick(data.get("subtitles_mode"), _SUBTITLES_MODES, DEFAULT_SUBTITLES_MODE)
     dub_mode = _pick(data.get("dub_mode"), _DUB_MODES, DEFAULT_DUB_MODE)
-    return {
+    payload: dict[str, str] = {
         "subtitles_mode": subtitles_mode,
         "dub_mode": dub_mode,
     }
+    for key in _EXTRA_KEYS:
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            payload[key] = value.strip()
+    return payload
 
 
 def parse_pipeline_config(value: Any) -> dict[str, str]:

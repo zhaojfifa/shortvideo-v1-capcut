@@ -9,7 +9,7 @@ from gateway.app.config import get_settings
 from gateway.app.core.workspace import (
     audio_wav_path,
     origin_srt_path,
-    raw_path,
+    raw_input_path,
     relative_to_workspace,
     subs_dir,
     translated_srt_path,
@@ -170,7 +170,7 @@ async def generate_with_openai(
     if not settings.openai_api_key:
         raise SubtitleError("OPENAI_API_KEY is not configured for Whisper subtitles.")
 
-    raw = raw_path(task_id)
+    raw = raw_input_path(task_id)
     if not raw.exists():
         raise SubtitleError("raw video not found")
 

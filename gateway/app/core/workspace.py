@@ -50,6 +50,10 @@ class Workspace:
     def raw_video_path(self) -> Path:
         return self.raw
 
+    @property
+    def raw_input_path(self) -> Path:
+        return raw_input_path(self.task_id)
+
     def raw_video_exists(self) -> bool:
         return self.raw_video_path.exists()
 
@@ -197,6 +201,19 @@ def raw_path(task_id: str) -> Path:
     path = task_base_dir(task_id) / "raw" / "raw.mp4"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def raw_clean_path(task_id: str) -> Path:
+    path = task_base_dir(task_id) / "raw" / "raw_clean.mp4"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def raw_input_path(task_id: str) -> Path:
+    clean = raw_clean_path(task_id)
+    if clean.exists():
+        return clean
+    return raw_path(task_id)
 
 
 def subs_dir(task_id: str) -> Path:

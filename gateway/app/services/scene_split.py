@@ -14,7 +14,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import HTTPException
 
-from gateway.app.core.workspace import raw_path, workspace_root
+from gateway.app.core.workspace import raw_input_path, workspace_root
 from gateway.app.ports.storage_provider import get_storage_service
 from gateway.app.utils.timing import log_step_timing
 
@@ -370,7 +370,7 @@ def generate_scenes_package(
     min_lines: int = DEFAULT_MIN_LINES,
     max_lines: int = DEFAULT_MAX_LINES,
 ) -> dict:
-    raw = raw_path(task_id)
+    raw = raw_input_path(task_id)
     if not raw.exists():
         raise RuntimeError("raw video not found")
 

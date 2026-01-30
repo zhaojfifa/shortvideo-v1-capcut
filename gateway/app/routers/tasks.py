@@ -1274,6 +1274,7 @@ async def task_workbench_page(
         "content_lang": detail.content_lang,
         "ui_lang": detail.ui_lang,
         "source_url": detail.source_url,
+        "pipeline_config": detail.pipeline_config,
         "raw_path": detail.raw_path,
         "origin_srt_path": detail.origin_srt_path,
         "mm_srt_path": detail.mm_srt_path,
@@ -1294,7 +1295,6 @@ async def task_workbench_page(
         "published_at": detail.published_at,
     }
     task_view = {"source_url_open": _extract_first_http_url(task.get("source_url"))}
-    subtitle_detection = _get_subtitle_detection(task_id)
 
     return render_template(
         request=request,
@@ -1303,7 +1303,6 @@ async def task_workbench_page(
             "task": detail,
             "task_json": task_json,
             "task_view": task_view,
-            "subtitle_detection": subtitle_detection,
             "env_summary": env_summary,
             "features": get_features(),
         },
@@ -1539,6 +1538,7 @@ def create_task_local_upload(
             {
                 "subtitles_mode": subtitles_mode or "whisper+gemini",
                 "dub_mode": dub_mode or "auto-fallback",
+                "ingest_mode": "local",
             }
         ),
         "status": "processing",
@@ -1846,6 +1846,20 @@ def build_parse(
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    if pipeline_config.get("ingest_mode") == "local":
+        repo.upsert(
+            task_id,
+            {
+                "status": task.get("status") or "processing",
+                "last_step": "parse",
+                "error_message": None,
+                "error_reason": None,
+            },
+        )
+        stored = repo.get(task_id)
+        return _task_to_detail(stored)
 
     link = task.get("source_url") or task.get("link")
     if not link:

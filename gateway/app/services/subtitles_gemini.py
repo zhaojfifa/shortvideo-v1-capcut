@@ -5,7 +5,7 @@ from typing import Any
 from gateway.app.config import get_settings
 from gateway.app.core.workspace import (
     origin_srt_path,
-    raw_path,
+    raw_input_path,
     segments_json_path,
     subs_dir,
     translated_srt_path,
@@ -53,7 +53,7 @@ async def generate_with_gemini(
     except ImportError as exc:  # pragma: no cover - import guard
         raise SubtitleError("google-genai is not installed") from exc
 
-    raw = raw_path(task_id)
+    raw = raw_input_path(task_id)
     if not raw.exists():
         raise SubtitleError("raw video not found")
 

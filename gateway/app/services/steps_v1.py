@@ -29,6 +29,7 @@ from gateway.app.services.artifact_storage import upload_task_artifact
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.parse import detect_platform, parse_video
 from gateway.app.services.subtitles import generate_subtitles
+from gateway.app.utils.pipeline_config import parse_pipeline_config, pipeline_config_to_storage
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
 from gateway.app.utils.timing import log_step_timing
 
@@ -232,6 +233,29 @@ async def run_subtitles_step(req: SubtitlesRequest):
             ),
             timeout=step_timeout_sec,
         )
+        probe = result.get("stream_probe") if isinstance(result, dict) else None
+        clean_generated = bool(result.get("clean_video_generated")) if isinstance(result, dict) else False
+        updates: dict[str, str] = {}
+        if isinstance(probe, dict):
+            has_audio = probe.get("has_audio")
+            if has_audio is True:
+                updates["has_audio"] = "true"
+            elif has_audio is False:
+                updates["has_audio"] = "false"
+            has_sub = probe.get("has_subtitle_stream")
+            if has_sub is True:
+                updates["subtitle_stream"] = "true"
+            elif has_sub is False:
+                updates["subtitle_stream"] = "false"
+            subtitle_codecs = probe.get("subtitle_codecs") or []
+            if isinstance(subtitle_codecs, list) and subtitle_codecs:
+                updates["subtitle_codecs"] = ",".join([str(v) for v in subtitle_codecs if str(v).strip()])
+            audio_codecs = probe.get("audio_codecs") or []
+            if isinstance(audio_codecs, list) and audio_codecs:
+                updates["audio_codecs"] = ",".join([str(v) for v in audio_codecs if str(v).strip()])
+        if clean_generated:
+            updates["clean_video_generated"] = "true"
+        _update_pipeline_config(req.task_id, updates)
 
         workspace = Workspace(req.task_id)
 
@@ -681,6 +705,22 @@ def _update_task(task_id: str, **fields) -> None:
         for key, value in fields.items():
             if hasattr(task, key):
                 setattr(task, key, value)
+        db.commit()
+    finally:
+        db.close()
+
+
+def _update_pipeline_config(task_id: str, updates: dict[str, str]) -> None:
+    if not updates:
+        return
+    db = SessionLocal()
+    try:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if not task:
+            return
+        current = parse_pipeline_config(task.pipeline_config)
+        current.update(updates)
+        task.pipeline_config = pipeline_config_to_storage(current)
         db.commit()
     finally:
         db.close()

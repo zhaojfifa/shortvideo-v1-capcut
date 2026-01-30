@@ -169,6 +169,10 @@
         {% set pipeline = task.pipeline_config or {} %}
         {% set subtitles_mode = pipeline.get("subtitles_mode", "whisper+gemini") %}
         {% set dub_mode = pipeline.get("dub_mode", "auto-fallback") %}
+        {% set ingest_mode = pipeline.get("ingest_mode") %}
+        {% set subtitle_stream = pipeline.get("subtitle_stream") %}
+        {% set clean_generated = pipeline.get("clean_video_generated") %}
+        {% set hard_subtitles = pipeline.get("has_hard_subtitles") %}
         <div class="meta-item"><strong>{{ t("workbench.meta.pipeline") }}</strong><span>{{ t("tasks.subtitles") }}: {{ subtitles_mode }} · {{ t("tasks.dub") }}: {{ dub_mode }}</span></div>
         <div class="meta-item"><strong>{{ t("workbench.meta.status") }}</strong><span>{{ task.status }}</span></div>
         <div class="meta-item"><strong>{{ t("workbench.meta.created") }}</strong><span>{{ task.created_at }}</span></div>
@@ -178,19 +182,6 @@
             <div><a href="{{ task_view.source_url_open }}" target="_blank" rel="noopener">{{ t("action.open") }}</a></div>
           {% else %}
             <div class="muted t-secondary">{{ t("workbench.source_url.empty") }}</div>
-          {% endif %}
-        </div>
-      </div>
-      <div class="info-row" style="margin-top:10px;">
-        <div class="info-pill">
-          {% if subtitle_detection and subtitle_detection.status == "ok" %}
-            {% if subtitle_detection.has_subtitle_stream %}
-              {{ t("tasks.workbench.subtitles.soft_detected") }}
-            {% else %}
-              {{ t("tasks.workbench.subtitles.none_detected_hint") }}
-            {% endif %}
-          {% else %}
-            {{ t("tasks.workbench.subtitles.unknown") }}
           {% endif %}
         </div>
       </div>
@@ -292,6 +283,11 @@
             <button id="btn-parse" class="btn-primary">{{ t("workbench.step.parse.run") }}</button>
             <span id="parse-status" class="muted">{{ t("workbench.status.not_parsed") }}</span>
           </div>
+          <div id="parse-hint" class="muted" style="margin-top:6px;">
+            {% if ingest_mode == "local" %}
+              {{ t("workbench.step.parse.local_skip") }}
+            {% endif %}
+          </div>
         </div>
         <div class="step-card">
           <h3>{{ t("workbench.step.dub.title") }}</h3>
@@ -331,6 +327,25 @@
           <div class="action-row">
             <button id="btn-subtitles" class="btn-primary">{{ t("workbench.step.subtitles.run") }}</button>
             <span id="subs-step-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
+          </div>
+          <div class="muted" style="margin-top:8px;" id="subtitle-hint">
+            {% if subtitle_stream == "true" %}
+              {{ t("tasks.workbench.subtitles.soft_detected") }}
+              {% if clean_generated == "true" %}
+                {{ t("tasks.workbench.subtitles.clean_ready") }}
+              {% endif %}
+            {% elif subtitle_stream == "false" %}
+              {{ t("tasks.workbench.subtitles.none_detected_hint") }}
+            {% else %}
+              {{ t("tasks.workbench.subtitles.unknown") }}
+            {% endif %}
+          </div>
+          <div class="muted" style="margin-top:8px;">
+            <label style="display:flex; gap:8px; align-items:center;">
+              <input type="checkbox" id="hard-subtitles-toggle" {% if hard_subtitles == "true" %}checked{% endif %} />
+              <span>{{ t("tasks.workbench.subtitles.hard_label") }}</span>
+            </label>
+            <div class="muted t-secondary" id="hard-subtitles-note">{{ t("tasks.workbench.subtitles.hard_note") }}</div>
           </div>
           <details id="subs-compare" style="margin-top:10px;">
             <summary>{{ t("workbench.compare") }}</summary>
@@ -405,6 +420,9 @@
   <script>
     window.__FEATURES__ = {{ features | tojson | safe }};
     window.currentTask = {{ task_json | tojson | safe }};
+    let pipelineConfig = window.currentTask.pipeline_config || {};
+    let ingestMode = pipelineConfig.ingest_mode || "";
+    const hardToggle = document.getElementById("hard-subtitles-toggle");
 
     function appendLog(line) {
       const logEl = document.getElementById("log-output");
@@ -515,6 +533,42 @@
       setStatusText("subs-step-status", hasSubs, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
       setStatusText("dub-status", hasAudio, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
       setStatusText("pack-step-status", hasPack, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
+    }
+
+    function applyLocalIngestUI() {
+      if (ingestMode !== "local") return;
+      const parseBtn = document.getElementById("btn-parse");
+      const parseStatus = document.getElementById("parse-status");
+      const parseHint = document.getElementById("parse-hint");
+      if (parseBtn) {
+        parseBtn.disabled = true;
+      }
+      if (parseStatus) {
+        parseStatus.textContent = window.__V185_I18N__.t("workbench.step.parse.local_skip");
+      }
+      if (parseHint) {
+        parseHint.textContent = window.__V185_I18N__.t("workbench.step.parse.local_skip");
+      }
+    }
+
+    function renderSubtitleHint() {
+      const hintEl = document.getElementById("subtitle-hint");
+      if (!hintEl) return;
+      const subtitleStream = pipelineConfig.subtitle_stream;
+      const cleanReady = pipelineConfig.clean_video_generated === "true";
+      if (subtitleStream === "true") {
+        let text = window.__V185_I18N__.t("tasks.workbench.subtitles.soft_detected");
+        if (cleanReady) {
+          text += " " + window.__V185_I18N__.t("tasks.workbench.subtitles.clean_ready");
+        }
+        hintEl.textContent = text;
+        return;
+      }
+      if (subtitleStream === "false") {
+        hintEl.textContent = window.__V185_I18N__.t("tasks.workbench.subtitles.none_detected_hint");
+        return;
+      }
+      hintEl.textContent = window.__V185_I18N__.t("tasks.workbench.subtitles.unknown");
     }
 
     function renderScenesStatus(data) {
@@ -676,6 +730,8 @@
     updateStepStatuses(window.currentTask);
     refreshPublishInfo(window.currentTask);
     renderScenesStatus(window.currentTask);
+    applyLocalIngestUI();
+    renderSubtitleHint();
 
     let taskRefreshInFlight = false;
     async function refreshTaskState() {
@@ -690,11 +746,18 @@
         }
         const data = await resp.json();
         window.currentTask = data;
+        pipelineConfig = window.currentTask.pipeline_config || {};
+        ingestMode = pipelineConfig.ingest_mode || "";
         updateDownloadsFromTask(data);
         updateStatusBadge(data);
         updateStepStatuses(data);
         refreshPublishInfo(data);
         renderScenesStatus(data);
+        applyLocalIngestUI();
+        renderSubtitleHint();
+        if (hardToggle) {
+          hardToggle.checked = pipelineConfig.has_hard_subtitles === "true";
+        }
         const subsStatus = data.subtitles_status;
         if (subsStatus === "queued" || subsStatus === "running") {
           startSubtitlesPolling();
@@ -717,6 +780,10 @@
 
     document.getElementById("btn-parse").addEventListener("click", async () => {
       const taskId = window.currentTask.task_id;
+      if (ingestMode === "local") {
+        appendLog(window.__V185_I18N__.t("workbench.step.parse.local_skip"));
+        return;
+      }
       const linkText = window.currentTask.source_url || "";
       const platform = window.currentTask.platform || null;
       if (!linkText) {
@@ -745,6 +812,31 @@
       appendLog("Parse call finished.");
       await refreshTaskState();
     });
+
+    if (hardToggle) {
+      hardToggle.checked = pipelineConfig.has_hard_subtitles === "true";
+      hardToggle.addEventListener("change", async () => {
+        const taskId = window.currentTask.task_id;
+        const nextConfig = Object.assign({}, pipelineConfig, {
+          has_hard_subtitles: hardToggle.checked ? "true" : "false",
+        });
+        try {
+          const resp = await fetch(`/api/tasks/${taskId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pipeline_config: nextConfig }),
+          });
+          if (!resp.ok) {
+            appendLog(`Hard subtitles update failed: HTTP ${resp.status}`);
+            return;
+          }
+          pipelineConfig = nextConfig;
+          window.currentTask.pipeline_config = nextConfig;
+        } catch (err) {
+          appendLog(`Hard subtitles update failed: ${err.message || err}`);
+        }
+      });
+    }
 
     document.getElementById("btn-subtitles").addEventListener("click", async () => {
       const taskId = window.currentTask.task_id;
