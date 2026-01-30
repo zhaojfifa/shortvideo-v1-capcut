@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>{{ tr("auth.login.title") }}</title>
+  <title>{{ t("auth.login.title") }}</title>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; background:#f6f7f9; }
     .card { max-width: 520px; margin: 60px auto; background:#fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
@@ -16,18 +16,18 @@
 </head>
 <body>
   <div class="card">
-    <h2>{{ tr("auth.login.title") }}</h2>
-    <div class="muted">{{ tr("auth.login.desc") }}</div>
+    <h2>{{ t("auth.login.title") }}</h2>
+    <div class="muted">{{ t("auth.login.desc") }}</div>
 
-    <div id="err" class="error">{{ tr("auth.login.invalid") }}</div>
+    <div id="err" class="error">{{ t("auth.login.invalid") }}</div>
 
-    <label>{{ tr("auth.login.operator_label") }}</label>
-    <input id="op" placeholder="{{ tr('auth.login.operator_placeholder') }}" />
+    <label>{{ t("auth.login.operator_label") }}</label>
+    <input id="op" placeholder="{{ t('auth.login.operator_placeholder') }}" />
 
-    <label>{{ tr("auth.login.key_label") }}</label>
-    <input id="key" placeholder="{{ tr('auth.login.key_placeholder') }}" />
+    <label>{{ t("auth.login.key_label") }}</label>
+    <input id="key" placeholder="{{ t('auth.login.key_placeholder') }}" />
 
-    <button id="btn">{{ tr("auth.login.button") }}</button>
+    <button id="btn">{{ t("auth.login.button") }}</button>
   </div>
 
 <script>
@@ -45,7 +45,7 @@
     });
 
     if (!res.ok) {
-      err.textContent = "{{ tr('auth.login.invalid') }}";
+      err.textContent = "{{ t('auth.login.invalid') }}";
       err.style.display = "block";
       return;
     }

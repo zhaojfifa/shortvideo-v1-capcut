@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{{ tr("page.publish.title") }} - {{ task.task_id }}</title>
+  <title>{{ t("page.publish.title") }} - {{ task.task_id }}</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
   <link rel="stylesheet" href="/static/pipeline_lab.css" />
   <link rel="stylesheet" href="/static/i18n.css" />
@@ -55,7 +55,7 @@
     .muted { color: #64748b; font-size: 0.85rem; }
     .section-grid {
       display: grid;
-      grid-template-columns: repeat (auto-fit, minmax(320px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
       gap: 16px;
     }
     .link-row {
@@ -148,26 +148,26 @@
     }
     .i18n.zh { display: inline; }
     .i18n.mm { display: inline; }
-    .i18n.mm:not (.block)::before { content: ""; }
+    .i18n.mm:not(.block)::before { content: ""; }
     .i18n.block { display: block; }
   </style>
 </head>
 <body data-lang="zh">
   <div class="page publish">
     <div class="card">
-{% set topbar_title = tr("page.publish.title") %}
-{% set topbar_subtitle = tr("page.publish.subtitle", task_id=task.task_id) %}
+{% set topbar_title = t("page.publish.title") %}
+{% set topbar_subtitle = t("page.publish.subtitle", task_id=task.task_id) %}
 {% set topbar_nav = [
-  {"label": tr("common.tasks"), "href": "/tasks", "active": True},
-  {"label": tr("common.tools"), "href": "/tools/hub", "active": False},
+  {"label": t("common.tasks"), "href": "/tasks", "active": True},
+  {"label": t("common.tools"), "href": "/tools/hub", "active": False},
 ] %}
 {% set topbar_actions = [
-  {"label": tr("common.back_task_board"), "href": "/tasks", "primary": False},
+  {"label": t("common.back_task_board"), "href": "/tasks", "primary": False},
 ] %}
 {% include "_topbar.html" %}
 <div class="info-row" style="margin-top:10px;">
         <div class="info-pill">
-          <span>{{ tr("publish.download_code") }}</span>
+          <span>{{ t("publish.download_code") }}</span>
           : <span id="download-code">{{ task.task_id[:6]|upper }}</span>
         </div>
       </div>
@@ -175,13 +175,13 @@
 
     <div class="card" id="op-gate" style="display:none;">
       <div class="section-title">
-        <h2>{{ tr("publish.gate.title") }}</h2>
-        <div class="secondary">{{ tr("publish.gate.desc") }}</div>
+        <h2>{{ t("publish.gate.title") }}</h2>
+        <div class="secondary">{{ t("publish.gate.desc") }}</div>
       </div>
       <div class="copy-row" style="margin-top:10px;">
-        <input id="op-key-input" class="publish-textarea" placeholder="{{ tr('publish.gate.need_key') }}" />
+        <input id="op-key-input" class="publish-textarea" placeholder="{{ t('publish.gate.need_key') }}" />
         <button type="button" class="btn-primary" id="op-key-save">
-          {{ tr("action.unlock") }}
+          {{ t("action.unlock") }}
         </button>
         <span id="op-key-status" class="muted"></span>
       </div>
@@ -191,16 +191,16 @@
       <div class="card">
         <div class="tabs" role="tablist">
           <button class="tab-btn active" data-tab="tab-sop" type="button">
-            {{ tr("publish.tab.sop") }}
+            {{ t("publish.tab.sop") }}
           </button>
           <button class="tab-btn" data-tab="tab-copy" type="button">
-            {{ tr("publish.tab.copy") }}
+            {{ t("publish.tab.copy") }}
           </button>
           <button class="tab-btn" data-tab="tab-deliverables" type="button">
-            {{ tr("publish.tab.deliverables") }}
+            {{ t("publish.tab.deliverables") }}
           </button>
           <button class="tab-btn" data-tab="tab-archive" type="button">
-            {{ tr("publish.tab.archive") }}
+            {{ t("publish.tab.archive") }}
           </button>
         </div>
       </div>
@@ -208,53 +208,53 @@
     <div class="tab-panel active" id="tab-sop">
       <div class="card">
         <div class="section-title">
-          <h2>{{ tr("publish.sop.title") }}</h2>
-          <div class="secondary">{{ tr("publish.sop.desc") }}</div>
+          <h2>{{ t("publish.sop.title") }}</h2>
+          <div class="secondary">{{ t("publish.sop.desc") }}</div>
         </div>
-        <div class="block">{{ tr("publish.sop.step1") }}</div>
-        <div class="block" style="margin-top:8px;">{{ tr("publish.sop.step2") }}</div>
-        <div class="block" style="margin-top:8px;">{{ tr("publish.sop.step3") }}</div>
-        <div class="block" style="margin-top:8px;">{{ tr("publish.sop.step4") }}</div>
+        <div class="block">{{ t("publish.sop.step1") }}</div>
+        <div class="block" style="margin-top:8px;">{{ t("publish.sop.step2") }}</div>
+        <div class="block" style="margin-top:8px;">{{ t("publish.sop.step3") }}</div>
+        <div class="block" style="margin-top:8px;">{{ t("publish.sop.step4") }}</div>
       </div>
     </div>
     <div class="tab-panel" id="tab-copy">
       <div class="card">
         <div class="section-title">
-          <h2>{{ tr("publish.copy.title") }}</h2>
-          <div class="secondary">{{ tr("publish.copy.desc") }}</div>
+          <h2>{{ t("publish.copy.title") }}</h2>
+          <div class="secondary">{{ t("publish.copy.desc") }}</div>
         </div>
         <div class="field" style="margin-top:10px;">
-          <label>{{ tr("publish.copy.caption") }}</label>
+          <label>{{ t("publish.copy.caption") }}</label>
           <div class="copy-row">
-            <button type="button" class="copy-btn" data-copy-target="copy-caption">{{ tr("action.copy") }}</button>
+            <button type="button" class="copy-btn" data-copy-target="copy-caption">{{ t("action.copy") }}</button>
           </div>
           <textarea id="copy-caption" class="publish-textarea"></textarea>
         </div>
         <div class="field" style="margin-top:10px;">
-          <label>{{ tr("publish.copy.hashtags") }}</label>
+          <label>{{ t("publish.copy.hashtags") }}</label>
           <div class="copy-row">
-            <button type="button" class="copy-btn" data-copy-target="copy-hashtags">{{ tr("action.copy") }}</button>
+            <button type="button" class="copy-btn" data-copy-target="copy-hashtags">{{ t("action.copy") }}</button>
           </div>
           <textarea id="copy-hashtags" class="publish-textarea"></textarea>
         </div>
         <div class="field" style="margin-top:10px;">
-          <label>{{ tr("publish.copy.comment") }}</label>
+          <label>{{ t("publish.copy.comment") }}</label>
           <div class="copy-row">
-            <button type="button" class="copy-btn" data-copy-target="copy-comment-cta">{{ tr("action.copy") }}</button>
+            <button type="button" class="copy-btn" data-copy-target="copy-comment-cta">{{ t("action.copy") }}</button>
           </div>
           <textarea id="copy-comment-cta" class="publish-textarea"></textarea>
         </div>
         <div class="field" style="margin-top:10px;">
-          <label>{{ tr("publish.copy.link_text") }}</label>
+          <label>{{ t("publish.copy.link_text") }}</label>
           <div class="copy-row">
-            <button type="button" class="copy-btn" data-copy-target="copy-link-text">{{ tr("action.copy") }}</button>
+            <button type="button" class="copy-btn" data-copy-target="copy-link-text">{{ t("action.copy") }}</button>
           </div>
           <textarea id="copy-link-text" class="publish-textarea"></textarea>
         </div>
         <div class="field" style="margin-top:10px;">
-          <label>{{ tr("publish.copy.publish_time") }}</label>
+          <label>{{ t("publish.copy.publish_time") }}</label>
           <div class="copy-row">
-            <button type="button" class="copy-btn" data-copy-target="copy-publish-time">{{ tr("action.copy") }}</button>
+            <button type="button" class="copy-btn" data-copy-target="copy-publish-time">{{ t("action.copy") }}</button>
           </div>
           <textarea id="copy-publish-time" class="publish-textarea"></textarea>
         </div>
@@ -263,72 +263,72 @@
 <div class="tab-panel" id="tab-deliverables">
       <div class="card">
         <div class="section-title">
-          <h2>{{ tr("publish.deliverables.title") }}</h2>
-          <div class="secondary">{{ tr("publish.deliverables.desc") }}</div>
+          <h2>{{ t("publish.deliverables.title") }}</h2>
+          <div class="secondary">{{ t("publish.deliverables.desc") }}</div>
         </div>
         <div id="deliverables-list" class="copy-row" style="margin-top:12px;"></div>
         <div class="muted" id="deliverables-empty" style="margin-top:8px; display:none;">
-          {{ tr("publish.deliverables.empty") }}
+          {{ t("publish.deliverables.empty") }}
         </div>
         <div class="copy-row" style="margin-top:12px;">
-          <a id="edit-bundle-link" class="btn-primary" href="#" target="_blank" rel="noopener">{{ tr("publish.deliverables.bundle") }}</a>
+          <a id="edit-bundle-link" class="btn-primary" href="#" target="_blank" rel="noopener">{{ t("publish.deliverables.bundle") }}</a>
         </div>
         <div class="copy-row" style="margin-top:12px;">
           <img id="qr-image" alt="QR" style="width:180px;height:180px;border:1px solid #e5e7eb;background:#fff;" />
-          <div class="muted">{{ tr("publish.deliverables.qr") }}</div>
+          <div class="muted">{{ t("publish.deliverables.qr") }}</div>
         </div>
         <div class="copy-row" style="margin-top:6px;">
-          <a id="qr-link" href="#" target="_blank" rel="noopener">{{ tr("publish.deliverables.open_link") }}</a>
-          <button type="button" class="copy-btn" data-copy-target="qr-link">{{ tr("publish.deliverables.copy_link") }}</button>
+          <a id="qr-link" href="#" target="_blank" rel="noopener">{{ t("publish.deliverables.open_link") }}</a>
+          <button type="button" class="copy-btn" data-copy-target="qr-link">{{ t("publish.deliverables.copy_link") }}</button>
         </div>
         <div class="copy-row" style="margin-top:6px;">
-          <a id="short-link" href="#" target="_blank" rel="noopener">{{ tr("publish.deliverables.short_link") }}</a>
-          <button type="button" class="copy-btn" data-copy-target="short-link">{{ tr("publish.deliverables.copy_short") }}</button>
+          <a id="short-link" href="#" target="_blank" rel="noopener">{{ t("publish.deliverables.short_link") }}</a>
+          <button type="button" class="copy-btn" data-copy-target="short-link">{{ t("publish.deliverables.copy_short") }}</button>
         </div>
       </div>
     </div>
 <div class="tab-panel" id="tab-archive">
       <div class="card">
         <div class="section-title">
-          <h2>{{ tr("publish.archive.title") }}</h2>
-          <div class="secondary">{{ tr("publish.archive.desc") }}</div>
+          <h2>{{ t("publish.archive.title") }}</h2>
+          <div class="secondary">{{ t("publish.archive.desc") }}</div>
         </div>
         <div class="info-row">
           <div class="info-pill">
-            {{ tr("publish.archive.published_at") }}: <span id="published-at">-</span>
+            {{ t("publish.archive.published_at") }}: <span id="published-at">-</span>
           </div>
         </div>
         <div class="section-grid" style="margin-top:12px;">
           <div class="field">
-            <label>{{ tr("publish.archive.location") }}</label>
+            <label>{{ t("publish.archive.location") }}</label>
             <input id="archive-location" class="publish-textarea" style="min-height:0;height:36px;" />
           </div>
           <div class="field">
-            <label>{{ tr("publish.archive.status") }}</label>
+            <label>{{ t("publish.archive.status") }}</label>
             <input id="archive-status" class="publish-textarea" style="min-height:0;height:36px;" />
           </div>
           <div class="field">
-            <label>{{ tr("publish.archive.published") }}</label>
+            <label>{{ t("publish.archive.published") }}</label>
             <div class="copy-row">
               <input type="checkbox" id="archive-published" />
-              <span class="muted">{{ tr("publish.archive.published_hint") }}</span>
+              <span class="muted">{{ t("publish.archive.published_hint") }}</span>
             </div>
           </div>
           <div class="field">
-            <label>{{ tr("publish.archive.download_url") }}</label>
+            <label>{{ t("publish.archive.download_url") }}</label>
             <div class="copy-row">
               <input id="archive-download-url" class="publish-textarea" style="min-height:0;height:36px;" />
-              <a id="archive-download-link" class="btn-secondary" href="#" target="_blank" rel="noopener">{{ tr("publish.archive.open") }}</a>
+              <a id="archive-download-link" class="btn-secondary" href="#" target="_blank" rel="noopener">{{ t("publish.archive.open") }}</a>
             </div>
           </div>
           <div class="field">
-            <label>{{ tr("publish.archive.key") }}</label>
+            <label>{{ t("publish.archive.key") }}</label>
             <input id="archive-key" class="publish-textarea" style="min-height:0;height:36px;" />
           </div>
         </div>
         <div class="action-row" style="margin-top:12px;">
-          <button id="archive-save-btn" class="btn-primary">{{ tr("publish.archive.save") }}</button>
-          <button id="publish-btn" class="btn-success">{{ tr("publish.archive.submit") }}</button>
+          <button id="archive-save-btn" class="btn-primary">{{ t("publish.archive.save") }}</button>
+          <button id="publish-btn" class="btn-success">{{ t("publish.archive.submit") }}</button>
           <span id="archive-save-status" class="muted"></span>
         </div>
       </div>
@@ -380,7 +380,7 @@ function resolveLang(serverLang) {
       if (hub) hub.style.display = "";
     }
 
-    function setText (id, value) {
+    function setText(id, value) {
       const el = document.getElementById(id);
       if (el) el.textContent = value || "-";
     }
@@ -424,9 +424,9 @@ function resolveLang(serverLang) {
       order.forEach((key) => {
         const item = deliverables && deliverables[key];
         if (!item || !item.url) return;
-        const row = document.createElement ("div");
+        const row = document.createElement("div");
         row.className = "link-row";
-        const link = document.createElement ("a");
+        const link = document.createElement("a");
         link.className = "download-link";
         link.href = item.url;
         link.target = "_blank";
@@ -452,14 +452,14 @@ function resolveLang(serverLang) {
       if (timeEl && !timeEl.value) timeEl.value = copy.publish_time_suggestion || "";
     }
 
-    async function fetchText (kind) {
+    async function fetchText(kind) {
       const headers = {};
       const opKey = getOpKey();
       if (opKey) headers["X-OP-KEY"] = opKey;
-      const url = `/api/tasks/${encodeURIComponent (TASK_ID)}/text?kind=${encodeURIComponent (kind)}`;
+      const url = `/api/tasks/${encodeURIComponent(TASK_ID)}/text?kind=${encodeURIComponent(kind)}`;
       const resp = await fetch(url, { headers });
       if (!resp.ok) return "";
-      const text = await resp.text ();
+      const text = await resp.text();
       return (text || "").trim();
     }
 
@@ -474,7 +474,7 @@ function resolveLang(serverLang) {
       const candidates = ["mm_edited", "mm_txt", "origin_srt"];
       for (const kind of candidates) {
         try {
-          const text = await fetchText (kind);
+          const text = await fetchText(kind);
           if (text) {
             captionEl.value = text;
             break;
@@ -486,7 +486,7 @@ function resolveLang(serverLang) {
     }
 
     function renderArchive(archive) {
-      setText ("published-at", archive.published_at || "-");
+      setText("published-at", archive.published_at || "-");
       setInputValue("archive-location", archive.archive_location || archive.publish_provider || "");
       setInputValue("archive-status", archive.status || archive.publish_status || "");
       setInputValue("archive-key", archive.archive_key || archive.publish_key || "");
@@ -498,7 +498,7 @@ function resolveLang(serverLang) {
       if (publishedEl) publishedEl.checked = published;
     }
 
-    function copyTextFromElement (el) {
+    function copyTextFromElement(el) {
       if (!el) return;
       let text = "";
       if (el.tagName === "A") {
@@ -509,37 +509,37 @@ function resolveLang(serverLang) {
         text = el.textContent || "";
       }
       if (!text || text === "#") return;
-      navigator.clipboard.writeText (text).catch(() => {});
+      navigator.clipboard.writeText(text).catch(() => {});
     }
 
     document.querySelectorAll("[data-copy-target]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const targetId = btn.getAttribute("data-copy-target");
         const target = document.getElementById(targetId);
-        copyTextFromElement (target);
+        copyTextFromElement(target);
       });
     });
 
     async function fetchPublishHub() {
       const opKey = getOpKey();
       if (!opKey) {
-        showGate(window.__V185_I18N__.tr("publish.gate.need_key"));
+        showGate(window.__V185_I18N__.t("publish.gate.need_key"));
         return;
       }
-      const resp = await fetch(`/api/tasks/${encodeURIComponent (TASK_ID)}/publish_hub`, {
+      const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish_hub`, {
         headers: { "X-OP-KEY": opKey },
       });
       if (resp.status === 401 || resp.status === 403) {
-        showGate(window.__V185_I18N__.tr("publish.gate.invalid_key"));
+        showGate(window.__V185_I18N__.t("publish.gate.invalid_key"));
         return;
       }
       if (!resp.ok) {
-        showGate(window.__V185_I18N__.tr("publish.gate.load_failed", { status: resp.status }));
+        showGate(window.__V185_I18N__.t("publish.gate.load_failed", { status: resp.status }));
         return;
       }
       hideGate();
       const data = await resp.json();
-      setText ("download-code", data.download_code || "-");
+      setText("download-code", data.download_code || "-");
       renderDeliverables(data.deliverables || {});
       renderCopyBundle(data.copy_bundle || {});
       await fillCaptionFallback(data.copy_bundle || {});
@@ -561,7 +561,7 @@ function resolveLang(serverLang) {
         const abs = new URL(qrTarget, window.location.origin).toString();
         const qrImg = document.getElementById("qr-image");
         if (qrImg) {
-          qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent (abs)}`;
+          qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(abs)}`;
         }
         setLink("qr-link", abs);
       }
@@ -579,25 +579,25 @@ function resolveLang(serverLang) {
     if (publishBtn) {
       publishBtn.addEventListener("click", async () => {
       const statusEl = document.getElementById("publish-status");
-      if (statusEl) statusEl.textContent = window.__V185_I18N__.tr("publish.status.submitting");
+      if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submitting");
       try {
         const opKey = getOpKey();
         const headers = { "Content-Type": "application/json" };
         if (opKey) headers["X-OP-KEY"] = opKey;
-        const resp = await fetch(`/api/tasks/${encodeURIComponent (TASK_ID)}/publish`, {
+        const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish`, {
           method: "POST",
           headers,
           body: JSON.stringify({ task_id: TASK_ID, force: false }),
         });
           if (!resp.ok) {
-            const detail = await resp.text ();
-            if (statusEl) statusEl.textContent = window.__V185_I18N__.tr("publish.status.submit_failed", { detail: `${resp.status} ${detail}` });
+            const detail = await resp.text();
+            if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submit_failed", { detail: `${resp.status} ${detail}` });
             return;
           }
-          if (statusEl) statusEl.textContent = window.__V185_I18N__.tr("publish.status.submitted");
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submitted");
           await fetchPublishHub();
         } catch (err) {
-          if (statusEl) statusEl.textContent = window.__V185_I18N__.tr("publish.status.submit_error", { error: err });
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submit_error", { error: err });
         }
       });
     }
@@ -606,7 +606,7 @@ function resolveLang(serverLang) {
     if (archiveSaveBtn) {
       archiveSaveBtn.addEventListener("click", async () => {
         const statusEl = document.getElementById("archive-save-status");
-        if (statusEl) statusEl.textContent = window.__V185_I18N__.tr("publish.status.saving");
+        if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.saving");
         const payload = {
           archive: {
             archive_location: document.getElementById("archive-location")?.value?.trim() || "",
@@ -621,20 +621,20 @@ function resolveLang(serverLang) {
           const opKey = getOpKey();
           const headers = { "Content-Type": "application/json" };
           if (opKey) headers["X-OP-KEY"] = opKey;
-          const resp = await fetch(`/api/tasks/${encodeURIComponent (TASK_ID)}/publish`, {
+          const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish`, {
             method: "POST",
             headers,
             body: JSON.stringify(payload),
           });
           if (!resp.ok) {
-            const detail = await resp.text ();
-            if (statusEl) statusEl.textContent = window.__V185_I18N__.tr("publish.status.save_failed", { detail: `${resp.status} ${detail}` });
+            const detail = await resp.text();
+            if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.save_failed", { detail: `${resp.status} ${detail}` });
             return;
           }
-          if (statusEl) statusEl.textContent = window.__V185_I18N__.tr("publish.status.saved");
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.saved");
           await fetchPublishHub();
         } catch (err) {
-          if (statusEl) statusEl.textContent = window.__V185_I18N__.tr("publish.status.save_error", { error: err });
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.save_error", { error: err });
         }
       });
     }
@@ -652,7 +652,7 @@ function resolveLang(serverLang) {
         const input = document.getElementById("op-key-input");
         const value = input ? input.value.trim() : "";
         if (!value) {
-          showGate(window.__V185_I18N__.tr("publish.gate.need_key"));
+          showGate(window.__V185_I18N__.t("publish.gate.need_key"));
           return;
         }
         setOpKey(value);
@@ -680,7 +680,7 @@ function resolveLang(serverLang) {
       const langToggle = document.getElementById("lang-toggle");
       if (langToggle) {
         langToggle.addEventListener("click", (event) => {
-          const btn = event.target.closest (".lang-btn");
+          const btn = event.target.closest(".lang-btn");
           if (!btn) return;
           const lang = btn.dataset.lang;
           if (!lang) return;
@@ -689,7 +689,7 @@ function resolveLang(serverLang) {
       }
 
       if (!getOpKey()) {
-        showGate(window.__V185_I18N__.tr("publish.gate.need_key"));
+        showGate(window.__V185_I18N__.t("publish.gate.need_key"));
         return;
       }
       fetchPublishHub().catch(() => {});

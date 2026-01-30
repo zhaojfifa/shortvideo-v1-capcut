@@ -5,7 +5,7 @@
 <div class="lang-tabs lang-switch">
   {% for loc in supported_locales %}
     <a href="#" data-lang-tab="{{ loc.code }}" class="lang-btn lang-pill ui-pill">
-      <span data-i18n="lang.{{ loc.code }}">{{ tr("lang." ~ loc.code) }}</span>
+      <span data-i18n="lang.{{ loc.code }}">{{ t("lang." ~ loc.code) }}</span>
     </a>
   {% endfor %}
 </div>

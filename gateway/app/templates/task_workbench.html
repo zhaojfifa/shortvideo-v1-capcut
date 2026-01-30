@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{{ tr("page.workbench.title") }} - {{ task.task_id }}</title>
+  <title>{{ t("page.workbench.title") }} - {{ task.task_id }}</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
   <link rel="stylesheet" href="/static/pipeline_lab.css" />
   <link rel="stylesheet" href="/static/i18n.css" />
@@ -66,7 +66,7 @@
     .badge-error { background: #fee2e2; color: #b91c1c; }
     .meta-grid {
       display: grid;
-      grid-template-columns: repeat (auto-fit, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 10px 16px;
     }
     .meta-item { font-size: 0.95rem; color: #374151; }
@@ -79,7 +79,7 @@
       letter-spacing: 0.05em;
     }
     .muted { color: #64748b; font-size: 0.85rem; }
-    .deliverables-grid { grid-template-columns: repeat (auto-fit, minmax(240px, 1fr)); }
+    .deliverables-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
     .deliverable-card {
       border: 1px solid rgba(15, 23, 42, 0.08);
       border-radius: 14px;
@@ -118,7 +118,7 @@
       color: #334155;
     }
     .publish-textarea { width: 100%; min-height: 120px; }
-    .steps-grid { grid-template-columns: repeat (auto-fit, minmax(260px, 1fr)); }
+    .steps-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
     .step-card {
       border: 1px solid rgba(15, 23, 42, 0.08);
       border-radius: 14px;
@@ -147,37 +147,37 @@
 <body>
   <div class="page workbench">
     <div class="card header-card">
-{% set topbar_title = tr("ui.workbench.title") %}
-{% set topbar_subtitle = tr("page.workbench.subtitle", task_id=task.task_id) %}
+{% set topbar_title = t("ui.workbench.title") %}
+{% set topbar_subtitle = t("page.workbench.subtitle", task_id=task.task_id) %}
 {% set topbar_nav = [
-  {"label": tr("common.tasks"), "href": "/tasks", "active": True},
-  {"label": tr("common.tools"), "href": "/tools/hub", "active": False},
+  {"label": t("common.tasks"), "href": "/tasks", "active": True},
+  {"label": t("common.tools"), "href": "/tools/hub", "active": False},
 ] %}
 {% set topbar_actions = [
-  {"label": tr("common.back_task_board"), "href": "/tasks", "primary": False},
+  {"label": t("common.back_task_board"), "href": "/tasks", "primary": False},
 ] %}
 {% include "_topbar.html" %}
       <div class="info-row" style="margin-top:8px;">
         <div id="status-badge" class="status-pill">{{ task.status }}</div>
       </div>
       <div class="meta-grid">
-        <div class="meta-item"><strong>{{ tr("workbench.meta.task_id") }}</strong><span>{{ task.task_id }}</span></div>
-        <div class="meta-item"><strong>{{ tr("workbench.meta.platform") }}</strong><span>{{ task.platform or '-' }}</span></div>
-        <div class="meta-item"><strong>{{ tr("workbench.meta.account") }}</strong><span>{{ task.account_id or '-' }}</span></div>
-        <div class="meta-item"><strong>{{ tr("workbench.meta.category") }}</strong><span>{{ task.category_key or '-' }}</span></div>
-        <div class="meta-item"><strong>{{ tr("workbench.meta.language") }}</strong><span>{{ task.content_lang or '-' }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.task_id") }}</strong><span>{{ task.task_id }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.platform") }}</strong><span>{{ task.platform or '-' }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.account") }}</strong><span>{{ task.account_id or '-' }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.category") }}</strong><span>{{ task.category_key or '-' }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.language") }}</strong><span>{{ task.content_lang or '-' }}</span></div>
         {% set pipeline = task.pipeline_config or {} %}
-        {% set subtitles_mode = pipeline.get ("subtitles_mode", "whisper+gemini") %}
-        {% set dub_mode = pipeline.get ("dub_mode", "auto-fallback") %}
-        <div class="meta-item"><strong>{{ tr("workbench.meta.pipeline") }}</strong><span>{{ tr("tasks.subtitles") }}: {{ subtitles_mode }} · {{ tr("tasks.dub") }}: {{ dub_mode }}</span></div>
-        <div class="meta-item"><strong>{{ tr("workbench.meta.status") }}</strong><span>{{ task.status }}</span></div>
-        <div class="meta-item"><strong>{{ tr("workbench.meta.created") }}</strong><span>{{ task.created_at }}</span></div>
+        {% set subtitles_mode = pipeline.get("subtitles_mode", "whisper+gemini") %}
+        {% set dub_mode = pipeline.get("dub_mode", "auto-fallback") %}
+        <div class="meta-item"><strong>{{ t("workbench.meta.pipeline") }}</strong><span>{{ t("tasks.subtitles") }}: {{ subtitles_mode }} · {{ t("tasks.dub") }}: {{ dub_mode }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.status") }}</strong><span>{{ task.status }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.created") }}</strong><span>{{ task.created_at }}</span></div>
         <div class="meta-item">
-          <strong>{{ tr("workbench.meta.source_url") }}</strong>
+          <strong>{{ t("workbench.meta.source_url") }}</strong>
           {% if task_view.source_url_open %}
-            <div><a href="{{ task_view.source_url_open }}" target="_blank" rel="noopener">{{ tr("action.open") }}</a></div>
+            <div><a href="{{ task_view.source_url_open }}" target="_blank" rel="noopener">{{ t("action.open") }}</a></div>
           {% else %}
-            <div class="muted t-secondary">{{ tr("workbench.source_url.empty") }}</div>
+            <div class="muted t-secondary">{{ t("workbench.source_url.empty") }}</div>
           {% endif %}
         </div>
       </div>
@@ -185,47 +185,47 @@
 
     <div class="panel">
       <div class="section-title">
-        <h2>{{ tr("workbench.deliverables") }}</h2>
-        <div class="secondary">{{ tr("workbench.deliverables.subtitle") }}</div>
+        <h2>{{ t("workbench.deliverables") }}</h2>
+        <div class="secondary">{{ t("workbench.deliverables.subtitle") }}</div>
       </div>
       <div class="section-grid deliverables-grid">
         <div class="deliverable-card primary">
-          <div class="deliverable-title">{{ tr("workbench.pack") }}</div>
+          <div class="deliverable-title">{{ t("workbench.pack") }}</div>
           <div class="deliverable-actions">
-            <a id="pack-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/pack" target="_blank" rel="noopener">{{ tr("action.download") }}</a>
-            <span id="pack-status" class="muted">{{ tr("workbench.status.not_ready") }}</span>
+            <a id="pack-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/pack" target="_blank" rel="noopener">{{ t("action.download") }}</a>
+            <span id="pack-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
-          <div class="muted" style="margin-top:6px;">{{ tr("workbench.deliverables.subtitle") }}</div>
+          <div class="muted" style="margin-top:6px;">{{ t("workbench.deliverables.subtitle") }}</div>
         </div>
         <div class="deliverable-card">
-          <div class="deliverable-title">{{ tr("workbench.scenes") }}</div>
+          <div class="deliverable-title">{{ t("workbench.scenes") }}</div>
           <div class="deliverable-actions">
-            <a id="scenes-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">{{ tr("workbench.scenes_download") }}</a>
-            <span id="scenes-status" class="muted">{{ tr("workbench.status.not_ready") }}</span>
+            <a id="scenes-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">{{ t("workbench.scenes_download") }}</a>
+            <span id="scenes-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
-          <div class="muted" style="margin-top:6px;">{{ tr("workbench.scenes_desc") }}</div>
+          <div class="muted" style="margin-top:6px;">{{ t("workbench.scenes_desc") }}</div>
         </div>
         <div class="deliverable-card">
-          <div class="deliverable-title">{{ tr("workbench.video") }}</div>
+          <div class="deliverable-title">{{ t("workbench.video") }}</div>
           <div class="deliverable-actions">
             <a id="raw-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/raw" target="_blank" rel="noopener">raw.mp4</a>
-            <span id="video-status" class="muted">{{ tr("workbench.status.not_ready") }}</span>
+            <span id="video-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
         </div>
         <div class="deliverable-card">
-          <div class="deliverable-title">{{ tr("workbench.mm_subtitles") }}</div>
+          <div class="deliverable-title">{{ t("workbench.mm_subtitles") }}</div>
           <div class="deliverable-actions">
             <a id="mm-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/subs_mm" target="_blank" rel="noopener">mm.srt</a>
             <a id="mm-txt-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/mm_txt" target="_blank" rel="noopener">mm.txt</a>
             <a id="origin-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/subs_origin" target="_blank" rel="noopener">origin.srt</a>
-            <span id="subs-status" class="muted">{{ tr("workbench.status.not_ready") }}</span>
+            <span id="subs-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
         </div>
         <div class="deliverable-card">
-          <div class="deliverable-title">{{ tr("workbench.mm_audio") }}</div>
+          <div class="deliverable-title">{{ t("workbench.mm_audio") }}</div>
           <div class="deliverable-actions">
             <a id="audio-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/audio_mm" target="_blank" rel="noopener">mm_audio</a>
-            <span id="audio-status" class="muted">{{ tr("workbench.status.not_ready") }}</span>
+            <span id="audio-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
           <audio id="audio-preview" controls style="display:none; width: 100%; margin-top:6px;"></audio>
         </div>
@@ -234,22 +234,22 @@
 
     <div class="panel">
       <div class="section-title">
-        <h2>{{ tr("workbench.scenes_section") }}</h2>
-        <div class="secondary">{{ tr("workbench.scenes_desc") }}</div>
+        <h2>{{ t("workbench.scenes_section") }}</h2>
+        <div class="secondary">{{ t("workbench.scenes_desc") }}</div>
       </div>
       <div class="section-grid" style="margin-top:12px;">
         <div class="field">
-          <label>{{ tr("workbench.scenes_action") }}</label>
+          <label>{{ t("workbench.scenes_action") }}</label>
           <div class="muted" style="white-space:pre-wrap;">
-{{ tr("workbench.scenes_help") }}
+{{ t("workbench.scenes_help") }}
           </div>
         </div>
         <div class="field">
-          <label>{{ tr("workbench.scenes_action") }}</label>
+          <label>{{ t("workbench.scenes_action") }}</label>
           <div class="action-row" style="margin-top:8px; flex-wrap:wrap; gap:8px;">
-            <button id="btn-scenes" class="btn-primary">{{ tr("workbench.scenes_generate") }}</button>
-            <a id="btn-scenes-download" class="btn-secondary disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">{{ tr("workbench.scenes_download") }}</a>
-            <span id="scenes-step-status" class="muted">{{ tr("workbench.status.not_ready") }}</span>
+            <button id="btn-scenes" class="btn-primary">{{ t("workbench.scenes_generate") }}</button>
+            <a id="btn-scenes-download" class="btn-secondary disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">{{ t("workbench.scenes_download") }}</a>
+            <span id="scenes-step-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
           <div id="scenes-error" class="muted" style="margin-top:6px;"></div>
         </div>
@@ -259,32 +259,32 @@
     
     <div class="panel">
       <div class="section-title">
-        <h2>{{ tr("workbench.publish_hub") }}</h2>
-        <div class="secondary">{{ tr("workbench.publish_hint") }}</div>
+        <h2>{{ t("workbench.publish_hub") }}</h2>
+        <div class="secondary">{{ t("workbench.publish_hint") }}</div>
       </div>
       <div class="action-row" style="margin-top:12px; flex-wrap:wrap; gap:8px;">
-        <a class="btn-primary" href="/tasks/{{ task.task_id }}/publish">{{ tr("workbench.publish_open") }}</a>
+        <a class="btn-primary" href="/tasks/{{ task.task_id }}/publish">{{ t("workbench.publish_open") }}</a>
       </div>
     </div>
 <div class="panel">
       <div class="section-title">
-        <h2>{{ tr("workbench.steps") }}</h2>
-        <div class="secondary">{{ tr("workbench.steps.subtitle") }}</div>
+        <h2>{{ t("workbench.steps") }}</h2>
+        <div class="secondary">{{ t("workbench.steps.subtitle") }}</div>
       </div>
       <div class="section-grid steps-grid">
         <div class="step-card">
-          <h3>{{ tr("workbench.step.parse.title") }}</h3>
-          <p class="muted">{{ tr("workbench.step.parse.desc") }}</p>
+          <h3>{{ t("workbench.step.parse.title") }}</h3>
+          <p class="muted">{{ t("workbench.step.parse.desc") }}</p>
           <div class="action-row">
-            <button id="btn-parse" class="btn-primary">{{ tr("workbench.step.parse.run") }}</button>
-            <span id="parse-status" class="muted">{{ tr("workbench.status.not_parsed") }}</span>
+            <button id="btn-parse" class="btn-primary">{{ t("workbench.step.parse.run") }}</button>
+            <span id="parse-status" class="muted">{{ t("workbench.status.not_parsed") }}</span>
           </div>
         </div>
         <div class="step-card">
-          <h3>{{ tr("workbench.step.dub.title") }}</h3>
+          <h3>{{ t("workbench.step.dub.title") }}</h3>
           <div class="form-grid">
             <div class="field">
-              <label for="voice-id">{{ tr("workbench.step.dub.voice") }}</label>
+              <label for="voice-id">{{ t("workbench.step.dub.voice") }}</label>
               <select id="voice-id">
                 <option value="mm_female_1">mm_female_1</option>
                 <option value="mm_male_1">mm_male_1</option>
@@ -292,7 +292,7 @@
               </select>
             </div>
             <div class="field">
-              <label for="dub-provider">{{ tr("workbench.step.dub.engine") }}</label>
+              <label for="dub-provider">{{ t("workbench.step.dub.engine") }}</label>
               <select id="dub-provider">
                 <option value="edge-tts">edge-tts</option>
                 <option value="lovo">lovo</option>
@@ -300,39 +300,39 @@
             </div>
           </div>
           <div class="action-row" style="margin-top:8px;">
-            <button id="btn-dub" class="btn-primary">{{ tr("workbench.step.dub.run") }}</button>
-            <span id="dub-status" class="muted">{{ tr("workbench.status.not_ready") }}</span>
+            <button id="btn-dub" class="btn-primary">{{ t("workbench.step.dub.run") }}</button>
+            <span id="dub-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
         </div>
         <div class="step-card">
-          <h3>{{ tr("workbench.step.pack.title") }}</h3>
-          <p class="muted">{{ tr("workbench.step.pack.desc") }}</p>
+          <h3>{{ t("workbench.step.pack.title") }}</h3>
+          <p class="muted">{{ t("workbench.step.pack.desc") }}</p>
           <div class="action-row">
-            <button id="btn-pack" class="btn-primary">{{ tr("workbench.step.pack.run") }}</button>
-            <span id="pack-step-status" class="muted">{{ tr("workbench.status.not_ready") }}</span>
+            <button id="btn-pack" class="btn-primary">{{ t("workbench.step.pack.run") }}</button>
+            <span id="pack-step-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
         </div>
         <div class="step-card step-wide">
-          <h3>{{ tr("workbench.step.subtitles.title") }}</h3>
-          <p class="muted">{{ tr("workbench.step.subtitles.desc") }}</p>
+          <h3>{{ t("workbench.step.subtitles.title") }}</h3>
+          <p class="muted">{{ t("workbench.step.subtitles.desc") }}</p>
           <div class="action-row">
-            <button id="btn-subtitles" class="btn-primary">{{ tr("workbench.step.subtitles.run") }}</button>
-            <span id="subs-step-status" class="muted">{{ tr("workbench.status.not_ready") }}</span>
+            <button id="btn-subtitles" class="btn-primary">{{ t("workbench.step.subtitles.run") }}</button>
+            <span id="subs-step-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
           <details id="subs-compare" style="margin-top:10px;">
-            <summary>{{ tr("workbench.compare") }}</summary>
+            <summary>{{ t("workbench.compare") }}</summary>
             <div style="margin-top:12px; display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
               <div>
                 <div class="copy-row" style="justify-content:space-between;">
-                  <label style="margin:0;">{{ tr("workbench.compare.origin") }}</label>
-                  <button type="button" id="btn-copy-origin" class="copy-btn">{{ tr("action.copy") }}</button>
+                  <label style="margin:0;">{{ t("workbench.compare.origin") }}</label>
+                  <button type="button" id="btn-copy-origin" class="copy-btn">{{ t("action.copy") }}</button>
                 </div>
                 <pre id="origin-text" class="output"></pre>
               </div>
               <div>
                 <div class="copy-row" style="justify-content:space-between;">
-                  <label style="margin:0;">{{ tr("workbench.compare.mm") }}</label>
-                  <button type="button" id="btn-copy-mm" class="copy-btn">{{ tr("action.copy") }}</button>
+                  <label style="margin:0;">{{ t("workbench.compare.mm") }}</label>
+                  <button type="button" id="btn-copy-mm" class="copy-btn">{{ t("action.copy") }}</button>
                 </div>
                 <pre id="mm-text" class="output"></pre>
               </div>
@@ -340,10 +340,10 @@
 
             <div style="margin-top:12px;">
               <div class="copy-row" style="justify-content:space-between;">
-                <label for="mm-edit" style="margin:0;">{{ tr("workbench.edit.mm") }}</label>
+                <label for="mm-edit" style="margin:0;">{{ t("workbench.edit.mm") }}</label>
                 <div class="copy-row">
-                  <button type="button" id="btn-load-edited" class="copy-btn">{{ tr("action.reset") }}</button>
-                  <button type="button" id="btn-save-edited" class="copy-btn">{{ tr("action.save") }}</button>
+                  <button type="button" id="btn-load-edited" class="copy-btn">{{ t("action.reset") }}</button>
+                  <button type="button" id="btn-save-edited" class="copy-btn">{{ t("action.save") }}</button>
                 </div>
               </div>
               <textarea id="mm-edit" rows="6" style="width:100%; margin-top:8px;"></textarea>
@@ -355,13 +355,13 @@
     </div>
 
     <details class="panel" id="debug-panel">
-      <summary>{{ tr("workbench.logs") }}</summary>
+      <summary>{{ t("workbench.logs") }}</summary>
       <div style="margin-top:12px;">
-        <h3 style="margin:0 0 8px;">{{ tr("workbench.logs.title") }}</h3>
+        <h3 style="margin:0 0 8px;">{{ t("workbench.logs.title") }}</h3>
         <pre id="log-output" class="output-log">Ready.</pre>
       </div>
       <div style="margin-top:12px;">
-        <h3 style="margin:0 0 8px;">{{ tr("workbench.logs.engineering") }}</h3>
+        <h3 style="margin:0 0 8px;">{{ t("workbench.logs.engineering") }}</h3>
         <div class="env-grid">
           <div class="env-card"><div class="env-label"><span>Workspace</span></div><div class="env-value">{{ env_summary.workspace_root }}</div></div>
           <div class="env-card"><div class="env-label"><span>Douyin API</span></div><div class="env-value">{{ env_summary.douyin_api_base }}</div></div>
@@ -376,11 +376,11 @@
         </div>
         <div style="margin-top:10px;" class="section-grid">
           <div class="field">
-            <label>{{ tr("workbench.origin_subtitles") }}</label>
+            <label>{{ t("workbench.origin_subtitles") }}</label>
             <div class="muted t-secondary">See deliverables above.</div>
           </div>
           <div class="field">
-            <label>{{ tr("workbench.source_url_raw") }}</label>
+            <label>{{ t("workbench.source_url_raw") }}</label>
             <div class="muted t-secondary" style="white-space:pre-wrap; word-break:break-word;">{{ task.source_url or '-' }}</div>
           </div>
         </div>
@@ -429,14 +429,14 @@
       }
     }
 
-    function setStatusText (id, isReady, readyText, missingText) {
+    function setStatusText(id, isReady, readyText, missingText) {
       const el = document.getElementById(id);
       if (!el) return;
       el.textContent = isReady ? readyText : missingText;
     }
 
-    function taskEndpoint (taskId, kind) {
-      const id = encodeURIComponent (taskId);
+    function taskEndpoint(taskId, kind) {
+      const id = encodeURIComponent(taskId);
       const map = {
         raw: `/v1/tasks/${id}/raw`,
         origin_srt: `/v1/tasks/${id}/subs_origin`,
@@ -452,7 +452,7 @@
     function isPresignedLike(url) {
       if (!url) return false;
       const u = String(url);
-      return /X-Amz-|Signature=|cloudflarestorage|AWS4-HMAC-SHA256/i.test (u);
+      return /X-Amz-|Signature=|cloudflarestorage|AWS4-HMAC-SHA256/i.test(u);
     }
 
     function updateDownloadsFromTask(data) {
@@ -465,25 +465,25 @@
       const hasPack = !!data.pack_path;
       const hasScenes = !!data.scenes_path;
 
-      setDownloadLink("raw-link", hasRaw ? taskEndpoint (taskId, "raw") : null);
-      setDownloadLink("origin-link", hasOrigin ? taskEndpoint (taskId, "origin_srt") : null);
-      setDownloadLink("mm-link", hasMmSrt ? taskEndpoint (taskId, "mm_srt") : null);
-      setDownloadLink("mm-txt-link", hasMmTxt ? taskEndpoint (taskId, "mm_txt") : null);
-      setDownloadLink("audio-link", hasAudio ? taskEndpoint (taskId, "audio_mm") : null);
-      setDownloadLink("pack-link", hasPack ? taskEndpoint (taskId, "pack") : null);
-      setDownloadLink("scenes-link", hasScenes ? taskEndpoint (taskId, "scenes") : null);
-      setDownloadLink("btn-scenes-download", hasScenes ? taskEndpoint (taskId, "scenes") : null);
+      setDownloadLink("raw-link", hasRaw ? taskEndpoint(taskId, "raw") : null);
+      setDownloadLink("origin-link", hasOrigin ? taskEndpoint(taskId, "origin_srt") : null);
+      setDownloadLink("mm-link", hasMmSrt ? taskEndpoint(taskId, "mm_srt") : null);
+      setDownloadLink("mm-txt-link", hasMmTxt ? taskEndpoint(taskId, "mm_txt") : null);
+      setDownloadLink("audio-link", hasAudio ? taskEndpoint(taskId, "audio_mm") : null);
+      setDownloadLink("pack-link", hasPack ? taskEndpoint(taskId, "pack") : null);
+      setDownloadLink("scenes-link", hasScenes ? taskEndpoint(taskId, "scenes") : null);
+      setDownloadLink("btn-scenes-download", hasScenes ? taskEndpoint(taskId, "scenes") : null);
 
-      setStatusText ("video-status", hasRaw, window.__V185_I18N__.tr("workbench.status.ready"), window.__V185_I18N__.tr("workbench.status.not_ready"));
-      setStatusText ("subs-status", hasMmSrt || hasMmTxt, window.__V185_I18N__.tr("workbench.status.ready"), window.__V185_I18N__.tr("workbench.status.not_ready"));
-      setStatusText ("audio-status", hasAudio, window.__V185_I18N__.tr("workbench.status.ready"), window.__V185_I18N__.tr("workbench.status.not_ready"));
-      setStatusText ("pack-status", hasPack, window.__V185_I18N__.tr("workbench.status.ready"), window.__V185_I18N__.tr("workbench.status.not_ready"));
-      setStatusText ("scenes-status", hasScenes, window.__V185_I18N__.tr("workbench.status.ready"), window.__V185_I18N__.tr("workbench.status.not_ready"));
+      setStatusText("video-status", hasRaw, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
+      setStatusText("subs-status", hasMmSrt || hasMmTxt, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
+      setStatusText("audio-status", hasAudio, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
+      setStatusText("pack-status", hasPack, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
+      setStatusText("scenes-status", hasScenes, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
 
       const audioEl = document.getElementById("audio-preview");
       if (audioEl) {
         if (hasAudio) {
-          audioEl.src = taskEndpoint (taskId, "audio_mm");
+          audioEl.src = taskEndpoint(taskId, "audio_mm");
           audioEl.style.display = "block";
         } else {
           audioEl.removeAttribute("src");
@@ -498,10 +498,10 @@
       const hasAudio = !!data.mm_audio_path;
       const hasPack = !!data.pack_path;
 
-      setStatusText ("parse-status", hasRaw, window.__V185_I18N__.tr("workbench.status.parsed"), window.__V185_I18N__.tr("workbench.status.not_parsed"));
-      setStatusText ("subs-step-status", hasSubs, window.__V185_I18N__.tr("workbench.status.ready"), window.__V185_I18N__.tr("workbench.status.not_ready"));
-      setStatusText ("dub-status", hasAudio, window.__V185_I18N__.tr("workbench.status.ready"), window.__V185_I18N__.tr("workbench.status.not_ready"));
-      setStatusText ("pack-step-status", hasPack, window.__V185_I18N__.tr("workbench.status.ready"), window.__V185_I18N__.tr("workbench.status.not_ready"));
+      setStatusText("parse-status", hasRaw, window.__V185_I18N__.t("workbench.status.parsed"), window.__V185_I18N__.t("workbench.status.not_parsed"));
+      setStatusText("subs-step-status", hasSubs, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
+      setStatusText("dub-status", hasAudio, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
+      setStatusText("pack-step-status", hasPack, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
     }
 
     function renderScenesStatus(data) {
@@ -509,14 +509,14 @@
       const statusEl = document.getElementById("scenes-step-status");
       const errorEl = document.getElementById("scenes-error");
       const map = {
-        queued: window.__V185_I18N__.tr("workbench.status.processing"),
-        running: window.__V185_I18N__.tr("workbench.status.processing"),
-        ready: window.__V185_I18N__.tr("workbench.status.ready"),
-        error: window.__V185_I18N__.tr("workbench.status.error", { error: data.scenes_error || "unknown" }),
-        already_ready: window.__V185_I18N__.tr("workbench.status.ready"),
+        queued: window.__V185_I18N__.t("workbench.status.processing"),
+        running: window.__V185_I18N__.t("workbench.status.processing"),
+        ready: window.__V185_I18N__.t("workbench.status.ready"),
+        error: window.__V185_I18N__.t("workbench.status.error", { error: data.scenes_error || "unknown" }),
+        already_ready: window.__V185_I18N__.t("workbench.status.ready"),
       };
       if (statusEl) {
-        statusEl.textContent = map[status] || window.__V185_I18N__.tr("workbench.status.not_ready");
+        statusEl.textContent = map[status] || window.__V185_I18N__.t("workbench.status.not_ready");
       }
       if (errorEl) {
         errorEl.textContent = status === "error" ? (data.scenes_error || "") : "";
@@ -613,7 +613,7 @@
       const taskId = data.task_id;
       let url = data.publish_url || "-";
       if (url === "-" || isPresignedLike(url)) {
-        url = data.pack_path ? taskEndpoint (taskId, "pack") : "-";
+        url = data.pack_path ? taskEndpoint(taskId, "pack") : "-";
       }
 
       const providerEl = document.getElementById("publish-provider");
@@ -631,18 +631,18 @@
       }
     }
 
-    function copyTextFromElement (el) {
+    function copyTextFromElement(el) {
       if (!el) return;
       const text = el.tagName === "A" ? el.getAttribute("href") : el.textContent || "";
       if (!text || text === "#") return;
-      navigator.clipboard.writeText (text).catch(() => {});
+      navigator.clipboard.writeText(text).catch(() => {});
     }
 
     document.querySelectorAll("[data-copy-target]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const targetId = btn.getAttribute("data-copy-target");
         const target = document.getElementById(targetId);
-        copyTextFromElement (target);
+        copyTextFromElement(target);
         appendLog(`Copied ${targetId}.`);
       });
     });
@@ -652,7 +652,7 @@
       copyPublishTextBtn.addEventListener("click", async () => {
         const text = (document.getElementById("publish-text") || {}).value || "";
         if (text) {
-          await navigator.clipboard.writeText (text);
+          await navigator.clipboard.writeText(text);
           appendLog("Copied publish text.");
         }
       });
@@ -742,7 +742,7 @@
         body: JSON.stringify({}),
       });
       if (resp.status === 202) {
-        appendLog(window.__V185_I18N__.tr("workbench.notice.subtitles_queued"));
+        appendLog(window.__V185_I18N__.t("workbench.notice.subtitles_queued"));
         startSubtitlesPolling();
         await refreshTaskState();
         return;
@@ -759,7 +759,7 @@
       const taskId = window.currentTask.task_id;
       const subsReady = window.currentTask.subtitles_status === "ready" || !!window.currentTask.mm_srt_path;
       if (!subsReady) {
-        appendLog(window.__V185_I18N__.tr("workbench.notice.subtitles_first"));
+        appendLog(window.__V185_I18N__.t("workbench.notice.subtitles_first"));
         return;
       }
       const voiceId = document.getElementById("voice-id").value;
@@ -777,13 +777,13 @@
         body: JSON.stringify(payload),
       });
       if (resp.status === 202) {
-        appendLog(window.__V185_I18N__.tr("workbench.notice.dub_queued"));
+        appendLog(window.__V185_I18N__.t("workbench.notice.dub_queued"));
         startDubPolling();
         await refreshTaskState();
         return;
       }
       if (!resp.ok) {
-        const detail = await resp.text ();
+        const detail = await resp.text();
         appendLog(`Dub failed: HTTP ${resp.status} ${detail}`);
         return;
       }
@@ -811,7 +811,7 @@
       const taskId = window.currentTask.task_id;
       const subsReady = window.currentTask.subtitles_status === "ready" || !!window.currentTask.mm_srt_path;
       if (!subsReady) {
-        appendLog(window.__V185_I18N__.tr("workbench.notice.subtitles_first"));
+        appendLog(window.__V185_I18N__.t("workbench.notice.subtitles_first"));
         return;
       }
       appendLog(`Calling /api/tasks/${taskId}/scenes...`);
@@ -845,7 +845,7 @@
             body: JSON.stringify({ task_id: taskId, force: false }),
           });
           if (!resp.ok) {
-            const detail = await resp.text ();
+            const detail = await resp.text();
             if (statusEl) statusEl.textContent = `Publish failed: ${resp.status} ${detail}`;
             return;
           }
@@ -883,7 +883,7 @@
       try {
         const resp = await fetch(url, { method: "GET" });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        return await resp.text ();
+        return await resp.text();
       } catch (err) {
         console.warn("fetchText failed", url, err);
         return fallbackMessage || `Failed to load. You can use download links above. (${url})`;
@@ -909,8 +909,8 @@
       mmPre.textContent = "Loading...";
       if (statusEl) statusEl.textContent = "Loading...";
 
-      const originUrl = `/api/tasks/${encodeURIComponent (taskId)}/text?kind=origin_srt`;
-      const mmTxtUrl = `/api/tasks/${encodeURIComponent (taskId)}/text?kind=mm_txt`;
+      const originUrl = `/api/tasks/${encodeURIComponent(taskId)}/text?kind=origin_srt`;
+      const mmTxtUrl = `/api/tasks/${encodeURIComponent(taskId)}/text?kind=mm_txt`;
 
       const originText = await fetchTextOrFallback(
         originUrl,
@@ -932,10 +932,10 @@
       originPre.setAttribute("data-loaded", "1");
 
       try {
-        const editedUrl = `/api/tasks/${encodeURIComponent (taskId)}/text?kind=mm_edited`;
+        const editedUrl = `/api/tasks/${encodeURIComponent(taskId)}/text?kind=mm_edited`;
         const r = await fetch(editedUrl);
         if (r.ok) {
-          const text = await r.text ();
+          const text = await r.text();
           if (text && text.trim().length > 0) {
             mmEdit.value = text;
             if (statusEl) statusEl.textContent = "Loaded mm_edited.txt";
@@ -964,7 +964,7 @@
     if (copyBtnOrigin) {
       copyBtnOrigin.addEventListener("click", async () => {
         const t = (document.getElementById("origin-text") || {}).textContent || "";
-        await navigator.clipboard.writeText (t);
+        await navigator.clipboard.writeText(t);
         appendLog("Copied origin subtitles.");
       });
     }
@@ -973,7 +973,7 @@
     if (copyBtnMm) {
       copyBtnMm.addEventListener("click", async () => {
         const t = (document.getElementById("mm-text") || {}).textContent || "";
-        await navigator.clipboard.writeText (t);
+        await navigator.clipboard.writeText(t);
         appendLog("Copied mm text.");
       });
     }
@@ -1005,13 +1005,13 @@
         const text = mmEdit ? mmEdit.value : "";
         if (statusEl) statusEl.textContent = "Saving...";
         try {
-          const resp = await fetch(`/api/tasks/${encodeURIComponent (taskId)}/mm_edited`, {
+          const resp = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/mm_edited`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ text }),
           });
           if (!resp.ok) {
-            const detail = await resp.text ();
+            const detail = await resp.text();
             if (statusEl) statusEl.textContent = `Save failed: HTTP ${resp.status} ${detail}`;
             appendLog(`Save mm_edited failed: HTTP ${resp.status}`);
             return;

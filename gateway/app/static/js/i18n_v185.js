@@ -52,7 +52,7 @@
     };
   }
 
-  function tr(key, vars) {
+  function t(key, vars) {
     const payload = getPayload();
     const locale = resolveLocale();
     const dict = payload.dict || {};
@@ -81,15 +81,15 @@
     document.documentElement.setAttribute("data-locale", locale);
     document.querySelectorAll("[data-i18n]").forEach((el) => {
       const key = el.getAttribute("data-i18n");
-      el.textContent = tr(key);
+      el.textContent = t(key);
     });
     document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
       const key = el.getAttribute("data-i18n-placeholder");
-      el.setAttribute("placeholder", tr(key));
+      el.setAttribute("placeholder", t(key));
     });
     document.querySelectorAll("[data-i18n-title]").forEach((el) => {
       const key = el.getAttribute("data-i18n-title");
-      el.setAttribute("title", tr(key));
+      el.setAttribute("title", t(key));
     });
   }
 
@@ -108,7 +108,7 @@
     });
   }
 
-  window.__V185_I18N__ = { tr, t: tr };
+  window.__V185_I18N__ = { t };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);

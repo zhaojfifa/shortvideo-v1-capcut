@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>{{ tr("page.tasks.board.title") }} - ShortVideo</title>
+  <title>{{ t("page.tasks.board.title") }} - ShortVideo</title>
   <link rel="stylesheet" href="/static/tasks_board.css">
   <link rel="stylesheet" href="/static/i18n.css" />
   <link rel="stylesheet" href="/static/css/ui_v185.css">
@@ -103,7 +103,7 @@
       tr { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; margin-bottom: 16px; padding: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
       td { border: none; padding: 8px 10px; }
       td::before {
-        content: attr(data-label);
+        content: att(data-label);
         display: block;
         font-weight: 700;
         color: #111827;
@@ -116,107 +116,107 @@
 {% set ui_show_secondary = false %}
   <div class="page tasks-board">
     <div class="card">
-      {% set topbar_title = tr("ui.tasks.board") %}
-{% set topbar_subtitle = tr("tasks.loaded_n", n=(tasks | length)) %}
+      {% set topbar_title = t("ui.tasks.board") %}
+{% set topbar_subtitle = t("tasks.loaded_n", n=(tasks | length)) %}
 {% set topbar_nav = [
-  {"label": tr("common.tasks"), "href": "/tasks", "active": True},
-  {"label": tr("common.tools"), "href": "/tools/hub", "active": False},
+  {"label": t("common.tasks"), "href": "/tasks", "active": True},
+  {"label": t("common.tools"), "href": "/tools/hub", "active": False},
 ] %}
 {% set topbar_actions = [
-  {"label": tr("common.new_task"), "href": "/tasks/new", "primary": True},
+  {"label": t("common.new_task"), "href": "/tasks/new", "primary": True},
 ] %}
 {% include "_topbar.html" %}
 
 
       <div class="legend">
-        <span class="legend-title">{{ tr("tasks.legend") }}</span>
+        <span class="legend-title">{{ t("tasks.legend") }}</span>
         <span class="legend-item">
           <span class="badge-dot dot-ready"></span>
-          <span>{{ tr("tasks.legend.ready") }}</span>
+          <span>{{ t("tasks.legend.ready") }}</span>
         </span>
         <span class="legend-item">
           <span class="badge-dot dot-processing"></span>
-          <span>{{ tr("tasks.legend.processing") }}</span>
+          <span>{{ t("tasks.legend.processing") }}</span>
         </span>
         <span class="legend-item">
           <span class="badge-dot dot-pending"></span>
-          <span>{{ tr("tasks.legend.queued") }}</span>
+          <span>{{ t("tasks.legend.queued") }}</span>
         </span>
         <span class="legend-item">
           <span class="badge-dot dot-error"></span>
-          <span>{{ tr("tasks.legend.failed") }}</span>
+          <span>{{ t("tasks.legend.failed") }}</span>
         </span>
       </div>
 
       <div class="table-wrapper">
-        {% set delete_label = tr("action.delete") %}
+        {% set delete_label = t("action.delete") %}
         <table class="tasks-table">
           <thead>
             <tr>
               <th class="bilingual">
-                <span>{{ tr("tasks.table.id") }}</span>
+                <span>{{ t("tasks.table.id") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ tr("tasks.table.id") }}</span>
+                  <span class="secondary">{{ t("tasks.table.id") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ tr("tasks.table.platform") }}</span>
+                <span>{{ t("tasks.table.platform") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ tr("tasks.table.platform") }}</span>
+                  <span class="secondary">{{ t("tasks.table.platform") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ tr("tasks.table.source") }}</span>
+                <span>{{ t("tasks.table.source") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ tr("tasks.table.source") }}</span>
+                  <span class="secondary">{{ t("tasks.table.source") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ tr("tasks.table.title") }}</span>
+                <span>{{ t("tasks.table.title") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ tr("tasks.table.title") }}</span>
+                  <span class="secondary">{{ t("tasks.table.title") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ tr("tasks.table.category") }}</span>
+                <span>{{ t("tasks.table.category") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ tr("tasks.table.category") }}</span>
+                  <span class="secondary">{{ t("tasks.table.category") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ tr("tasks.table.language") }}</span>
+                <span>{{ t("tasks.table.language") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ tr("tasks.table.language") }}</span>
+                  <span class="secondary">{{ t("tasks.table.language") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ tr("tasks.table.status") }}</span>
+                <span>{{ t("tasks.table.status") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ tr("tasks.table.status") }}</span>
+                  <span class="secondary">{{ t("tasks.table.status") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ tr("tasks.table.created") }}</span>
+                <span>{{ t("tasks.table.created") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ tr("tasks.table.created") }}</span>
+                  <span class="secondary">{{ t("tasks.table.created") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ tr("tasks.table.pack") }}</span>
+                <span>{{ t("tasks.table.pack") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ tr("tasks.table.pack") }}</span>
+                  <span class="secondary">{{ t("tasks.table.pack") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ tr("tasks.table.publish") }}</span>
+                <span>{{ t("tasks.table.publish") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ tr("tasks.table.publish") }}</span>
+                  <span class="secondary">{{ t("tasks.table.publish") }}</span>
                 {% endif %}
               </th>
               <th class="bilingual">
-                <span>{{ tr("tasks.table.detail") }}</span>
+                <span>{{ t("tasks.table.detail") }}</span>
                 {% if ui_show_secondary %}
-                  <span class="secondary">{{ tr("tasks.table.detail") }}</span>
+                  <span class="secondary">{{ t("tasks.table.detail") }}</span>
                 {% endif %}
               </th>
             </tr>
@@ -249,11 +249,11 @@
 
               {% set cat_key = task.category_key or "-" %}
               {% if cat_key == "suitcase" %}
-                {% set cat_label_primary = tr("category_suitcase") %}
-                {% set cat_label_secondary = tr("category_suitcase") %}
+                {% set cat_label_primary = t("category_suitcase") %}
+                {% set cat_label_secondary = t("category_suitcase") %}
               {% elif cat_key == "beauty" %}
-                {% set cat_label_primary = tr("category_beauty") %}
-                {% set cat_label_secondary = tr("category_beauty") %}
+                {% set cat_label_primary = t("category_beauty") %}
+                {% set cat_label_secondary = t("category_beauty") %}
               {% elif cat_key == "-" %}
                 {% set cat_label_primary = "-" %}
                 {% set cat_label_secondary = "-" %}
@@ -295,8 +295,8 @@
               {% endif %}
 
               <tr>
-                <td class="truncate" data-label="{{ tr('tasks.table.id') }}" title="{{ task.task_id }}"><a href="/tasks/{{ task.task_id }}">{{ task.task_id }}</a></td>
-                <td data-label="{{ tr('tasks.table.platform') }}">
+                <td class="truncate" data-label="{{ t('tasks.table.id') }}" title="{{ task.task_id }}"><a href="/tasks/{{ task.task_id }}">{{ task.task_id }}</a></td>
+                <td data-label="{{ t('tasks.table.platform') }}">
                   <div class="bilingual">
                     <span>{{ platform_label_primary }}</span>
                     {% if ui_show_secondary %}
@@ -304,15 +304,15 @@
                     {% endif %}
                   </div>
                 </td>
-                <td class="truncate" data-label="{{ tr('tasks.table.source') }}" title="{{ task.source_url }}">
+                <td class="truncate" data-label="{{ t('tasks.table.source') }}" title="{{ task.source_url }}">
                   {% if task.source_url %}
                     <span class="source-text">{{ task.source_url }}</span>
                   {% else %}
                     -
                   {% endif %}
                 </td>
-                <td class="truncate" data-label="{{ tr('tasks.table.title') }}" title="{{ task.title }}">{{ task.title or "" }}</td>
-                <td data-label="{{ tr('tasks.table.category') }}">
+                <td class="truncate" data-label="{{ t('tasks.table.title') }}" title="{{ task.title }}">{{ task.title or "" }}</td>
+                <td data-label="{{ t('tasks.table.category') }}">
                   <div class="bilingual">
                     <span>{{ cat_label_primary }}</span>
                     {% if ui_show_secondary %}
@@ -320,71 +320,71 @@
                     {% endif %}
                   </div>
                 </td>
-                <td data-label="{{ tr('tasks.table.language') }}">{{ lang_label or "-" }}</td>
-                <td data-label="{{ tr('tasks.table.status') }}">
+                <td data-label="{{ t('tasks.table.language') }}">{{ lang_label or "-" }}</td>
+                <td data-label="{{ t('tasks.table.status') }}">
                   <div class="bilingual">
-                    <span class="{{ badge }}">{{ tr(status_key) }}</span>
+                    <span class="{{ badge }}">{{ t(status_key) }}</span>
                     {% if ui_show_secondary %}
-                      <span class="secondary">{{ tr(status_key) }}</span>
+                      <span class="secondary">{{ t(status_key) }}</span>
                     {% endif %}
                   </div>
                 </td>
-                <td data-label="{{ tr('tasks.table.created') }}">{{ task.created_at }}</td>
-                <td data-label="{{ tr('tasks.table.pack') }}">
+                <td data-label="{{ t('tasks.table.created') }}">{{ task.created_at }}</td>
+                <td data-label="{{ t('tasks.table.pack') }}">
                   {% if features.allow_pack_download %}
                     <div class="action-item">
-                      <a href="/v1/tasks/{{ task.task_id }}/pack" target="_blank" rel="noopener">{{ tr("action.download") }}</a>
+                      <a href="/v1/tasks/{{ task.task_id }}/pack" target="_blank" rel="noopener">{{ t("action.download") }}</a>
                       {% if ui_show_secondary %}
-                        <span class="secondary">{{ tr("action.download") }}</span>
+                        <span class="secondary">{{ t("action.download") }}</span>
                       {% endif %}
                     </div>
                   {% else %}
-                    {{ tr("tasks.pack_unavailable") }}
+                    {{ t("tasks.pack_unavailable") }}
                   {% endif %}
                 </td>
-                <td data-label="{{ tr('tasks.table.publish') }}">
+                <td data-label="{{ t('tasks.table.publish') }}">
                   <div class="action-item">
-                    <a href="/tasks/{{ task.task_id }}/publish">{{ tr("tasks.publish_hub") }}</a>
+                    <a href="/tasks/{{ task.task_id }}/publish">{{ t("tasks.publish_hub") }}</a>
                     {% if ui_show_secondary %}
-                      <span class="secondary">{{ tr("tasks.publish_hub") }}</span>
+                      <span class="secondary">{{ t("tasks.publish_hub") }}</span>
                     {% endif %}
                   </div>
                 </td>
-                <td data-label="{{ tr('tasks.table.detail') }}">
+                <td data-label="{{ t('tasks.table.detail') }}">
                   <div class="action-stack">
                     <div class="action-item">
-                      <a href="/tasks/{{ task.task_id }}/publish">{{ tr("tasks.publish_hub") }}</a>
+                      <a href="/tasks/{{ task.task_id }}/publish">{{ t("tasks.publish_hub") }}</a>
                       {% if ui_show_secondary %}
-                        <span class="secondary">{{ tr("tasks.publish_hub") }}</span>
+                        <span class="secondary">{{ t("tasks.publish_hub") }}</span>
                       {% endif %}
                     </div>
 <div class="action-item">
-                      <a href="/tasks/{{ task.task_id }}">{{ tr("action.open") }}</a>
+                      <a href="/tasks/{{ task.task_id }}">{{ t("action.open") }}</a>
                       {% if ui_show_secondary %}
-                        <span class="secondary">{{ tr("action.open") }}</span>
+                        <span class="secondary">{{ t("action.open") }}</span>
                       {% endif %}
                     </div>
                     {% set pipeline = task.pipeline_config or {} %}
-                    {% set subtitles_mode = pipeline.get ("subtitles_mode", "whisper+gemini") %}
-                    {% set dub_mode = pipeline.get ("dub_mode", "auto-fallback") %}
+                    {% set subtitles_mode = pipeline.get("subtitles_mode", "whisper+gemini") %}
+                    {% set dub_mode = pipeline.get("dub_mode", "auto-fallback") %}
                     <div class="action-item">
-                      <span class="muted">{{ tr("tasks.subtitles") }}: {{ subtitles_mode }}</span>
+                      <span class="muted">{{ t("tasks.subtitles") }}: {{ subtitles_mode }}</span>
                     </div>
                     <div class="action-item">
-                      <span class="muted">{{ tr("tasks.dub") }}: {{ dub_mode }}</span>
+                      <span class="muted">{{ t("tasks.dub") }}: {{ dub_mode }}</span>
                     </div>
                     <div class="action-item">
                       <button type="button"
                               class="link-button danger"
                               data-action="delete"
                               data-task-id="{{ task.task_id }}">
-                        {{ tr("action.delete") }}
+                        {{ t("action.delete") }}
                       </button>
                     </div>
                     <div class="action-item">
-                      <a href="/api/tasks/{{ task.task_id }}" target="_blank" rel="noopener">{{ tr("action.json") }}</a>
+                      <a href="/api/tasks/{{ task.task_id }}" target="_blank" rel="noopener">{{ t("action.json") }}</a>
                       {% if ui_show_secondary %}
-                        <span class="secondary">{{ tr("action.json") }}</span>
+                        <span class="secondary">{{ t("action.json") }}</span>
                       {% endif %}
                     </div>
                   </div>
@@ -408,40 +408,40 @@
     const showSecondary = {{ "true" if ui_show_secondary else "false" }};
     const I18N = window.__V185_I18N__ || { tr: (key, vars) => key };
     const LABELS = {
-      id: "{{ tr('tasks.table.id') }}",
-      platform: "{{ tr('tasks.table.platform') }}",
-      source: "{{ tr('tasks.table.source') }}",
-      title: "{{ tr('tasks.table.title') }}",
-      category: "{{ tr('tasks.table.category') }}",
-      lang: "{{ tr('tasks.table.language') }}",
-      status: "{{ tr('tasks.table.status') }}",
-      created: "{{ tr('tasks.table.created') }}",
-      pack: "{{ tr('tasks.table.pack') }}",
-      detail: "{{ tr('tasks.table.detail') }}",
+      id: "{{ t('tasks.table.id') }}",
+      platform: "{{ t('tasks.table.platform') }}",
+      source: "{{ t('tasks.table.source') }}",
+      title: "{{ t('tasks.table.title') }}",
+      category: "{{ t('tasks.table.category') }}",
+      lang: "{{ t('tasks.table.language') }}",
+      status: "{{ t('tasks.table.status') }}",
+      created: "{{ t('tasks.table.created') }}",
+      pack: "{{ t('tasks.table.pack') }}",
+      detail: "{{ t('tasks.table.detail') }}",
     };
     const STATUS_LABELS = {
-      ready: { primary: "{{ tr('tasks.status.ready') }}", secondary: "" },
-      processing: { primary: "{{ tr('tasks.status.processing') }}", secondary: "" },
-      pending: { primary: "{{ tr('tasks.status.queued') }}", secondary: "" },
-      error: { primary: "{{ tr('tasks.status.failed') }}", secondary: "" },
-      unknown: { primary: "{{ tr('tasks.status.failed') }}", secondary: "" },
+      ready: { primary: "{{ t('tasks.status.ready') }}", secondary: "" },
+      processing: { primary: "{{ t('tasks.status.processing') }}", secondary: "" },
+      pending: { primary: "{{ t('tasks.status.queued') }}", secondary: "" },
+      error: { primary: "{{ t('tasks.status.failed') }}", secondary: "" },
+      unknown: { primary: "{{ t('tasks.status.failed') }}", secondary: "" },
     };
     const CATEGORY_LABELS = {
-      suitcase: { primary: "{{ tr('category_suitcase') }}", secondary: "{{ tr('category_suitcase') }}" },
-      beauty: { primary: "{{ tr('category_beauty') }}", secondary: "{{ tr('category_beauty') }}" },
-      other: { primary: "{{ tr('category_other') }}", secondary: "{{ tr('category_other') }}" },
+      suitcase: { primary: "{{ t('category_suitcase') }}", secondary: "{{ t('category_suitcase') }}" },
+      beauty: { primary: "{{ t('category_beauty') }}", secondary: "{{ t('category_beauty') }}" },
+      other: { primary: "{{ t('category_other') }}", secondary: "{{ t('category_other') }}" },
     };
     const PLATFORM_LABELS = {
-      douyin: { primary: "{{ tr('label.platform_douyin') }}", secondary: "" },
-      tk: { primary: "{{ tr('label.platform_tiktok') }}", secondary: "" },
-      tiktok: { primary: "{{ tr('label.platform_tiktok') }}", secondary: "" },
-      xhs: { primary: "{{ tr('label.platform_xhs') }}", secondary: "" },
-      fb: { primary: "{{ tr('label.platform_fb') }}", secondary: "" },
-      facebook: { primary: "{{ tr('label.platform_fb') }}", secondary: "" },
+      douyin: { primary: "{{ t('label.platform_douyin') }}", secondary: "" },
+      tk: { primary: "{{ t('label.platform_tiktok') }}", secondary: "" },
+      tiktok: { primary: "{{ t('label.platform_tiktok') }}", secondary: "" },
+      xhs: { primary: "{{ t('label.platform_xhs') }}", secondary: "" },
+      fb: { primary: "{{ t('label.platform_fb') }}", secondary: "" },
+      facebook: { primary: "{{ t('label.platform_fb') }}", secondary: "" },
     };
-    const COUNT_LABEL = "{{ tr('tasks.loaded_n', n='{n}') }}";
+    const COUNT_LABEL = "{{ t('tasks.loaded_n', n='{n}') }}";
     const DELETE_LABEL = "{{ delete_label }}";
-    const EMPTY_LABEL = "{{ tr('tasks.no_tasks') }}";
+    const EMPTY_LABEL = "{{ t('tasks.no_tasks') }}";
 
     function statusBadgeClass(status) {
       if (status === "ready") return "badge badge-ready";
@@ -497,7 +497,7 @@
         const raw = el.textContent || "";
         const url = extractFirstHttpUrl(raw);
         if (!url) return;
-        const a = document.createElement ("a");
+        const a = document.createElement("a");
         a.href = url;
         a.target = "_blank";
         a.rel = "noopener";
@@ -510,8 +510,8 @@
       tableBody.innerHTML = "";
 
       if (!tasks.length) {
-        const emptyRow = document.createElement ("tr");
-        const emptyCell = document.createElement ("td");
+        const emptyRow = document.createElement("tr");
+        const emptyCell = document.createElement("td");
         emptyCell.colSpan = 10;
         emptyCell.className = "empty muted";
         emptyCell.innerHTML = `
@@ -531,7 +531,7 @@
           const platform = platformLabel(t.platform);
           const srcRaw = t.source_url || "";
           const srcUrl = extractFirstHttpUrl(srcRaw);
-          const row = document.createElement ("tr");
+          const row = document.createElement("tr");
           const pipeline = t.pipeline_config || {};
           const subtitlesMode = pipeline.subtitles_mode || "whisper+gemini";
           const dubMode = pipeline.dub_mode || "auto-fallback";
@@ -568,22 +568,22 @@
             <td data-label="${LABELS.pack}">${
               (allowPackDownload)
                 ? `<div class="action-item">
-                    <a href="/v1/tasks/${t.task_id}/pack" target="_blank" rel="noopener">{{ tr("action.download") }}</a>
-                    ${showSecondary ? `<span class="secondary">{{ tr("download") }}</span>` : ""}
+                    <a href="/v1/tasks/${t.task_id}/pack" target="_blank" rel="noopener">{{ t("action.download") }}</a>
+                    ${showSecondary ? `<span class="secondary">{{ t("download") }}</span>` : ""}
                   </div>`
-                : I18N.tr("tasks.pack_unavailable")
+                : I18N.t("tasks.pack_unavailable")
             }</td>
             <td data-label="${LABELS.detail}">
               <div class="action-stack">
                 <div class="action-item">
-                  <a href="/tasks/${t.task_id}">{{ tr("action.open") }}</a>
-                  ${showSecondary ? `<span class="secondary">{{ tr("open") }}</span>` : ""}
+                  <a href="/tasks/${t.task_id}">{{ t("action.open") }}</a>
+                  ${showSecondary ? `<span class="secondary">{{ t("open") }}</span>` : ""}
                 </div>
                 <div class="action-item">
-                  <span class="muted">${I18N.tr("tasks.subtitles")}: ${subtitlesMode}</span>
+                  <span class="muted">${I18N.t("tasks.subtitles")}: ${subtitlesMode}</span>
                 </div>
                 <div class="action-item">
-                  <span class="muted">${I18N.tr("tasks.dub")}: ${dubMode}</span>
+                  <span class="muted">${I18N.t("tasks.dub")}: ${dubMode}</span>
                 </div>
                 <div class="action-item">
                   <button type="button"
@@ -594,8 +594,8 @@
                   </button>
                 </div>
                 <div class="action-item">
-                  <a href="/api/tasks/${t.task_id}" target="_blank" rel="noopener">{{ tr("action.json") }}</a>
-                  ${showSecondary ? `<span class="secondary">{{ tr("json") }}</span>` : ""}
+                  <a href="/api/tasks/${t.task_id}" target="_blank" rel="noopener">{{ t("action.json") }}</a>
+                  ${showSecondary ? `<span class="secondary">{{ t("json") }}</span>` : ""}
                 </div>
               </div>
             </td>
@@ -643,7 +643,7 @@
 
       tasksInFlight = true;
       if (countPrimaryEl) {
-        countPrimaryEl.textContent = I18N.tr("tasks.loading");
+        countPrimaryEl.textContent = I18N.t("tasks.loading");
       }
       if (countSecondaryEl) {
         countSecondaryEl.textContent = "";
@@ -662,7 +662,7 @@
       } catch (err) {
         console.error(err);
         if (countPrimaryEl) {
-          countPrimaryEl.textContent = I18N.tr("tasks.load_failed", { error: err.message });
+          countPrimaryEl.textContent = I18N.t("tasks.load_failed", { error: err.message });
         }
         if (countSecondaryEl) {
           countSecondaryEl.textContent = "";
@@ -694,25 +694,25 @@
     }
 
     async function handleDeleteClick(event) {
-      const button = event.target.closest ("[data-action='delete']");
+      const button = event.target.closest("[data-action='delete']");
       if (!button) return;
       if (button.getAttribute("data-action") !== "delete") return;
-      event.preventDefault ();
+      event.preventDefault();
       const taskId = button.dataset.taskId;
       if (!taskId) return;
-      const confirmed = window.confirm(I18N.tr("tasks.delete_confirm"));
+      const confirmed = window.confirm(I18N.t("tasks.delete_confirm"));
       if (!confirmed) return;
       const originalText = button.textContent;
       button.disabled = true;
-      button.textContent = I18N.tr("tasks.deleting");
+      button.textContent = I18N.t("tasks.deleting");
       try {
-        const res = await fetch(`/api/tasks/${encodeURIComponent (taskId)}?delete_assets=false`, {
+        const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}?delete_assets=false`, {
           method: "DELETE",
         });
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
         }
-        const row = button.closest ("tr");
+        const row = button.closest("tr");
         if (row) {
           row.remove();
         }
@@ -721,7 +721,7 @@
         }
       } catch (err) {
         console.error(err);
-        window.alert (I18N.tr("tasks.delete_failed", { error: err.message }));
+        window.alert(I18N.t("tasks.delete_failed", { error: err.message }));
       } finally {
         button.disabled = false;
         button.textContent = originalText;

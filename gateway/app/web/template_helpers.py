@@ -9,10 +9,10 @@ from gateway.app.web.i18n import i18n_payload
 
 def get_template_globals(request: Request) -> Dict[str, object]:
     locale = get_ui_locale(request)
-    tr_func = get_translator(locale)
+    t_func = get_translator(locale)
     return {
         "ui_locale": locale,
         "supported_locales": get_supported_locales(),
-        "tr": tr_func,
+        "t": t_func,
         "i18n_payload": i18n_payload(locale),
     }

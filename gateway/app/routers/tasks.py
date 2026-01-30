@@ -18,7 +18,7 @@ from typing import Optional
 from uuid import uuid4
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Security
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, Security, UploadFile
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.responses import (
     HTMLResponse,
@@ -1379,6 +1379,123 @@ def create_task(
     background_tasks.add_task(_run_pipeline_background, task_id, repo)
 
     return _task_to_detail(stored_task)
+
+
+def _save_upload_to_paths(
+    *,
+    upload: UploadFile,
+    inputs_path: Path,
+    raw_path_target: Path,
+    max_bytes: int,
+) -> int:
+    inputs_path.parent.mkdir(parents=True, exist_ok=True)
+    raw_path_target.parent.mkdir(parents=True, exist_ok=True)
+    total = 0
+    with inputs_path.open("wb") as out:
+        while True:
+            chunk = upload.file.read(1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                out.close()
+                try:
+                    inputs_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+                raise HTTPException(status_code=413, detail="upload too large")
+            out.write(chunk)
+    if inputs_path != raw_path_target:
+        shutil.copyfile(inputs_path, raw_path_target)
+    return total
+
+
+@api_router.post("/tasks/local_upload")
+def create_task_local_upload(
+    file: UploadFile = File(...),
+    category: str | None = Form(default=None),
+    language: str | None = Form(default=None),
+    platform: str | None = Form(default=None),
+    account_id: str | None = Form(default=None),
+    account_name: str | None = Form(default=None),
+    video_type: str | None = Form(default=None),
+    template: str | None = Form(default=None),
+    title: str | None = Form(default=None),
+    note: str | None = Form(default=None),
+    style_preset: str | None = Form(default=None),
+    subtitles_mode: str | None = Form(default=None),
+    dub_mode: str | None = Form(default=None),
+    repo=Depends(get_task_repository),
+):
+    if not file or not file.filename:
+        raise HTTPException(status_code=400, detail="file is required")
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in {".mp4", ".mov", ".mkv"}:
+        raise HTTPException(status_code=400, detail="unsupported file type")
+
+    task_id = uuid4().hex[:12]
+    max_mb = int(os.getenv("MAX_LOCAL_UPLOAD_MB", "200"))
+    max_bytes = max_mb * 1024 * 1024
+
+    inputs_path = task_base_dir(task_id) / "inputs" / "raw.mp4"
+    raw_file_path = raw_path(task_id)
+    _save_upload_to_paths(
+        upload=file,
+        inputs_path=inputs_path,
+        raw_path_target=raw_file_path,
+        max_bytes=max_bytes,
+    )
+
+    platform_value = platform or "local"
+    task_payload = {
+        "task_id": task_id,
+        "title": title,
+        "source_url": "",
+        "platform": platform_value,
+        "account_id": account_id,
+        "account_name": account_name,
+        "video_type": video_type,
+        "template": template,
+        "category_key": category or "suitcase",
+        "content_lang": language or "mm",
+        "ui_lang": "zh",
+        "style_preset": style_preset,
+        "face_swap_enabled": False,
+        "selected_tool_ids": None,
+        "pipeline_config": pipeline_config_to_storage(
+            {
+                "subtitles_mode": subtitles_mode or "whisper+gemini",
+                "dub_mode": dub_mode or "auto-fallback",
+            }
+        ),
+        "status": "processing",
+        "last_step": "parse",
+        "error_message": None,
+        "source_type": "local",
+        "source_filename": file.filename,
+        "note": note,
+    }
+    task_payload = normalize_task_payload(task_payload, is_new=True)
+    repo.create(task_payload)
+    stored_task = repo.get(task_id)
+    if not stored_task:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Task persistence failed for task_id={task_id}",
+        )
+
+    raw_key = upload_task_artifact(stored_task, raw_file_path, "raw.mp4", task_id=task_id)
+    repo.upsert(
+        task_id,
+        {
+            "raw_path": raw_key,
+            "error_message": None,
+            "error_reason": None,
+        },
+    )
+
+    return {"ok": True, "task_id": task_id, "redirect": f"/tasks/{task_id}"}
 
 
 @api_router.patch("/tasks/{task_id}", response_model=TaskDetail)
