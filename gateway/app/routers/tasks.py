@@ -1531,6 +1531,7 @@ def _save_upload_to_paths(
 
 @api_router.post("/tasks/local_upload")
 def create_task_local_upload(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     category: str | None = Form(default=None),
     language: str | None = Form(default=None),
@@ -1545,7 +1546,6 @@ def create_task_local_upload(
     style_preset: str | None = Form(default=None),
     subtitles_mode: str | None = Form(default=None),
     dub_mode: str | None = Form(default=None),
-    background_tasks: BackgroundTasks | None = None,
     repo=Depends(get_task_repository),
 ):
     if not file or not file.filename:
