@@ -1076,6 +1076,47 @@ def _repo_upsert(repo, task_id: str, patch: dict) -> None:
     repo.upsert(task_id, patch)
 
 
+def _should_autostart(task: dict) -> bool:
+    if not isinstance(task, dict):
+        return False
+    if task.get("status") in ("processing", "queued") and task.get("last_step"):
+        return False
+    if any(task.get(k) for k in ("subtitles_status", "dub_status", "pack_status")):
+        return False
+    return True
+
+
+def _kickoff_autostart(
+    *,
+    task_id: str,
+    start_step: str,
+    reason: str,
+    repo,
+    background_tasks: BackgroundTasks,
+) -> None:
+    task = repo.get(task_id)
+    if not task or not _should_autostart(task):
+        return
+    logger.info(
+        "AUTO_START",
+        extra={"task": task_id, "step": start_step, "phase": "enqueue", "reason": reason},
+    )
+    if start_step == "parse":
+        background_tasks.add_task(_run_pipeline_background, task_id, repo)
+        return
+    if start_step == "subtitles":
+        default_lang = os.getenv("DEFAULT_MM_LANG", "my")
+        target_lang = task.get("content_lang") or default_lang
+        background_tasks.add_task(
+            _run_subtitles_background,
+            task_id,
+            target_lang,
+            False,
+            True,
+            repo,
+        )
+
+
 def _run_pipeline_background(task_id: str, repo) -> None:
     task = repo.get(task_id)
     if not task:
@@ -1447,7 +1488,14 @@ def create_task(
             detail=f"Task persistence failed for task_id={task_id}",
         )
 
-    background_tasks.add_task(_run_pipeline_background, task_id, repo)
+    if source_text:
+        _kickoff_autostart(
+            task_id=task_id,
+            start_step="parse",
+            reason="source_url",
+            repo=repo,
+            background_tasks=background_tasks,
+        )
 
     return _task_to_detail(stored_task)
 
@@ -1497,6 +1545,7 @@ def create_task_local_upload(
     style_preset: str | None = Form(default=None),
     subtitles_mode: str | None = Form(default=None),
     dub_mode: str | None = Form(default=None),
+    background_tasks: BackgroundTasks | None = None,
     repo=Depends(get_task_repository),
 ):
     if not file or not file.filename:
@@ -1527,7 +1576,7 @@ def create_task_local_upload(
     task_payload = {
         "task_id": task_id,
         "title": title,
-        "source_url": "",
+        "source_url": None,
         "platform": platform_value,
         "account_id": account_id,
         "account_name": account_name,
@@ -1546,8 +1595,8 @@ def create_task_local_upload(
                 "ingest_mode": "local",
             }
         ),
-        "status": "processing",
-        "last_step": "parse",
+        "status": "pending",
+        "last_step": None,
         "error_message": None,
         "source_type": "local",
         "source_filename": file.filename,
@@ -1571,6 +1620,15 @@ def create_task_local_upload(
             "error_reason": None,
         },
     )
+
+    if background_tasks is not None:
+        _kickoff_autostart(
+            task_id=task_id,
+            start_step="subtitles",
+            reason="local_upload",
+            repo=repo,
+            background_tasks=background_tasks,
+        )
 
     return {"ok": True, "task_id": task_id, "redirect": f"/tasks/{task_id}"}
 
