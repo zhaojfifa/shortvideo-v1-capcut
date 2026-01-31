@@ -163,6 +163,7 @@ class TaskDetail(TaskSummary):
     stale_for_seconds: Optional[int] = None
     no_dub: Optional[bool] = None
     dub_skip_reason: Optional[str] = None
+    subtitle_track_kind: Optional[str] = None
 
 
 class DubResponse(TaskDetail):

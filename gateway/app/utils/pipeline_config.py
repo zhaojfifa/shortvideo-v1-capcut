@@ -19,6 +19,7 @@ _EXTRA_KEYS = {
     "no_subtitles",
     "no_dub",
     "dub_skip_reason",
+    "subtitle_track_kind",
 }
 
 

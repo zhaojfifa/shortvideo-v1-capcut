@@ -142,6 +142,7 @@ from gateway.app.db import SessionLocal
 from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
 from gateway.app.services.task_cleanup import delete_task_record, purge_task_artifacts
 from gateway.app.utils.pipeline_config import parse_pipeline_config, pipeline_config_to_storage
+from gateway.app.utils.subtitle_probe import probe_subtitles
 
 from ..core.workspace import (
     Workspace,
@@ -1048,6 +1049,7 @@ def _task_to_detail(task: dict) -> TaskDetail:
         "pipeline_config": pipeline_config,
         "no_dub": pipeline_config.get("no_dub") == "true",
         "dub_skip_reason": pipeline_config.get("dub_skip_reason"),
+        "subtitle_track_kind": pipeline_config.get("subtitle_track_kind"),
     }
 
     allowed = _model_allowed_fields(TaskDetail)
@@ -1074,6 +1076,39 @@ def _sha256_file(path: Path) -> str | None:
 
 def _repo_upsert(repo, task_id: str, patch: dict) -> None:
     repo.upsert(task_id, patch)
+
+
+def _merge_probe_into_pipeline_config(
+    pipeline_config: dict[str, str], probe: dict[str, Any] | None
+) -> dict[str, str]:
+    if not probe:
+        return pipeline_config
+    kind = probe.get("subtitle_track_kind")
+    if isinstance(kind, str) and kind:
+        pipeline_config["subtitle_track_kind"] = kind
+    has_sub = probe.get("has_subtitle_stream")
+    if has_sub is True:
+        pipeline_config["subtitle_stream"] = "true"
+    elif has_sub is False:
+        pipeline_config["subtitle_stream"] = "false"
+    subtitle_codecs = probe.get("subtitle_codecs") or []
+    if isinstance(subtitle_codecs, list) and subtitle_codecs:
+        pipeline_config["subtitle_codecs"] = ",".join(
+            [str(v) for v in subtitle_codecs if str(v).strip()]
+        )
+    return pipeline_config
+
+
+def _update_pipeline_probe(repo, task_id: str, probe: dict[str, Any] | None) -> None:
+    if not probe:
+        return
+    task = repo.get(task_id)
+    if not task:
+        return
+    current = parse_pipeline_config(task.get("pipeline_config"))
+    updated = _merge_probe_into_pipeline_config(current, probe)
+    if updated != current:
+        repo.upsert(task_id, {"pipeline_config": pipeline_config_to_storage(updated)})
 
 
 def _should_autostart(task: dict) -> bool:
@@ -1628,6 +1663,11 @@ def create_task_local_upload(
         raw_path_target=raw_file_path,
         max_bytes=max_bytes,
     )
+    probe = None
+    try:
+        probe = probe_subtitles(raw_file_path)
+    except Exception:
+        logger.exception("SUBTITLE_PROBE_FAIL", extra={"task_id": task_id})
 
     if account and not account_id:
         account_id = account
@@ -1635,6 +1675,14 @@ def create_task_local_upload(
         account_name = account
 
     platform_value = platform or "local"
+    pipeline_config = _merge_probe_into_pipeline_config(
+        {
+            "subtitles_mode": subtitles_mode or "whisper+gemini",
+            "dub_mode": dub_mode or "auto-fallback",
+            "ingest_mode": "local",
+        },
+        probe,
+    )
     task_payload = {
         "task_id": task_id,
         "title": title,
@@ -1650,13 +1698,7 @@ def create_task_local_upload(
         "style_preset": style_preset,
         "face_swap_enabled": False,
         "selected_tool_ids": None,
-        "pipeline_config": pipeline_config_to_storage(
-            {
-                "subtitles_mode": subtitles_mode or "whisper+gemini",
-                "dub_mode": dub_mode or "auto-fallback",
-                "ingest_mode": "local",
-            }
-        ),
+        "pipeline_config": pipeline_config_to_storage(pipeline_config),
         "status": "pending",
         "last_step": None,
         "error_message": None,
@@ -2023,6 +2065,11 @@ def build_parse(
     raw_key = None
     if raw_file.exists():
         raw_key = upload_task_artifact(task, raw_file, "raw.mp4", task_id=task_id)
+        try:
+            probe = probe_subtitles(raw_file)
+            _update_pipeline_probe(repo, task_id, probe)
+        except Exception:
+            logger.exception("SUBTITLE_PROBE_FAIL", extra={"task_id": task_id})
     duration_sec = parse_res.get("duration_sec") if isinstance(parse_res, dict) else None
     repo.upsert(
         task_id,

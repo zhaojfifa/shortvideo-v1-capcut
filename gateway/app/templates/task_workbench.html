@@ -166,6 +166,7 @@
         <div class="meta-item"><strong>{{ t("workbench.meta.account") }}</strong><span>{{ task.account_id or '-' }}</span></div>
         <div class="meta-item"><strong>{{ t("workbench.meta.category") }}</strong><span>{{ task.category_key or '-' }}</span></div>
         <div class="meta-item"><strong>{{ t("workbench.meta.language") }}</strong><span>{{ task.content_lang or '-' }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.subtitle_track") }}</strong><span>{{ task.subtitle_track_kind or '-' }}</span></div>
         {% set pipeline = task.pipeline_config or {} %}
         {% set subtitles_mode = pipeline.get("subtitles_mode", "whisper+gemini") %}
         {% set dub_mode = pipeline.get("dub_mode", "auto-fallback") %}
