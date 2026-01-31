@@ -334,7 +334,10 @@ async def run_subtitles_step(req: SubtitlesRequest):
         )
         probe = result.get("stream_probe") if isinstance(result, dict) else None
         clean_generated = bool(result.get("clean_video_generated")) if isinstance(result, dict) else False
+        no_subtitles_flag = bool(result.get("no_subtitles")) if isinstance(result, dict) else False
         updates: dict[str, str] = {}
+        if no_subtitles_flag:
+            updates["no_subtitles"] = "true"
         if isinstance(probe, dict):
             has_audio = probe.get("has_audio")
             if has_audio is True:
@@ -497,7 +500,7 @@ async def run_dub_step(req: DubRequest):
         mm_txt_text = mm_txt_path.read_text(encoding="utf-8")
     except Exception:
         return _skip_dub_ready(req, workspace, "mm_txt_missing", provider)
-    if mm_txt_text.strip() == "NO_SUBTITLES":
+    if mm_txt_text.strip().lower() == "no subtitles":
         return _skip_dub_ready(req, workspace, "no_subtitles_marker", provider)
     if not mm_txt_text.strip():
         return _skip_dub_ready(req, workspace, "mm_txt_empty", provider)

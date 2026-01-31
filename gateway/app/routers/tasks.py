@@ -1810,6 +1810,17 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
     payload["stale"] = stale
     payload["stale_reason"] = "running_but_not_updated" if stale else None
     payload["stale_for_seconds"] = stale_for
+
+    if payload.get("subtitles_status") in (None, "error"):
+        if payload.get("origin_srt_path") or payload.get("mm_srt_path") or payload.get("mm_txt_path"):
+            payload["subtitles_status"] = "ready"
+            payload["subtitles_error"] = None
+
+    if payload.get("dub_status") in (None, "error"):
+        if payload.get("mm_audio_path") or payload.get("no_dub") is True:
+            payload["dub_status"] = "ready"
+            payload["dub_error"] = None
+
     logger.info(
         "task_status_shape",
         extra={

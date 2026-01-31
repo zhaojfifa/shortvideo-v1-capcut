@@ -203,6 +203,57 @@ def build_preview(text: str | None) -> list[str]:
     return preview_lines(text)
 
 
+def _write_no_subtitles_placeholders(
+    *, workspace: Workspace, task_id: str, reason: str, log_stage
+) -> dict:
+    origin_srt_path = workspace.origin_srt_path
+    mm_srt_path = workspace.mm_srt_path
+    mm_txt_path = workspace.mm_txt_path
+
+    origin_srt_path.parent.mkdir(parents=True, exist_ok=True)
+    origin_srt_path.write_text("", encoding="utf-8")
+    mm_srt_path.parent.mkdir(parents=True, exist_ok=True)
+    mm_srt_path.write_text("", encoding="utf-8")
+    mm_txt_path.parent.mkdir(parents=True, exist_ok=True)
+    mm_txt_path.write_text("no Subtitles", encoding="utf-8")
+
+    logger.info(
+        "SUB2_SKIP_NO_SUBTITLES",
+        extra={
+            "task_id": task_id,
+            "step": "subtitles",
+            "stage": "SUB2_SKIP_NO_SUBTITLES",
+            "reason": reason,
+        },
+    )
+    log_stage("SUB2_SKIP_NO_SUBTITLES", reason=reason)
+    log_stage(
+        "SUB2_WRITE_DONE",
+        origin_srt_path=str(origin_srt_path),
+        origin_srt_size=origin_srt_path.stat().st_size if origin_srt_path.exists() else None,
+        mm_srt_path=str(mm_srt_path),
+        mm_srt_size=mm_srt_path.stat().st_size if mm_srt_path.exists() else None,
+        mm_txt_path=str(mm_txt_path),
+        mm_txt_size=mm_txt_path.stat().st_size if mm_txt_path.exists() else None,
+    )
+    log_stage(
+        "SUB2_DONE",
+        origin_srt_len=0,
+        mm_srt_len=0,
+        segments_count=0,
+    )
+    return {
+        "task_id": task_id,
+        "origin_srt": "",
+        "mm_srt": "",
+        "mm_txt_path": relative_to_workspace(mm_txt_path),
+        "segments_json": {"scenes": []},
+        "origin_preview": [],
+        "mm_preview": [],
+        "no_subtitles": True,
+    }
+
+
 def _ffmpeg_path() -> str:
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
@@ -354,9 +405,11 @@ async def generate_subtitles(
         raw_source = workspace.raw_video_path
         probe_result = _probe_streams(raw_source)
         if probe_result.get("has_audio") is False:
-            raise HTTPException(
-                status_code=422,
-                detail="No audio track; cannot ASR. If the video has hard subtitles, v1.85 cannot remove them automatically.",
+            return _write_no_subtitles_placeholders(
+                workspace=workspace,
+                task_id=task_id,
+                reason="no_audio",
+                log_stage=log_stage,
             )
         clean_path = raw_clean_path(task_id)
         if clean_path.exists() and clean_path.stat().st_size > 0:
@@ -368,6 +421,15 @@ async def generate_subtitles(
                 raw_for_asr = clean_path
         if raw_for_asr is None:
             raw_for_asr = raw_source
+    else:
+        origin_srt_text = workspace.read_origin_srt_text()
+        if not origin_srt_text:
+            return _write_no_subtitles_placeholders(
+                workspace=workspace,
+                task_id=task_id,
+                reason="missing_origin_or_raw",
+                log_stage=log_stage,
+            )
 
     if backend == "gemini":
         try:
@@ -402,6 +464,13 @@ async def generate_subtitles(
                     duration_ms=int((time.perf_counter() - wav_start) * 1000),
                 )
                 audio_sec = _wav_duration_seconds(wav_path)
+                if not audio_sec or audio_sec <= 0:
+                    return _write_no_subtitles_placeholders(
+                        workspace=workspace,
+                        task_id=task_id,
+                        reason="no_audio",
+                        log_stage=log_stage,
+                    )
                 asr_timeout_sec = _compute_asr_timeout_sec(audio_sec)
                 log_stage(
                     "SUB2_ASR_TIMEOUT",
@@ -447,16 +516,20 @@ async def generate_subtitles(
             else:
                 origin_srt_text = workspace.read_origin_srt_text()
                 if not origin_srt_text:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Neither origin.srt nor raw video found, please run /v1/parse first",
+                    return _write_no_subtitles_placeholders(
+                        workspace=workspace,
+                        task_id=task_id,
+                        reason="missing_origin_or_raw",
+                        log_stage=log_stage,
                     )
                 segments = _parse_srt_to_segments(origin_srt_text)
 
             if not segments:
-                raise HTTPException(
-                    status_code=502,
-                    detail="ASR produced empty result (silent/low-volume audio). Please check audio track or replace video.",
+                return _write_no_subtitles_placeholders(
+                    workspace=workspace,
+                    task_id=task_id,
+                    reason="empty_segments",
+                    log_stage=log_stage,
                 )
 
             origin_text = segments_to_srt(segments, "origin")
@@ -636,6 +709,11 @@ async def generate_subtitles(
             result["clean_video_generated"] = clean_generated
             return result
         except subtitles_openai.SubtitleError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            return _write_no_subtitles_placeholders(
+                workspace=workspace,
+                task_id=task_id,
+                reason="openai_subtitles_failed",
+                log_stage=log_stage,
+            )
 
     raise HTTPException(status_code=400, detail=f"Unsupported SUBTITLES_BACKEND: {settings.subtitles_backend}")
