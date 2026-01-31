@@ -1244,6 +1244,11 @@ def _run_pipeline_background(task_id: str, repo) -> None:
         raw_key = None
         if raw_file.exists():
             raw_key = upload_task_artifact(task, raw_file, "raw.mp4", task_id=task_id)
+            try:
+                probe = probe_subtitles(raw_file)
+                _update_pipeline_probe(repo, task_id, probe)
+            except Exception:
+                logger.exception("SUBTITLE_PROBE_FAIL", extra={"task_id": task_id})
         duration_sec = parse_res.get("duration_sec") if isinstance(parse_res, dict) else None
         _repo_upsert(
             repo,
@@ -1714,6 +1719,8 @@ def create_task_local_upload(
             status_code=500,
             detail=f"Task persistence failed for task_id={task_id}",
         )
+    if probe:
+        _update_pipeline_probe(repo, task_id, probe)
 
     raw_key = upload_task_artifact(stored_task, raw_file_path, "raw.mp4", task_id=task_id)
     repo.upsert(

@@ -60,7 +60,7 @@ def probe_subtitles(video_path: Path) -> dict[str, Any]:
         if s.get("codec_type") == "subtitle" and s.get("codec_name")
     ]
     has_subtitle_stream = bool(subtitle_codecs)
-    track_kind = "soft" if has_subtitle_stream else "none"
+    track_kind = "soft" if has_subtitle_stream else "hard"
 
     return {
         "status": "ok",
