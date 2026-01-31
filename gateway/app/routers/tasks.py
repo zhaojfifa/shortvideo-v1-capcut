@@ -1104,18 +1104,80 @@ def _kickoff_autostart(
     if start_step == "parse":
         background_tasks.add_task(_run_pipeline_background, task_id, repo)
         return
-    if start_step == "subtitles":
+    if start_step in {"subtitles", "pipeline"}:
+        background_tasks.add_task(auto_run_pipeline, task_id, repo)
+
+
+def auto_run_pipeline(task_id: str, repo) -> None:
+    logger.info("AUTO_PIPELINE_START", extra={"task_id": task_id})
+    try:
+        task = repo.get(task_id)
+        if not task:
+            logger.info("AUTO_PIPELINE_DONE", extra={"task_id": task_id, "reason": "missing_task"})
+            return
+
+        pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
         default_lang = os.getenv("DEFAULT_MM_LANG", "my")
         target_lang = task.get("content_lang") or default_lang
-        background_tasks.add_task(
-            _run_subtitles_background,
-            task_id,
-            target_lang,
-            False,
-            True,
-            repo,
-        )
 
+        has_subs = bool(
+            task.get("subtitles_status") == "ready"
+            or task.get("origin_srt_path")
+            or task.get("mm_srt_path")
+        )
+        if not has_subs:
+            logger.info("AUTO_PIPELINE_STEP", extra={"task_id": task_id, "step": "subtitles"})
+            _run_subtitles_job(
+                task_id=task_id,
+                target_lang=target_lang,
+                force=False,
+                translate=True,
+                repo=repo,
+            )
+        else:
+            logger.info("AUTO_PIPELINE_SKIP", extra={"task_id": task_id, "step": "subtitles"})
+
+        task = repo.get(task_id) or task
+        pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+        no_dub = pipeline_config.get("no_dub") == "true"
+        has_audio = bool(task.get("mm_audio_path") or task.get("mm_audio_key"))
+        if not has_audio and not no_dub:
+            logger.info("AUTO_PIPELINE_STEP", extra={"task_id": task_id, "step": "dub"})
+            payload = DubProviderRequest()
+            asyncio.run(_run_dub_job(task_id, payload, repo))
+        else:
+            logger.info("AUTO_PIPELINE_SKIP", extra={"task_id": task_id, "step": "dub"})
+
+        task = repo.get(task_id) or task
+        has_pack = bool(
+            task.get("pack_status") == "ready"
+            or task.get("pack_key")
+            or task.get("pack_path")
+        )
+        if not has_pack:
+            logger.info("AUTO_PIPELINE_STEP", extra={"task_id": task_id, "step": "pack"})
+            repo.upsert(task_id, {"status": "processing", "last_step": "pack"})
+            pack_req = PackRequest(task_id=task_id)
+            pack_res = asyncio.run(run_pack_step_v1(pack_req))
+            pack_key = None
+            if isinstance(pack_res, dict):
+                pack_key = pack_res.get("pack_key") or pack_res.get("zip_key")
+            repo.upsert(
+                task_id,
+                {
+                    "last_step": "pack",
+                    "pack_key": pack_key,
+                    "pack_type": "capcut_v18" if pack_key else None,
+                    "pack_status": "ready" if pack_key else None,
+                    "pack_error": None,
+                    "status": "done" if pack_key else "processing",
+                },
+            )
+        else:
+            logger.info("AUTO_PIPELINE_SKIP", extra={"task_id": task_id, "step": "pack"})
+        logger.info("AUTO_PIPELINE_DONE", extra={"task_id": task_id})
+    except Exception:
+        logger.exception("AUTO_PIPELINE_FAIL", extra={"task_id": task_id})
 
 def _run_pipeline_background(task_id: str, repo) -> None:
     task = repo.get(task_id)
@@ -1624,7 +1686,7 @@ def create_task_local_upload(
     if background_tasks is not None:
         _kickoff_autostart(
             task_id=task_id,
-            start_step="subtitles",
+            start_step="pipeline",
             reason="local_upload",
             repo=repo,
             background_tasks=background_tasks,
