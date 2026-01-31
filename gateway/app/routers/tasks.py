@@ -1531,8 +1531,8 @@ def _save_upload_to_paths(
 
 @api_router.post("/tasks/local_upload")
 def create_task_local_upload(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = None,
     category: str | None = Form(default=None),
     language: str | None = Form(default=None),
     account: str | None = Form(default=None),
