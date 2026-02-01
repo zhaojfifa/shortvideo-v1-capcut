@@ -60,6 +60,17 @@ def on_startup() -> None:
     for d in (Path("scenes"), Path("scene_packs"), Path("deliver/packs"), AUDIO_DIR):
         d.mkdir(parents=True, exist_ok=True)
 
+
+@app.on_event("startup")
+def warmup_whisper_on_startup() -> None:
+    try:
+        from gateway.app.providers import whisper_singleton
+
+        whisper_singleton.get_whisper_model()
+        whisper_singleton.warmup()
+    except Exception as exc:
+        logger.warning("startup whisper warmup failed: %s", exc)
+
 @app.on_event("startup")
 def log_routes_on_startup() -> None:
     """Log route table to help spot duplicates in CI/logs (dev-only signal)."""

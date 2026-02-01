@@ -29,7 +29,7 @@ from gateway.app.providers.gemini_subtitles import (
     GeminiSubtitlesError,
     translate_segments_with_gemini,
 )
-from gateway.app.providers.whisper_singleton import get_whisper_model
+from gateway.app.providers.whisper_singleton import transcribe
 from gateway.app.services import subtitles_openai
 
 logger = logging.getLogger(__name__)
@@ -296,11 +296,10 @@ def _transcribe_with_faster_whisper(
     audio_path: Path,
     language_hint: str | None = None,
 ) -> tuple[list[dict], str | None]:
-    model = get_whisper_model()
     kwargs = {}
     if language_hint:
         kwargs["language"] = language_hint
-    segments_iter, info = model.transcribe(str(audio_path), **kwargs)
+    segments_iter, info = transcribe(str(audio_path), **kwargs)
     segments = []
     for idx, seg in enumerate(segments_iter, start=1):
         text = (seg.text or "").strip()
