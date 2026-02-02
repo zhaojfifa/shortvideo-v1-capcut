@@ -1,6 +1,40 @@
 (function () {
   const COOKIE_NAME = "ui_locale";
   const PARAM_NAME = "ui_locale";
+  const CLIENT_DICT = {
+    zh: {
+      scn_apollo_avatar_title: "ApolloAvatar",
+      scn_apollo_avatar_desc: "数字人跟随生成",
+      apollo_avatar_duration: "时长档位",
+      apollo_avatar_15s: "15秒",
+      apollo_avatar_30s: "30秒",
+      apollo_avatar_live_toggle: "Live（计费）",
+      apollo_avatar_live_hint: "开启 Live 会调用外部视频模型并产生费用；默认仅展示 demo，不计费。",
+      apollo_avatar_char_image: "角色图",
+      apollo_avatar_prompt: "提示词",
+      apollo_avatar_ref_video: "参考视频",
+      apollo_avatar_create_task: "创建任务",
+      apollo_avatar_generate_demo: "生成（Demo）",
+      apollo_avatar_generate_live: "生成（Live）",
+      apollo_avatar_live_disabled_hint: "当前环境未开启 Live gate。",
+    },
+    mm: {
+      scn_apollo_avatar_title: "ApolloAvatar",
+      scn_apollo_avatar_desc: "Avatar follow generation",
+      apollo_avatar_duration: "ကြာချိန်",
+      apollo_avatar_15s: "15 စက္ကန့်",
+      apollo_avatar_30s: "30 စက္ကန့်",
+      apollo_avatar_live_toggle: "Live (ကျသင့်)",
+      apollo_avatar_live_hint: "Live ကိုဖွင့်လျှင် ကုန်ကျစရိတ်ရှိနိုင်သည်၊ မူလအနေဖြင့် demo သာ ပြပါမည်။",
+      apollo_avatar_char_image: "ဇာတ်ကောင်ပုံ",
+      apollo_avatar_prompt: "Prompt",
+      apollo_avatar_ref_video: "ရည်ညွှန်းဗီဒီယို",
+      apollo_avatar_create_task: "Task ဖန်တီးမည်",
+      apollo_avatar_generate_demo: "Generate (Demo)",
+      apollo_avatar_generate_live: "Generate (Live)",
+      apollo_avatar_live_disabled_hint: "Live gate ကိုမဖွင့်ထားသေးပါ။",
+    },
+  };
 
   function getPayload() {
     return window.__I18N__ || { locale: "zh", supported: ["zh", "mm"], dict: { zh: {}, mm: {} } };
@@ -13,8 +47,7 @@
 
   function getQueryLocale() {
     const qs = new URLSearchParams(window.location.search || "");
-    const v = (qs.get(PARAM_NAME) || "").toLowerCase();
-    return v;
+    return (qs.get(PARAM_NAME) || "").toLowerCase();
   }
 
   function getCookieLocale() {
@@ -65,9 +98,14 @@
         text = table[key];
         break;
       }
+      const clientTable = CLIENT_DICT[loc] || {};
+      if (clientTable[key]) {
+        text = clientTable[key];
+        break;
+      }
     }
     if (!text) {
-      text = `⟦${key}⟧`;
+      text = `【MISSING:${key}】`;
     }
     if (vars && typeof text === "string") {
       Object.keys(vars).forEach((k) => {
@@ -116,3 +154,4 @@
     boot();
   }
 })();
+
