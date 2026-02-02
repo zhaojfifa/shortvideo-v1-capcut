@@ -105,6 +105,8 @@ def get_settings() -> Settings:
 
 # Convenient singleton-style accessor
 settings = get_settings()
+DEMO_ASSET_BASE_URL = os.getenv("DEMO_ASSET_BASE_URL", "").rstrip("/")
+
 
 
 def _env_str(name: str, default: str = "") -> str:
@@ -142,7 +144,6 @@ def create_storage_service():
     Composition root should call this and register the instance.
     """
     settings = get_settings()
-
     # log for local visibility
     print(f"[System] Initializing Storage Service: {settings.STORAGE_BACKEND}")
 

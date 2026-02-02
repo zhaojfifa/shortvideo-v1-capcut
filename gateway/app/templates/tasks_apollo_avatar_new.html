@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -42,6 +42,10 @@
 {% include "_topbar.html" %}
 
     <main class="card">
+      {% set demo_base = (demo_asset_base_url or "").rstrip("/") %}
+      {% set demo_avatar_img = "/static/demo/demo_avatar.jpg" %}
+      {% set demo_ref_mp4 = (demo_base ~ "/demo_ref.mp4") if demo_base else "" %}
+
       <div class="field">
         <label data-i18n="apollo_avatar_duration">Duration</label>
         <div class="radio-group">
@@ -62,13 +66,19 @@
       <div class="row">
         <div class="field">
           <label data-i18n="apollo_avatar_char_image">Avatar image</label>
-          <input id="avatar_image_url" value="/static/demo/demo_avatar.jpg" />
-          <img id="avatar_preview" class="preview" src="/static/demo/demo_avatar.jpg" alt="avatar preview" />
+          <input id="avatar_image_url" value="{{ demo_avatar_img }}" />
+          <img id="avatar_preview" class="preview" src="{{ demo_avatar_img }}" alt="avatar preview" />
         </div>
         <div class="field">
           <label data-i18n="apollo_avatar_ref_video">Reference video</label>
-          <input id="ref_video_url" value="/static/demo/demo_ref.mp4" />
-          <video class="preview" controls src="/static/demo/demo_ref.mp4"></video>
+          <input id="ref_video_url" value="{{ demo_ref_mp4 }}" />
+          {% if demo_ref_mp4 %}
+          <video class="preview" controls preload="metadata">
+            <source src="{{ demo_ref_mp4 }}" type="video/mp4" />
+          </video>
+          {% else %}
+          <div class="hint">Reference video is hosted on CDN. Set DEMO_ASSET_BASE_URL to enable preview.</div>
+          {% endif %}
         </div>
       </div>
 
