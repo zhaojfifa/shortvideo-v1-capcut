@@ -14,7 +14,7 @@ from gateway.app.domain.apollo_avatar import (
     SegmentPlan,
     SegmentSpec,
 )
-from gateway.app.providers.fal_wan26 import FalWan26FlashProvider, FalWan26Request
+from gateway.app.providers.video_gen_registry import get_video_gen_provider
 from gateway.app.services.artifact_storage import get_download_url, upload_task_artifact
 from gateway.app.utils.ffmpeg_concat import ffmpeg_concat_videos
 from gateway.app.core.workspace import task_base_dir
@@ -74,31 +74,25 @@ class ApolloAvatarService:
                 artifacts.final_video_url = f"{demo_base}/demo_final_{req.target_duration_sec}.mp4"
             return artifacts
 
-        if provider_name != "fal_wan26_flash":
-            raise RuntimeError(f"Unknown provider: {provider_name}")
-
-        fal_key = config.FAL_KEY
-        if not fal_key:
-            raise RuntimeError("FAL_KEY is required for live generation")
-
-        provider = FalWan26FlashProvider(
-            fal_key=fal_key,
-            model=config.FAL_WAN26_FLASH_MODEL,
-        )
+        provider = get_video_gen_provider()
 
         seg_paths: list[Path] = []
         for seg in plan.segments:
-            res = await provider.generate(
-                FalWan26Request(
-                    image_url=req.avatar_image_url,
-                    prompt=req.prompt,
-                    duration_sec=seg.duration_sec,
-                    seed=seg.seed,
-                )
+            res = await provider.generate_segment(
+                avatar_image_url=req.avatar_image_url,
+                ref_video_url=req.reference_video_url or "",
+                prompt=req.prompt,
+                duration_sec=seg.duration_sec,
+                seed=seg.seed,
             )
             seg_path = seg_dir / f"seg_{seg.idx:02d}.mp4"
-            await self._download_to_path(res.video_url, seg_path)
-            seg_key = upload_task_artifact(task, seg_path, f"apollo_avatar/seg_{seg.idx:02d}.mp4", task_id=task_id)
+            await self._download_to_path(res.url, seg_path)
+            seg_key = upload_task_artifact(
+                task,
+                seg_path,
+                f"apollo_avatar/seg_{seg.idx:02d}.mp4",
+                task_id=task_id,
+            )
             seg_url = get_download_url(task_id, f"apollo_avatar/seg_{seg.idx:02d}.mp4")
             seg_paths.append(seg_path)
             artifacts.segments.append(
@@ -106,7 +100,7 @@ class ApolloAvatarService:
                     idx=seg.idx,
                     duration_sec=seg.duration_sec,
                     video_url=seg_url,
-                    request_id=res.request_id,
+                    request_id=res.meta.get("request_id") or "fal-unknown",
                     seed_used=seg.seed,
                 )
             )

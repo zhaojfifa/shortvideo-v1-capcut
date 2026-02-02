@@ -108,6 +108,7 @@ def get_settings() -> Settings:
 # Convenient singleton-style accessor
 settings = get_settings()
 DEMO_ASSET_BASE_URL = os.getenv("DEMO_ASSET_BASE_URL", "").rstrip("/")
+APOLLO_AVATAR_PROVIDER = os.getenv("APOLLO_AVATAR_PROVIDER", "fal_wan26_flash")
 
 
 
