@@ -89,6 +89,10 @@ app.include_router(publish_router.router)
 app.include_router(admin_publish.router, tags=["admin"])
 app.include_router(admin_tools_router.router)
 app.include_router(v17_pack_router)
+if get_settings().enable_apollo_avatar:
+    from gateway.app.routers.apollo_avatar import router as apollo_avatar_router
+
+    app.include_router(apollo_avatar_router)
 
 ALLOW_PREFIXES = (
     "/health",
