@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     ui_mobile_prefix_enabled: bool = Field(True, env="UI_MOBILE_PREFIX_ENABLED")
     enable_apollo_avatar: bool = Field(False, env="ENABLE_APOLLO_AVATAR")
     apollo_avatar_live_enabled: bool = Field(False, env="APOLLO_AVATAR_LIVE_ENABLED")
+    apollo_avatar_provider: str = Field("fal_wan26_flash", env="APOLLO_AVATAR_PROVIDER")
+    demo_asset_base_url: str = Field("", env="DEMO_ASSET_BASE_URL")
 # === Storage Configuration (PR-0B) ===
     STORAGE_BACKEND: str = "local"  # 选项: "local", "s3"
     
@@ -130,6 +132,7 @@ def _env_float(name: str, default: float) -> float:
 
 FAL_KEY = _env_str("FAL_KEY", "")
 FAL_WAN26_MODEL_ID = _env_str("FAL_WAN26_MODEL_ID", "wan/v2.6/image-to-video/flash")
+FAL_WAN26_FLASH_MODEL = _env_str("FAL_WAN26_FLASH_MODEL", "wan/v2.6/image-to-video/flash")
 WAN26_TIMEOUT_SEC = _env_int("WAN26_TIMEOUT_SEC", 900)
 WAN26_POLL_INTERVAL_SEC = _env_float("WAN26_POLL_INTERVAL_SEC", 2.0)
 WAN26_POLL_MAX_INTERVAL_SEC = _env_float("WAN26_POLL_MAX_INTERVAL_SEC", 8.0)

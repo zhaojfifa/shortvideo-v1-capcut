@@ -18,8 +18,9 @@
     return data || {};
   }
 
-  function getDurationProfile() {
-    return document.querySelector("input[name='duration_profile']:checked")?.value || "15s";
+  function getTargetDurationSec() {
+    const value = document.querySelector("input[name='duration_profile']:checked")?.value || "15s";
+    return value === "30s" ? 30 : 15;
   }
 
   function getPayload(isDemo) {
@@ -28,10 +29,10 @@
     const seedRaw = $("seed")?.value?.trim();
     const seedVal = seedRaw ? Number(seedRaw) : null;
     return {
-      duration_profile: getDurationProfile(),
+      target_duration_sec: getTargetDurationSec(),
       live_enabled: isDemo ? false : (gateOn && liveChecked),
-      avatar_image_key: $("avatar_image_url")?.value?.trim() || "",
-      reference_video_key: $("ref_video_url")?.value?.trim() || "",
+      avatar_image_url: $("avatar_image_url")?.value?.trim() || "",
+      reference_video_url: $("ref_video_url")?.value?.trim() || "",
       prompt: $("prompt")?.value?.trim() || "",
       seed: Number.isFinite(seedVal) ? seedVal : null,
     };
