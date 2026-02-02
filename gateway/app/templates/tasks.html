@@ -408,6 +408,7 @@
     const countPrimaryEl = document.getElementById("task-count-primary");
     const countSecondaryEl = document.getElementById("task-count-secondary");
     const showSecondary = {{ "true" if ui_show_secondary else "false" }};
+    const TASKS_KIND = "{{ tasks_kind or 'tasks' }}";
     const I18N = window.__V185_I18N__ || { tr: (key, vars) => key };
     const LABELS = {
       id: "{{ t('tasks.table.id') }}",
@@ -651,7 +652,8 @@
         countSecondaryEl.textContent = "";
       }
       try {
-        const url = `/api/tasks?limit=50&ts=${Date.now()}`;
+        const kindParam = TASKS_KIND === "apollo_avatar" ? "&kind=apollo_avatar" : "";
+        const url = `/api/tasks?limit=50${kindParam}&ts=${Date.now()}`;
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
