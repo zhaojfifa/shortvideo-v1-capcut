@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import json
+from typing import Any
+
 from fastapi import HTTPException
 
-from gateway.app.config import get_settings
+from gateway.app import config
 from gateway.app.domain.apollo_avatar import ApolloAvatarRequest, GenArtifacts, SegmentPlan
+from gateway.app.providers.fal_wan26_i2v import build_default_provider
+from gateway.app.providers.video_gen_base import ProviderError
 
 _DURATION_SECONDS = {"15s": 15, "30s": 30}
 
@@ -16,43 +21,63 @@ def validate_duration_profile(duration_profile: str) -> None:
 def build_segment_plan(duration_profile: str) -> SegmentPlan:
     validate_duration_profile(duration_profile)
     total_seconds = _DURATION_SECONDS[duration_profile]
-    segments_count = max(1, total_seconds // 5)
     return SegmentPlan(
-        segments_count=segments_count,
+        segments_count=max(1, total_seconds // 5),
         segment_seconds=5,
         duration_profile=duration_profile,
     )
 
 
-def _task_live_enabled(task: dict) -> bool:
+def _task_live_enabled(task: dict[str, Any]) -> bool:
     meta = task.get("meta")
+    if isinstance(meta, str):
+        try:
+            meta = json.loads(meta)
+        except Exception:
+            meta = {}
     if not isinstance(meta, dict):
         return False
-    apollo_avatar = meta.get("apollo_avatar")
-    if not isinstance(apollo_avatar, dict):
-        return False
-    return bool(apollo_avatar.get("live_enabled"))
+    if isinstance(meta.get("live_enabled"), bool):
+        return bool(meta.get("live_enabled"))
+    apollo_meta = meta.get("apollo_avatar")
+    if isinstance(apollo_meta, dict):
+        return bool(apollo_meta.get("live_enabled"))
+    return False
 
 
-def enforce_live_gate(task: dict) -> None:
-    settings = get_settings()
-    if not settings.apollo_avatar_live_enabled:
-        raise HTTPException(status_code=403, detail="Apollo Avatar live generation is disabled")
-    if not _task_live_enabled(task):
-        raise HTTPException(status_code=403, detail="Task is not enabled for Apollo Avatar live generation")
-
-
-def generate(task: dict, req: ApolloAvatarRequest) -> GenArtifacts:
-    enforce_live_gate(task)
-    plan = build_segment_plan(req.duration_profile)
-    task_id = str(task.get("task_id") or task.get("id") or "")
-    segment_keys = [
-        f"deliver/apollo_avatar/{task_id}/segments/seg_{i+1:02d}.mp4"
-        for i in range(plan.segments_count)
-    ]
+def _to_demo_artifacts(*, task_id: str, duration_profile: str) -> GenArtifacts:
+    output_name = "demo_output_30.mp4" if duration_profile == "30s" else "demo_output_15.mp4"
     return GenArtifacts(
-        segments_keys=segment_keys,
-        final_video_key=f"deliver/apollo_avatar/{task_id}/output_{req.duration_profile}.mp4",
+        segments_keys=[],
+        final_video_key=f"static/demo/{output_name}",
+        manifest_key=f"deliver/apollo_avatar/{task_id}/manifest.demo.json",
+        demo=True,
+    )
+
+
+def generate(task: dict[str, Any], req: ApolloAvatarRequest) -> GenArtifacts:
+    validate_duration_profile(req.duration_profile)
+
+    live_enabled = bool(config.settings.apollo_avatar_live_enabled) and _task_live_enabled(task)
+    task_id = str(task.get("task_id") or task.get("id") or "")
+    if not live_enabled:
+        return _to_demo_artifacts(task_id=task_id, duration_profile=req.duration_profile)
+
+    provider = build_default_provider()
+    try:
+        video_url = provider.generate_sync(
+            image_url=req.avatar_image_key or "",
+            prompt=req.prompt or "",
+            duration_sec=_DURATION_SECONDS[req.duration_profile],
+            resolution=config.WAN26_RESOLUTION,
+            request_id=task_id,
+        )
+    except ProviderError:
+        raise
+
+    return GenArtifacts(
+        segments_keys=[],
+        final_video_key=video_url,
         manifest_key=f"deliver/apollo_avatar/{task_id}/manifest.json",
         demo=False,
     )

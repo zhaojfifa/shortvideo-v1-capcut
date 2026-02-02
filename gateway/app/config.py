@@ -1,4 +1,5 @@
 from functools import lru_cache
+import os
 from typing import Dict
 
 from pydantic import BaseSettings, Field
@@ -104,6 +105,33 @@ def get_settings() -> Settings:
 
 # Convenient singleton-style accessor
 settings = get_settings()
+
+
+def _env_str(name: str, default: str = "") -> str:
+    value = os.getenv(name)
+    return value if value is not None and value != "" else default
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except Exception:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)))
+    except Exception:
+        return default
+
+
+FAL_KEY = _env_str("FAL_KEY", "")
+FAL_WAN26_MODEL_ID = _env_str("FAL_WAN26_MODEL_ID", "wan/v2.6/image-to-video/flash")
+WAN26_TIMEOUT_SEC = _env_int("WAN26_TIMEOUT_SEC", 900)
+WAN26_POLL_INTERVAL_SEC = _env_float("WAN26_POLL_INTERVAL_SEC", 2.0)
+WAN26_POLL_MAX_INTERVAL_SEC = _env_float("WAN26_POLL_MAX_INTERVAL_SEC", 8.0)
+WAN26_RESOLUTION = _env_str("WAN26_RESOLUTION", "1080p")
 # ============================================================
 #  Dependency Injection Factory (PR-0B)
 # ============================================================
