@@ -396,6 +396,7 @@ async def tasks_apollo_avatar_new(request: Request) -> HTMLResponse:
             "apollo_avatar_live_enabled": bool(
                 getattr(settings, "apollo_avatar_live_enabled", False)
             ),
+            "demo_asset_base_url": getattr(settings, "demo_asset_base_url", "") or "",
         },
     )
 
