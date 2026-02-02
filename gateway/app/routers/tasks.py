@@ -1798,6 +1798,7 @@ def update_task_selected_tools(
 def list_tasks(
     account_id: Optional[str] = Query(default=None),
     status: Optional[str] = Query(default=None),
+    kind: Optional[str] = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=500, alias="limit"),
     repo=Depends(get_task_repository),
@@ -1811,6 +1812,22 @@ def list_tasks(
         filters["status"] = status
 
     items = sort_tasks_by_created(repo.list(filters=filters))
+    kind_norm = (kind or "").strip().lower()
+    if kind_norm:
+        if kind_norm == "apollo_avatar":
+            items = [
+                t
+                for t in items
+                if (str(t.get("platform") or "").lower() == "apollo_avatar")
+                or (str(t.get("category_key") or "").lower() == "apollo_avatar")
+            ]
+        else:
+            items = [
+                t
+                for t in items
+                if str(t.get("category_key") or "").lower() == kind_norm
+                or str(t.get("platform") or "").lower() == kind_norm
+            ]
     total = len(items)
     items = items[(page - 1) * page_size : (page - 1) * page_size + page_size]
 
