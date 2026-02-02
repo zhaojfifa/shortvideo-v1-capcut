@@ -104,11 +104,6 @@ async def generate_apollo_avatar(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    settings = get_settings()
-    live_enabled = bool(payload.live_enabled) if payload else False
-    if live_enabled and not bool(getattr(settings, "apollo_avatar_live_enabled", False)):
-        raise HTTPException(status_code=403, detail="Apollo Avatar live generation is disabled")
-
     meta = task.get("meta") or {}
     if isinstance(meta, str):
         try:
@@ -120,6 +115,10 @@ async def generate_apollo_avatar(
     apollo_meta = meta.get("apollo_avatar") if isinstance(meta, dict) else {}
     if not isinstance(apollo_meta, dict):
         apollo_meta = {}
+    settings = get_settings()
+    live_enabled = bool(payload.live_enabled) if payload else bool(apollo_meta.get("live_enabled"))
+    if live_enabled and not bool(getattr(settings, "apollo_avatar_live_enabled", False)):
+        raise HTTPException(status_code=403, detail="Apollo Avatar live generation is disabled")
 
     req = payload or ApolloAvatarRequest(
         target_duration_sec=int(apollo_meta.get("target_duration_sec") or 15),

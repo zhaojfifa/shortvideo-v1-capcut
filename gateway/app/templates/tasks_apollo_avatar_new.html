@@ -43,7 +43,7 @@
 
     <main class="card">
       {% set demo_base = (demo_asset_base_url or "").rstrip("/") %}
-      {% set demo_avatar_img = "/static/demo/demo_avatar.jpg" %}
+      {% set demo_avatar_img = (demo_base ~ "/demo_avatar.jpg") if demo_base else "" %}
       {% set demo_ref_mp4 = (demo_base ~ "/demo_ref.mp4") if demo_base else "" %}
 
       <div class="field">
@@ -68,15 +68,19 @@
           <label data-i18n="apollo_avatar_char_image">Avatar image</label>
           <input id="avatar_file" type="file" accept="image/*" />
           <img id="avatar_preview" class="preview" src="{{ demo_avatar_img }}" alt="avatar preview" />
+          {% if not demo_avatar_img %}
+          <div class="hint">Set DEMO_ASSET_BASE_URL to enable demo preview.</div>
+          {% endif %}
         </div>
         <div class="field">
           <label data-i18n="apollo_avatar_ref_video">Reference video</label>
           <input id="ref_video_file" type="file" accept="video/*" />
-          {% if demo_ref_mp4 %}
-          <video class="preview" controls preload="metadata">
+          <video id="ref_video_preview" class="preview" controls preload="metadata">
+            {% if demo_ref_mp4 %}
             <source src="{{ demo_ref_mp4 }}" type="video/mp4" />
+            {% endif %}
           </video>
-          {% else %}
+          {% if not demo_ref_mp4 %}
           <div class="hint">Reference video is hosted on CDN. Set DEMO_ASSET_BASE_URL to enable preview.</div>
           {% endif %}
         </div>
@@ -105,6 +109,7 @@
   <script src="/static/js/i18n_v185.js"></script>
   <script>
     window.__APOLLO_AVATAR_LIVE_ENABLED__ = {{ 1 if apollo_avatar_live_enabled else 0 }};
+    window.__DEMO_ASSET_BASE_URL__ = "{{ demo_base }}";
   </script>
   <script src="/static/js/tasks_apollo_avatar_new.js"></script>
 </body>
