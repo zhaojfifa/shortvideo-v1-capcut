@@ -1,84 +1,127 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from pathlib import Path
+from typing import Optional
 
-from fastapi import HTTPException
+import httpx
 
 from gateway.app import config
-from gateway.app.domain.apollo_avatar import ApolloAvatarRequest, GenArtifacts, SegmentPlan
-from gateway.app.providers.fal_wan26_i2v import build_default_provider
-from gateway.app.providers.video_gen_base import ProviderError
-
-_DURATION_SECONDS = {"15s": 15, "30s": 30}
-
-
-def validate_duration_profile(duration_profile: str) -> None:
-    if duration_profile not in _DURATION_SECONDS:
-        raise HTTPException(status_code=400, detail="duration_profile must be one of: 15s, 30s")
-
-
-def build_segment_plan(duration_profile: str) -> SegmentPlan:
-    validate_duration_profile(duration_profile)
-    total_seconds = _DURATION_SECONDS[duration_profile]
-    return SegmentPlan(
-        segments_count=max(1, total_seconds // 5),
-        segment_seconds=5,
-        duration_profile=duration_profile,
-    )
+from gateway.app.domain.apollo_avatar import (
+    ApolloAvatarRequest,
+    GenArtifacts,
+    SegmentArtifact,
+    SegmentPlan,
+    SegmentSpec,
+)
+from gateway.app.providers.fal_wan26 import FalWan26FlashProvider, FalWan26Request
+from gateway.app.services.artifact_storage import get_download_url, upload_task_artifact
+from gateway.app.utils.ffmpeg_concat import ffmpeg_concat_videos
+from gateway.app.core.workspace import task_base_dir
 
 
-def _task_live_enabled(task: dict[str, Any]) -> bool:
-    meta = task.get("meta")
-    if isinstance(meta, str):
-        try:
-            meta = json.loads(meta)
-        except Exception:
-            meta = {}
-    if not isinstance(meta, dict):
-        return False
-    if isinstance(meta.get("live_enabled"), bool):
-        return bool(meta.get("live_enabled"))
-    apollo_meta = meta.get("apollo_avatar")
-    if isinstance(apollo_meta, dict):
-        return bool(apollo_meta.get("live_enabled"))
-    return False
+class ApolloAvatarService:
+    def __init__(self, *, repo, storage=None):
+        self.repo = repo
+        self.storage = storage
 
+    def _build_plan(self, target_duration_sec: int, seed: Optional[int]) -> SegmentPlan:
+        if target_duration_sec == 15:
+            seg = 5
+        elif target_duration_sec == 30:
+            seg = 10
+        else:
+            raise ValueError("target_duration_sec must be 15 or 30")
 
-def _to_demo_artifacts(*, task_id: str, duration_profile: str) -> GenArtifacts:
-    output_name = "demo_output_30.mp4" if duration_profile == "30s" else "demo_output_15.mp4"
-    return GenArtifacts(
-        segments_keys=[],
-        final_video_key=f"static/demo/{output_name}",
-        manifest_key=f"deliver/apollo_avatar/{task_id}/manifest.demo.json",
-        demo=True,
-    )
+        segments: list[SegmentSpec] = []
+        for i in range(3):
+            seed_i = None if seed is None else int(seed) + i
+            segments.append(SegmentSpec(idx=i + 1, duration_sec=seg, seed=seed_i))
 
-
-def generate(task: dict[str, Any], req: ApolloAvatarRequest) -> GenArtifacts:
-    validate_duration_profile(req.duration_profile)
-
-    live_enabled = bool(config.settings.apollo_avatar_live_enabled) and _task_live_enabled(task)
-    task_id = str(task.get("task_id") or task.get("id") or "")
-    if not live_enabled:
-        return _to_demo_artifacts(task_id=task_id, duration_profile=req.duration_profile)
-
-    provider = build_default_provider()
-    try:
-        video_url = provider.generate_sync(
-            image_url=req.avatar_image_key or "",
-            prompt=req.prompt or "",
-            duration_sec=_DURATION_SECONDS[req.duration_profile],
-            resolution=config.WAN26_RESOLUTION,
-            request_id=task_id,
+        return SegmentPlan(
+            target_duration_sec=target_duration_sec,
+            segment_duration_sec=seg,
+            segment_count=3,
+            segments=segments,
         )
-    except ProviderError:
-        raise
 
-    return GenArtifacts(
-        segments_keys=[],
-        final_video_key=video_url,
-        manifest_key=f"deliver/apollo_avatar/{task_id}/manifest.json",
-        demo=False,
-    )
+    async def _download_to_path(self, url: str, dest: Path) -> None:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        async with httpx.AsyncClient(timeout=300) as client:
+            r = await client.get(url)
+            r.raise_for_status()
+            dest.write_bytes(r.content)
 
+    async def generate_stitch_only(
+        self,
+        task: dict,
+        req: ApolloAvatarRequest,
+        *,
+        live_enabled: bool,
+    ) -> GenArtifacts:
+        provider_name = getattr(config.settings, "apollo_avatar_provider", "fal_wan26_flash")
+        plan = self._build_plan(req.target_duration_sec, req.seed)
+        artifacts = GenArtifacts(provider=provider_name, plan=plan)
+
+        task_id = str(task.get("task_id") or task.get("id") or "")
+        task_dir = task_base_dir(task_id) / "apollo_avatar"
+        seg_dir = task_dir / "segments"
+        seg_dir.mkdir(parents=True, exist_ok=True)
+
+        if not live_enabled:
+            demo_base = getattr(config.settings, "demo_asset_base_url", "").rstrip("/")
+            if demo_base:
+                artifacts.final_video_url = f"{demo_base}/demo_final_{req.target_duration_sec}.mp4"
+            return artifacts
+
+        if provider_name != "fal_wan26_flash":
+            raise RuntimeError(f"Unknown provider: {provider_name}")
+
+        fal_key = config.FAL_KEY
+        if not fal_key:
+            raise RuntimeError("FAL_KEY is required for live generation")
+
+        provider = FalWan26FlashProvider(
+            fal_key=fal_key,
+            model=config.FAL_WAN26_FLASH_MODEL,
+        )
+
+        seg_paths: list[Path] = []
+        for seg in plan.segments:
+            res = await provider.generate(
+                FalWan26Request(
+                    image_url=req.avatar_image_url,
+                    prompt=req.prompt,
+                    duration_sec=seg.duration_sec,
+                    seed=seg.seed,
+                )
+            )
+            seg_path = seg_dir / f"seg_{seg.idx:02d}.mp4"
+            await self._download_to_path(res.video_url, seg_path)
+            seg_key = upload_task_artifact(task, seg_path, f"apollo_avatar/seg_{seg.idx:02d}.mp4", task_id=task_id)
+            seg_url = get_download_url(task_id, f"apollo_avatar/seg_{seg.idx:02d}.mp4")
+            seg_paths.append(seg_path)
+            artifacts.segments.append(
+                SegmentArtifact(
+                    idx=seg.idx,
+                    duration_sec=seg.duration_sec,
+                    video_url=seg_url,
+                    request_id=res.request_id,
+                    seed_used=seg.seed,
+                )
+            )
+
+        final_path = task_dir / f"final_{req.target_duration_sec}.mp4"
+        ffmpeg_concat_videos(seg_paths, final_path)
+        upload_task_artifact(task, final_path, f"apollo_avatar/final_{req.target_duration_sec}.mp4", task_id=task_id)
+        artifacts.final_video_url = get_download_url(task_id, f"apollo_avatar/final_{req.target_duration_sec}.mp4")
+
+        manifest_path = task_dir / "segment_manifest.json"
+        manifest_path.write_text(
+            json.dumps(artifacts.model_dump(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        upload_task_artifact(task, manifest_path, "apollo_avatar/manifest.json", task_id=task_id)
+        artifacts.manifest_url = get_download_url(task_id, "apollo_avatar/manifest.json")
+
+        return artifacts

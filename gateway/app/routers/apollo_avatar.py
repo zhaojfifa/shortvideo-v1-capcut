@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from gateway.app.deps import get_task_repository
 from gateway.app.domain.apollo_avatar import ApolloAvatarRequest
-from gateway.app.services import apollo_avatar_service
+from gateway.app.services.apollo_avatar_service import ApolloAvatarService
 from gateway.app.task_repo_utils import normalize_task_payload
 from gateway.app.utils.pipeline_config import pipeline_config_to_storage
 
@@ -18,8 +18,6 @@ def create_apollo_avatar_task(
     payload: ApolloAvatarRequest,
     repo=Depends(get_task_repository),
 ):
-    apollo_avatar_service.validate_duration_profile(payload.duration_profile)
-
     task_id = uuid4().hex[:12]
     task_payload = normalize_task_payload(
         {
@@ -31,17 +29,17 @@ def create_apollo_avatar_task(
             "content_lang": "mm",
             "ui_lang": "zh",
             "pipeline_config": pipeline_config_to_storage(
-                {"apollo_avatar_duration_profile": payload.duration_profile}
+                {"apollo_avatar_target_duration_sec": str(payload.target_duration_sec)}
             ),
             "status": "pending",
             "last_step": None,
             "error_message": None,
             "meta": {
                 "apollo_avatar": {
-                    "duration_profile": payload.duration_profile,
+                    "target_duration_sec": payload.target_duration_sec,
                     "live_enabled": bool(payload.live_enabled),
-                    "avatar_image_key": payload.avatar_image_key,
-                    "reference_video_key": payload.reference_video_key,
+                    "avatar_image_url": payload.avatar_image_url,
+                    "reference_video_url": payload.reference_video_url,
                     "prompt": payload.prompt,
                     "seed": payload.seed,
                 }
@@ -56,13 +54,13 @@ def create_apollo_avatar_task(
     return {
         "ok": True,
         "task_id": task_id,
-        "duration_profile": payload.duration_profile,
+        "target_duration_sec": payload.target_duration_sec,
         "live_enabled": bool(payload.live_enabled),
     }
 
 
 @router.post("/{task_id}/generate")
-def generate_apollo_avatar(
+async def generate_apollo_avatar(
     task_id: str,
     payload: ApolloAvatarRequest,
     repo=Depends(get_task_repository),
@@ -71,22 +69,24 @@ def generate_apollo_avatar(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    artifacts = apollo_avatar_service.generate(task, payload)
+    live_enabled = bool(payload.live_enabled)
+    service = ApolloAvatarService(repo=repo)
+    artifacts = await service.generate_stitch_only(task, payload, live_enabled=live_enabled)
     repo.upsert(
         task_id,
         {
             "last_step": "apollo_avatar_generate",
             "status": "ready",
-            "apollo_avatar_manifest_key": artifacts.manifest_key,
-            "apollo_avatar_final_video_key": artifacts.final_video_key,
+            "apollo_avatar_manifest_key": artifacts.manifest_url,
+            "apollo_avatar_final_video_key": artifacts.final_video_url,
+            "apollo_avatar": artifacts.model_dump(),
         },
     )
     return {
         "ok": True,
         "task_id": task_id,
-        "segments_keys": artifacts.segments_keys,
-        "final_video_key": artifacts.final_video_key,
-        "manifest_key": artifacts.manifest_key,
-        "demo": artifacts.demo,
+        "segments": [s.model_dump() for s in artifacts.segments],
+        "final_video_url": artifacts.final_video_url,
+        "manifest_url": artifacts.manifest_url,
     }
 

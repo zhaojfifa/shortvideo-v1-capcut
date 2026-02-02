@@ -1,31 +1,43 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel
-
-
-DurationProfile = Literal["15s", "30s"]
+from pydantic import BaseModel, Field
 
 
-class ApolloAvatarRequest(BaseModel):
-    duration_profile: DurationProfile = "15s"
-    live_enabled: bool = False
-    avatar_image_key: str | None = None
-    reference_video_key: str | None = None
-    prompt: str | None = None
-    seed: int | None = None
+class SegmentSpec(BaseModel):
+    idx: int
+    duration_sec: int
+    seed: Optional[int] = None
 
 
 class SegmentPlan(BaseModel):
-    segments_count: int
-    segment_seconds: int = 5
-    duration_profile: DurationProfile
+    target_duration_sec: Literal[15, 30]
+    segment_duration_sec: Literal[5, 10]
+    segment_count: Literal[3]
+    segments: List[SegmentSpec]
+
+
+class SegmentArtifact(BaseModel):
+    idx: int
+    duration_sec: int
+    video_url: str
+    request_id: str
+    seed_used: Optional[int] = None
 
 
 class GenArtifacts(BaseModel):
-    segments_keys: list[str]
-    final_video_key: str
-    manifest_key: str
-    demo: bool = False
+    provider: str
+    plan: SegmentPlan
+    segments: List[SegmentArtifact] = Field(default_factory=list)
+    final_video_url: Optional[str] = None
+    manifest_url: Optional[str] = None
 
+
+class ApolloAvatarRequest(BaseModel):
+    target_duration_sec: Literal[15, 30] = 15
+    prompt: str
+    seed: Optional[int] = None
+    avatar_image_url: str
+    reference_video_url: Optional[str] = None
+    live_enabled: bool = False
