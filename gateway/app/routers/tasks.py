@@ -329,11 +329,20 @@ def _resolve_text_path(task_id: str, kind: str) -> Path | None:
 async def tasks_page(
     request: Request,
     limit: int = Query(50, ge=1, le=500),
+    kind: str | None = Query(default=None),
     repo=Depends(get_task_repository),
 ):
     """Render the task board HTML page."""
 
     db_tasks = sort_tasks_by_created(repo.list())
+    kind_norm = (kind or "").strip().lower()
+    if kind_norm == "apollo_avatar":
+        db_tasks = [
+            t
+            for t in db_tasks
+            if (str(t.get("platform") or "").lower() == "apollo_avatar")
+            or (str(t.get("category_key") or "").lower() == "apollo_avatar")
+        ]
 
     rows: list[dict] = []
     for t in db_tasks[:limit]:
@@ -356,7 +365,11 @@ async def tasks_page(
     return render_template(
         request=request,
         name="tasks.html",
-        ctx={"tasks": rows, "features": get_features()},
+        ctx={
+            "tasks": rows,
+            "features": get_features(),
+            "tasks_kind": kind_norm or "tasks",
+        },
     )
 
 
@@ -364,13 +377,22 @@ async def tasks_page(
 async def tasks_new(request: Request) -> HTMLResponse:
     """Render suitcase quick-create page."""
 
-    settings = get_settings()
     return render_template(
         request=request,
         name="tasks_new.html",
+        ctx={"features": get_features()},
+    )
+
+
+@pages_router.get("/tasks/apollo-avatar/new", response_class=HTMLResponse)
+async def tasks_apollo_avatar_new(request: Request) -> HTMLResponse:
+    settings = get_settings()
+    if not bool(getattr(settings, "enable_apollo_avatar", False)):
+        raise HTTPException(status_code=404, detail="ApolloAvatar is disabled")
+    return render_template(
+        request=request,
+        name="tasks_apollo_avatar_new.html",
         ctx={
-            "features": get_features(),
-            "enable_apollo_avatar": bool(getattr(settings, "enable_apollo_avatar", False)),
             "apollo_avatar_live_enabled": bool(
                 getattr(settings, "apollo_avatar_live_enabled", False)
             ),

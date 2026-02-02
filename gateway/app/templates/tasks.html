@@ -118,12 +118,14 @@
     <div class="card">
       {% set topbar_title = t("ui.tasks.board") %}
 {% set topbar_subtitle = t("tasks.loaded_n", n=(tasks | length)) %}
+{% set avatar_active = (tasks_kind == "apollo_avatar") %}
 {% set topbar_nav = [
-  {"label": t("common.tasks"), "href": "/tasks", "active": True},
-  {"label": t("common.tools"), "href": "/tools/hub", "active": False},
+  {"label": "数字人", "href": "/tasks?kind=apollo_avatar", "active": avatar_active},
+  {"label": "任务", "href": "/tasks", "active": not avatar_active},
+  {"label": "工具", "href": "/tools/hub", "active": False},
 ] %}
 {% set topbar_actions = [
-  {"label": t("common.new_task"), "href": "/tasks/new", "primary": True},
+  {"label": "新建数字人" if avatar_active else t("common.new_task"), "href": "/tasks/apollo-avatar/new" if avatar_active else "/tasks/new", "primary": True},
 ] %}
 {% include "_topbar.html" %}
 
