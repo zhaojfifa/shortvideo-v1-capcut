@@ -83,6 +83,16 @@
     .summary-item strong { display: block; font-size: 0.85rem; color: #111827; }
     pre { background: #f9fafb; padding: 10px; border-radius: 8px; border: 1px solid #e5e7eb; }
     .error { color: #b91c1c; }
+    .entry-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 12px; }
+    .entry-card { border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; padding: 12px; }
+    .entry-card h3 { margin: 0 0 6px; font-size: 1rem; }
+    .entry-card p { margin: 0 0 10px; color: #6b7280; font-size: .9rem; }
+    .hidden { display: none; }
+    .apollo-panel { margin-top: 12px; border-top: 1px dashed #d1d5db; padding-top: 12px; }
+    .switch { display: inline-flex; gap: 8px; align-items: center; }
+    .hint { font-size: .85rem; color: #6b7280; margin-top: 6px; }
+    .preview-media { width: 100%; max-height: 220px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; }
+    .actions-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -100,6 +110,16 @@
 
 
     <main class="card">
+      {% if enable_apollo_avatar %}
+      <section class="entry-grid">
+        <div class="entry-card" data-scenario="apollo_avatar">
+          <h3 data-i18n="scn_apollo_avatar_title">{{ t("common.new_task") }} · ApolloAvatar</h3>
+          <p data-i18n="scn_apollo_avatar_desc">数字人跟随生成</p>
+          <button class="btn-secondary" type="button" id="apollo-open-btn" data-i18n="common.open">Open</button>
+        </div>
+      </section>
+      {% endif %}
+
       <form id="task-form">
         <div class="field">
           <label>{{ t("tasks.new.source_mode") }}</label>
@@ -229,6 +249,49 @@
         <div class="muted t-secondary" style="margin-top: 6px;">{{ t("label.auto_category_hint") }}</div>
       </form>
 
+      {% if enable_apollo_avatar %}
+      <section id="apollo-avatar-panel" class="apollo-panel hidden">
+        <h3 data-i18n="scn_apollo_avatar_title">ApolloAvatar</h3>
+        <div class="field">
+          <label data-i18n="apollo_avatar_duration">Duration</label>
+          <div class="radio-group">
+            <label class="radio"><input type="radio" name="apollo_duration_profile" value="15s" checked><span data-i18n="apollo_avatar_15s">15s</span></label>
+            <label class="radio"><input type="radio" name="apollo_duration_profile" value="30s"><span data-i18n="apollo_avatar_30s">30s</span></label>
+          </div>
+        </div>
+        <div class="field">
+          <label class="switch">
+            <input id="apollo-live-toggle" type="checkbox">
+            <span data-i18n="apollo_avatar_live_toggle">Live (billable)</span>
+          </label>
+          <div class="hint" data-i18n="apollo_avatar_live_hint">开启 Live 会调用外部视频模型并产生费用；默认仅展示 demo，不计费。</div>
+          <div class="hint hidden" id="apollo-live-disabled-hint" data-i18n="apollo_avatar_live_disabled_hint">Live gate not enabled.</div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label data-i18n="apollo_avatar_char_image">Character Image</label>
+            <input id="apollo-image-url" type="text" value="/static/demo/demo_avatar.jpg" />
+            <img class="preview-media" id="apollo-image-preview" src="/static/demo/demo_avatar.jpg" alt="demo avatar" />
+          </div>
+          <div class="field">
+            <label data-i18n="apollo_avatar_ref_video">Reference Video</label>
+            <video class="preview-media" controls src="/static/demo/demo_ref.mp4"></video>
+            <div class="hint">PR-4</div>
+          </div>
+        </div>
+        <div class="field">
+          <label data-i18n="apollo_avatar_prompt">Prompt</label>
+          <textarea id="apollo-prompt">Professional spokesperson explains a product in Burmese, medium shot, stable framing.</textarea>
+        </div>
+        <div class="actions-row">
+          <button class="btn-secondary" type="button" id="apollo-create-btn" data-i18n="apollo_avatar_create_task">Create Task</button>
+          <button class="btn-secondary" type="button" id="apollo-generate-demo-btn" data-i18n="apollo_avatar_generate_demo">Generate (Demo)</button>
+          <button class="btn-primary" type="button" id="apollo-generate-live-btn" data-i18n="apollo_avatar_generate_live">Generate (Live)</button>
+        </div>
+        <pre id="apollo-result" style="margin-top:10px;"></pre>
+      </section>
+      {% endif %}
+
       <div style="margin-top: 12px;">
         <pre id="create-result"></pre>
       </div>
@@ -236,6 +299,13 @@
   </div>
 
   <script src="/static/js/i18n_v185.js"></script>
+  {% if enable_apollo_avatar %}
+  <script>
+    window.__APOLLO_AVATAR_LIVE_ENABLED__ = {{ 1 if apollo_avatar_live_enabled else 0 }};
+    window.__APOLLO_AVATAR_ENABLED__ = {{ 1 if enable_apollo_avatar else 0 }};
+  </script>
+  <script src="/static/js/apollo_avatar_new_v19.js"></script>
+  {% endif %}
   <script>
     window.__FEATURES__ = {{ features | tojson | safe }};
     const form = document.getElementById("task-form");

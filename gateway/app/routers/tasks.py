@@ -364,10 +364,17 @@ async def tasks_page(
 async def tasks_new(request: Request) -> HTMLResponse:
     """Render suitcase quick-create page."""
 
+    settings = get_settings()
     return render_template(
         request=request,
         name="tasks_new.html",
-        ctx={"features": get_features()},
+        ctx={
+            "features": get_features(),
+            "enable_apollo_avatar": bool(getattr(settings, "enable_apollo_avatar", False)),
+            "apollo_avatar_live_enabled": bool(
+                getattr(settings, "apollo_avatar_live_enabled", False)
+            ),
+        },
     )
 
 
