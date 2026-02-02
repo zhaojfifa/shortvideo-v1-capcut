@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>热点跟随 - 新建</title>
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css">
+</head>
+<body>
+  <div class="page">
+    {% set topbar_title = "热点跟随 - 新建" %}
+{% set topbar_subtitle = "Coming soon" %}
+{% set topbar_nav = [
+  {"label": "数字人", "href": "/tasks?kind=apollo_avatar", "active": False},
+  {"label": "热点跟随", "href": "/tasks/hot-follow", "active": True},
+  {"label": "工具", "href": "/tools/hub", "active": False},
+] %}
+{% set topbar_actions = [
+  {"label": "返回", "href": "/tasks/hot-follow", "primary": False},
+] %}
+{% include "_topbar.html" %}
+
+    <div class="card">
+      <div class="card-body">
+        <h2>热点跟随 - 新建</h2>
+        <p class="muted">Coming soon. 此页面为占位，不触发后端任务/外部API。</p>
+
+        <label>关键词 / 话题</label>
+        <input class="input" type="text" placeholder="例如：拉杆箱、防晒、开学季" disabled />
+
+        <div style="margin-top: 12px;">
+          <button class="btn btn-secondary" disabled>创建（暂不可用）</button>
+          <a class="btn" href="/tasks/hot-follow">返回列表</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

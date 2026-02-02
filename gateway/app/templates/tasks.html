@@ -119,9 +119,10 @@
       {% set topbar_title = t("ui.tasks.board") %}
 {% set topbar_subtitle = t("tasks.loaded_n", n=(tasks | length)) %}
 {% set avatar_active = (tasks_kind == "apollo_avatar") %}
+{% set hot_follow_active = (tasks_kind == "hot_follow") %}
 {% set topbar_nav = [
   {"label": "数字人", "href": "/tasks?kind=apollo_avatar", "active": avatar_active},
-  {"label": "任务", "href": "/tasks", "active": not avatar_active},
+  {"label": "热点跟随", "href": "/tasks?kind=hot_follow", "active": hot_follow_active},
   {"label": "工具", "href": "/tools/hub", "active": False},
 ] %}
 {% set topbar_actions = [
