@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>热点跟随 - ShortVideo</title>
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css">
+</head>
+<body>
+  <div class="page">
+    {% set topbar_title = "热点跟随" %}
+{% set topbar_subtitle = "Coming soon" %}
+{% set topbar_nav = [
+  {"label": "数字人", "href": "/tasks?kind=apollo_avatar", "active": False},
+  {"label": "热点跟随", "href": "/tasks/hot-follow", "active": True},
+  {"label": "工具", "href": "/tools/hub", "active": False},
+] %}
+{% set topbar_actions = [
+  {"label": "新建热点跟随", "href": "/tasks/hot-follow/new", "primary": True},
+] %}
+{% include "_topbar.html" %}
+
+    <div class="card">
+      <div class="card-body">
+        <h2 data-i18n="hot_follow_title">热点跟随</h2>
+        <p class="muted" data-i18n="coming_soon">Coming soon.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

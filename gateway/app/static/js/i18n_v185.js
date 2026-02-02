@@ -4,35 +4,47 @@
   const CLIENT_DICT = {
     zh: {
       scn_apollo_avatar_title: "ApolloAvatar",
-      scn_apollo_avatar_desc: "æ•°å­—äººè·Ÿéšç”Ÿæˆ",
-      apollo_avatar_duration: "æ—¶é•¿æ¡£ä½",
-      apollo_avatar_15s: "15ç§’",
-      apollo_avatar_30s: "30ç§’",
-      apollo_avatar_live_toggle: "Liveï¼ˆè®¡è´¹ï¼‰",
-      apollo_avatar_live_hint: "å¼€å¯ Live ä¼šè°ƒç”¨å¤–éƒ¨è§†é¢‘æ¨¡åž‹å¹¶äº§ç”Ÿè´¹ç”¨ï¼›é»˜è®¤ä»…å±•ç¤º demoï¼Œä¸è®¡è´¹ã€‚",
-      apollo_avatar_char_image: "è§’è‰²å›¾",
-      apollo_avatar_prompt: "æç¤ºè¯",
-      apollo_avatar_ref_video: "å‚è€ƒè§†é¢‘",
-      apollo_avatar_create_task: "åˆ›å»ºä»»åŠ¡",
-      apollo_avatar_generate_demo: "ç”Ÿæˆï¼ˆDemoï¼‰",
-      apollo_avatar_generate_live: "ç”Ÿæˆï¼ˆLiveï¼‰",
-      apollo_avatar_live_disabled_hint: "å½“å‰çŽ¯å¢ƒæœªå¼€å¯ Live gateã€‚",
+      scn_apollo_avatar_desc: "Êý×ÖÈË¸úËæÉú³É",
+      apollo_avatar_duration: "Ê±³¤µµÎ»",
+      apollo_avatar_15s: "15Ãë",
+      apollo_avatar_30s: "30Ãë",
+      apollo_avatar_live_toggle: "Live£¨¼Æ·Ñ£©",
+      apollo_avatar_live_hint: "¿ªÆô Live »áµ÷ÓÃÍâ²¿ÊÓÆµÄ£ÐÍ²¢²úÉú·ÑÓÃ£»Ä¬ÈÏ½öÕ¹Ê¾ demo£¬²»¼Æ·Ñ¡£",
+      apollo_avatar_char_image: "½ÇÉ«Í¼",
+      apollo_avatar_prompt: "ÌáÊ¾´Ê",
+      apollo_avatar_ref_video: "²Î¿¼ÊÓÆµ",
+      apollo_avatar_create_task: "´´½¨ÈÎÎñ",
+      apollo_avatar_generate_demo: "Éú³É£¨Demo£©",
+      apollo_avatar_generate_live: "Éú³É£¨Live£©",
+      apollo_avatar_live_disabled_hint: "µ±Ç°»·¾³Î´¿ªÆô Live gate¡£",
+      tab_digital_human: "Êý×ÖÈË",
+      tab_hot_follow: "ÈÈµã¸úËæ",
+      hot_follow_title: "ÈÈµã¸úËæ",
+      coming_soon: "¾´ÇëÆÚ´ý¡£",
+      seed: "Seed£¨¿ÉÑ¡£©",
+      new_digital_human: "ÐÂ½¨Êý×ÖÈË",
     },
     mm: {
       scn_apollo_avatar_title: "ApolloAvatar",
       scn_apollo_avatar_desc: "Avatar follow generation",
-      apollo_avatar_duration: "á€€á€¼á€¬á€á€»á€­á€”á€º",
-      apollo_avatar_15s: "15 á€…á€€á€¹á€€á€”á€·á€º",
-      apollo_avatar_30s: "30 á€…á€€á€¹á€€á€”á€·á€º",
-      apollo_avatar_live_toggle: "Live (á€€á€»á€žá€„á€·á€º)",
-      apollo_avatar_live_hint: "Live á€€á€­á€¯á€–á€½á€„á€·á€ºá€œá€»á€¾á€„á€º á€€á€¯á€”á€ºá€€á€»á€…á€›á€­á€á€ºá€›á€¾á€­á€”á€­á€¯á€„á€ºá€žá€Šá€ºáŠ á€™á€°á€œá€¡á€”á€±á€–á€¼á€„á€·á€º demo á€žá€¬ á€•á€¼á€•á€«á€™á€Šá€ºá‹",
-      apollo_avatar_char_image: "á€‡á€¬á€á€ºá€€á€±á€¬á€„á€ºá€•á€¯á€¶",
+      apollo_avatar_duration: "????????",
+      apollo_avatar_15s: "15 ???????",
+      apollo_avatar_30s: "30 ???????",
+      apollo_avatar_live_toggle: "Live (??????)",
+      apollo_avatar_live_hint: "Live ????????????? ??????????????????????? ??????????? demo ?? ????????",
+      apollo_avatar_char_image: "????????????",
       apollo_avatar_prompt: "Prompt",
-      apollo_avatar_ref_video: "á€›á€Šá€ºá€Šá€½á€¾á€”á€ºá€¸á€—á€®á€’á€®á€šá€­á€¯",
-      apollo_avatar_create_task: "Task á€–á€”á€ºá€á€®á€¸á€™á€Šá€º",
+      apollo_avatar_ref_video: "????????????????",
+      apollo_avatar_create_task: "Task ?????????",
       apollo_avatar_generate_demo: "Generate (Demo)",
       apollo_avatar_generate_live: "Generate (Live)",
-      apollo_avatar_live_disabled_hint: "Live gate á€€á€­á€¯á€™á€–á€½á€„á€·á€ºá€‘á€¬á€¸á€žá€±á€¸á€•á€«á‹",
+      apollo_avatar_live_disabled_hint: "Live gate ??????????????????",
+      tab_digital_human: "Digital Human",
+      tab_hot_follow: "Hot Follow",
+      hot_follow_title: "Hot Follow",
+      coming_soon: "Coming soon.",
+      seed: "Seed",
+      new_digital_human: "New Digital Human",
     },
   };
 
@@ -105,7 +117,7 @@
       }
     }
     if (!text) {
-      text = `ã€MISSING:${key}ã€‘`;
+      text = `¡¾MISSING:${key}¡¿`;
     }
     if (vars && typeof text === "string") {
       Object.keys(vars).forEach((k) => {
@@ -154,4 +166,3 @@
     boot();
   }
 })();
-

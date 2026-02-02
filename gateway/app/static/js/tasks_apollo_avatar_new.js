@@ -25,12 +25,15 @@
   function getPayload(isDemo) {
     const liveChecked = !!$("live_enabled")?.checked;
     const gateOn = Number(window.__APOLLO_AVATAR_LIVE_ENABLED__ || 0) === 1;
+    const seedRaw = $("seed")?.value?.trim();
+    const seedVal = seedRaw ? Number(seedRaw) : null;
     return {
       duration_profile: getDurationProfile(),
       live_enabled: isDemo ? false : (gateOn && liveChecked),
       avatar_image_key: $("avatar_image_url")?.value?.trim() || "",
       reference_video_key: $("ref_video_url")?.value?.trim() || "",
       prompt: $("prompt")?.value?.trim() || "",
+      seed: Number.isFinite(seedVal) ? seedVal : null,
     };
   }
 
