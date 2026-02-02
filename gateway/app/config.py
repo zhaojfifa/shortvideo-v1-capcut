@@ -78,6 +78,8 @@ class Settings(BaseSettings):
     ui_secondary_lang: str = Field("en", env="UI_SECONDARY_LANG")
     ui_show_secondary: bool = Field(True, env="UI_SHOW_SECONDARY")
     ui_mobile_prefix_enabled: bool = Field(True, env="UI_MOBILE_PREFIX_ENABLED")
+    enable_apollo_avatar: bool = Field(False, env="ENABLE_APOLLO_AVATAR")
+    apollo_avatar_live_enabled: bool = Field(False, env="APOLLO_AVATAR_LIVE_ENABLED")
 # === Storage Configuration (PR-0B) ===
     STORAGE_BACKEND: str = "local"  # 选项: "local", "s3"
     
