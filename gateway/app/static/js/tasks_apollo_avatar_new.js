@@ -47,7 +47,8 @@
     const liveChecked = !!$("live_enabled")?.checked;
     const gateOn = Number(window.__APOLLO_AVATAR_LIVE_ENABLED__ || 0) === 1;
     const seedVal = getSeed();
-    const demoRoot = (window.__DEMO_APOLLO_ROOT__ || "").replace(/\/$/, "");
+    const demoBase = (window.__DEMO_ASSET_BASE_URL__ || "").replace(/\/+$/, "");
+    const demoRoot = demoBase.endsWith("/apollo_avatar") ? demoBase : (demoBase ? `${demoBase}/apollo_avatar` : "");
     const demoAvatar = demoRoot ? `${demoRoot}/demo_avatar.png` : "";
     const demoRef15 = demoRoot ? `${demoRoot}/demo_15.mp4` : "";
     return {
@@ -73,6 +74,18 @@
     refVideoFile: null,
   };
 
+  async function fetchAsFile(url, filename, mime) {
+    if (!url) {
+      throw new Error("Demo asset URL missing");
+    }
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch demo asset: ${url}`);
+    }
+    const blob = await res.blob();
+    return new File([blob], filename, { type: mime || blob.type || "application/octet-stream" });
+  }
+
   function buildCreateFormData(liveEnabled) {
     if (!state.avatarFile) {
       throw new Error("Avatar image is required");
@@ -97,6 +110,18 @@
     const gateOn = Number(window.__APOLLO_AVATAR_LIVE_ENABLED__ || 0) === 1;
     const liveChecked = !!$("live_enabled")?.checked;
     const liveEnabled = isDemo ? false : (gateOn && liveChecked);
+    if (isDemo && (!state.avatarFile || !state.refVideoFile)) {
+      const base = (window.__DEMO_ASSET_BASE_URL__ || "").replace(/\/+$/, "");
+      const root = base.endsWith("/apollo_avatar") ? base : (base ? `${base}/apollo_avatar` : "");
+      const demoAvatar = root ? `${root}/demo_avatar.png` : "";
+      const demoRef = root
+        ? (getTargetDurationSec() === 30
+            ? `${root}/demo_30.mp4`
+            : `${root}/demo_15.mp4`)
+        : "";
+      state.avatarFile = state.avatarFile || await fetchAsFile(demoAvatar, "demo_avatar.png", "image/png");
+      state.refVideoFile = state.refVideoFile || await fetchAsFile(demoRef, "demo_ref.mp4", "video/mp4");
+    }
     const form = buildCreateFormData(liveEnabled);
     const result = await postForm("/api/apollo/avatar/tasks", form);
     currentTaskId = result.task_id || result.id || null;
@@ -131,10 +156,11 @@
       genBtn.disabled = !gateOn;
     }
 
-    const demoRoot = (window.__DEMO_APOLLO_ROOT__ || "").replace(/\/$/, "");
-    const demoAvatar = demoRoot ? `${demoRoot}/demo_avatar.png` : "/static/demo/demo_avatar.png";
-    const demo15 = demoRoot ? `${demoRoot}/demo_15.mp4` : "/static/demo/demo_15.mp4";
-    const demo30 = demoRoot ? `${demoRoot}/demo_30.mp4` : "/static/demo/demo_30.mp4";
+    const demoBase = (window.__DEMO_ASSET_BASE_URL__ || "").replace(/\/+$/, "");
+    const demoRoot = demoBase.endsWith("/apollo_avatar") ? demoBase : (demoBase ? `${demoBase}/apollo_avatar` : "");
+    const demoAvatar = demoRoot ? `${demoRoot}/demo_avatar.png` : "";
+    const demo15 = demoRoot ? `${demoRoot}/demo_15.mp4` : "";
+    const demo30 = demoRoot ? `${demoRoot}/demo_30.mp4` : "";
 
     const avatarPreview = $("avatar_preview");
     const refPreview = $("ref_video_preview");
@@ -154,7 +180,9 @@
     };
 
     if (avatarPreview && !avatarPreview.getAttribute("src")) {
-      avatarPreview.src = demoAvatar;
+      if (demoAvatar) {
+        avatarPreview.src = demoAvatar;
+      }
     }
     setDemoVideo();
 
