@@ -22,15 +22,6 @@ def _dump(obj):
         return obj.model_dump()
     if hasattr(obj, "dict"):
         return obj.dict()
-    try:
-        import dataclasses
-
-        if dataclasses.is_dataclass(obj):
-            return dataclasses.asdict(obj)
-    except Exception:
-        pass
-    if hasattr(obj, "__dict__"):
-        return dict(obj.__dict__)
     return obj
 
 
@@ -165,7 +156,7 @@ async def generate_apollo_avatar(
     return {
         "ok": True,
         "task_id": task_id,
-        "segments": [_dump(s) for s in artifacts.segments],
+        "segments": [_dump(s) for s in (getattr(artifacts, "segments", None) or [])],
         "final_video_url": artifacts.final_video_url,
         "manifest_url": artifacts.manifest_url,
     }
