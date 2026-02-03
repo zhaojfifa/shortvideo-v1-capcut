@@ -43,6 +43,23 @@
     return Number.isFinite(seedVal) ? seedVal : null;
   }
 
+  function getPayload(isDemo) {
+    const liveChecked = !!$("live_enabled")?.checked;
+    const gateOn = Number(window.__APOLLO_AVATAR_LIVE_ENABLED__ || 0) === 1;
+    const seedVal = getSeed();
+    const demoRoot = (window.__DEMO_APOLLO_ROOT__ || "").replace(/\/$/, "");
+    const demoAvatar = demoRoot ? `${demoRoot}/demo_avatar.png` : "";
+    const demoRef15 = demoRoot ? `${demoRoot}/demo_15.mp4` : "";
+    return {
+      target_duration_sec: getTargetDurationSec(),
+      live_enabled: isDemo ? false : (gateOn && liveChecked),
+      avatar_image_url: isDemo ? demoAvatar : ($("avatar_image_url")?.value?.trim() || ""),
+      reference_video_url: isDemo ? demoRef15 : ($("ref_video_url")?.value?.trim() || ""),
+      prompt: $("prompt")?.value?.trim() || "",
+      seed: Number.isFinite(seedVal) ? seedVal : null,
+    };
+  }
+
   function setResult(value, isError) {
     const box = $("result");
     if (!box) return;
@@ -93,7 +110,13 @@
         throw new Error("Create task first");
       }
     }
-    const result = await postJson(`/api/apollo/avatar/${encodeURIComponent(currentTaskId)}/generate`, null);
+    const payload = getPayload(isDemo);
+    if (!isDemo && !payload.avatar_image_url && !payload.reference_video_url) {
+      const result = await postJson(`/api/apollo/avatar/${encodeURIComponent(currentTaskId)}/generate`, null);
+      setResult(result, false);
+      return;
+    }
+    const result = await postJson(`/api/apollo/avatar/${encodeURIComponent(currentTaskId)}/generate`, payload);
     setResult(result, false);
   }
 
@@ -108,10 +131,10 @@
       genBtn.disabled = !gateOn;
     }
 
-    const demoBase = (window.__DEMO_ASSET_BASE_URL__ || "").replace(/\/+$/, "");
-    const demoAvatar = demoBase ? `${demoBase}/apollo_avatar/demo_avatar.png` : "/static/demo/demo_avatar.png";
-    const demo15 = demoBase ? `${demoBase}/apollo_avatar/demo_15.mp4` : "/static/demo/demo_15.mp4";
-    const demo30 = demoBase ? `${demoBase}/apollo_avatar/demo_30.mp4` : "/static/demo/demo_30.mp4";
+    const demoRoot = (window.__DEMO_APOLLO_ROOT__ || "").replace(/\/$/, "");
+    const demoAvatar = demoRoot ? `${demoRoot}/demo_avatar.png` : "/static/demo/demo_avatar.png";
+    const demo15 = demoRoot ? `${demoRoot}/demo_15.mp4` : "/static/demo/demo_15.mp4";
+    const demo30 = demoRoot ? `${demoRoot}/demo_30.mp4` : "/static/demo/demo_30.mp4";
 
     const avatarPreview = $("avatar_preview");
     const refPreview = $("ref_video_preview");
