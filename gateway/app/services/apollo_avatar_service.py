@@ -71,7 +71,7 @@ class ApolloAvatarService:
         if not live_enabled:
             demo_base = getattr(config.settings, "demo_asset_base_url", "").rstrip("/")
             if demo_base:
-                artifacts.final_video_url = f"{demo_base}/demo_final_{req.target_duration_sec}.mp4"
+                artifacts.final_video_url = f"{demo_base}/demo_{req.target_duration_sec}.mp4"
             return artifacts
 
         provider = get_video_gen_provider()
