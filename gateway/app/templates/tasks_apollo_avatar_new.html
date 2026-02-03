@@ -43,12 +43,13 @@
 
     <main class="card">
       {% set demo_base = (demo_asset_base_url or "").rstrip("/") %}
-      {% if demo_base and demo_base.endswith("/apollo_avatar") %}
-        {% set demo_root = demo_base %}
-      {% elif demo_base %}
-        {% set demo_root = demo_base ~ "/apollo_avatar" %}
-      {% else %}
-        {% set demo_root = "" %}
+      {% set demo_root = "" %}
+      {% if demo_base %}
+        {% if demo_base.endswith("/apollo_avatar") or demo_base.endswith("apollo_avatar") %}
+          {% set demo_root = demo_base %}
+        {% else %}
+          {% set demo_root = demo_base ~ "/apollo_avatar" %}
+        {% endif %}
       {% endif %}
 
       {% set demo_avatar_img = (demo_root ~ "/demo_avatar.png") if demo_root else "" %}
@@ -117,9 +118,8 @@
 
   <script src="/static/js/i18n_v185.js"></script>
   <script>
+    window.__DEMO_ASSET_BASE_URL__ = "{{ demo_asset_base_url or '' }}";
     window.__APOLLO_AVATAR_LIVE_ENABLED__ = {{ 1 if apollo_avatar_live_enabled else 0 }};
-    window.__DEMO_ASSET_BASE_URL__ = "{{ demo_base }}";
-    window.__DEMO_APOLLO_ROOT__ = "{{ demo_root }}";
   </script>
   <script src="/static/js/tasks_apollo_avatar_new.js"></script>
 </body>
