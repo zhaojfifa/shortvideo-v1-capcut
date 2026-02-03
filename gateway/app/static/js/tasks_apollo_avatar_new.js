@@ -3,6 +3,14 @@
     return document.getElementById(id);
   }
 
+  function normalizeDemoRoot(rawBase) {
+    const base0 = String(rawBase || "").trim().replace(/\/+$/, "");
+    if (!base0) return "";
+    const base1 = base0.replace(/\/apollo_avatar\/[^/]+\.(png|jpg|jpeg|mp4)$/i, "/apollo_avatar");
+    if (base1.endsWith("/apollo_avatar") || base1.endsWith("apollo_avatar")) return base1;
+    return `${base1}/apollo_avatar`;
+  }
+
   async function postJson(url, payload) {
     const res = await fetch(url, {
       method: "POST",
@@ -47,8 +55,7 @@
     const liveChecked = !!$("live_enabled")?.checked;
     const gateOn = Number(window.__APOLLO_AVATAR_LIVE_ENABLED__ || 0) === 1;
     const seedVal = getSeed();
-    const demoBase = (window.__DEMO_ASSET_BASE_URL__ || "").replace(/\/+$/, "");
-    const demoRoot = demoBase.endsWith("/apollo_avatar") ? demoBase : (demoBase ? `${demoBase}/apollo_avatar` : "");
+    const demoRoot = normalizeDemoRoot(window.__DEMO_ASSET_BASE_URL__);
     const demoAvatar = demoRoot ? `${demoRoot}/demo_avatar.png` : "";
     const demoRef15 = demoRoot ? `${demoRoot}/demo_15.mp4` : "";
     return {
@@ -78,7 +85,7 @@
     if (!url) {
       throw new Error("Demo asset URL missing");
     }
-    const res = await fetch(url);
+    const res = await fetch(url, { mode: "cors" });
     if (!res.ok) {
       throw new Error(`Failed to fetch demo asset: ${url}`);
     }
@@ -111,8 +118,7 @@
     const liveChecked = !!$("live_enabled")?.checked;
     const liveEnabled = isDemo ? false : (gateOn && liveChecked);
     if (isDemo && (!state.avatarFile || !state.refVideoFile)) {
-      const base = (window.__DEMO_ASSET_BASE_URL__ || "").replace(/\/+$/, "");
-      const root = base.endsWith("/apollo_avatar") ? base : (base ? `${base}/apollo_avatar` : "");
+      const root = normalizeDemoRoot(window.__DEMO_ASSET_BASE_URL__);
       const demoAvatar = root ? `${root}/demo_avatar.png` : "";
       const demoRef = root
         ? (getTargetDurationSec() === 30
@@ -136,11 +142,6 @@
       }
     }
     const payload = getPayload(isDemo);
-    if (!isDemo && !payload.avatar_image_url && !payload.reference_video_url) {
-      const result = await postJson(`/api/apollo/avatar/${encodeURIComponent(currentTaskId)}/generate`, null);
-      setResult(result, false);
-      return;
-    }
     const result = await postJson(`/api/apollo/avatar/${encodeURIComponent(currentTaskId)}/generate`, payload);
     setResult(result, false);
   }
@@ -156,8 +157,7 @@
       genBtn.disabled = !gateOn;
     }
 
-    const demoBase = (window.__DEMO_ASSET_BASE_URL__ || "").replace(/\/+$/, "");
-    const demoRoot = demoBase.endsWith("/apollo_avatar") ? demoBase : (demoBase ? `${demoBase}/apollo_avatar` : "");
+    const demoRoot = normalizeDemoRoot(window.__DEMO_ASSET_BASE_URL__);
     const demoAvatar = demoRoot ? `${demoRoot}/demo_avatar.png` : "";
     const demo15 = demoRoot ? `${demoRoot}/demo_15.mp4` : "";
     const demo30 = demoRoot ? `${demoRoot}/demo_30.mp4` : "";
