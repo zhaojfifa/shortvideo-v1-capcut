@@ -43,8 +43,9 @@
 
     <main class="card">
       {% set demo_base = (demo_asset_base_url or "").rstrip("/") %}
-      {% set demo_avatar_img = (demo_base ~ "/demo_avatar.jpg") if demo_base else "" %}
-      {% set demo_ref_mp4 = (demo_base ~ "/demo_ref.mp4") if demo_base else "" %}
+      {% set demo_avatar_img = (demo_base ~ "/apollo_avatar/demo_avatar.png") if demo_base else "" %}
+      {% set demo_15_mp4 = (demo_base ~ "/apollo_avatar/demo_15.mp4") if demo_base else "" %}
+      {% set demo_30_mp4 = (demo_base ~ "/apollo_avatar/demo_30.mp4") if demo_base else "" %}
 
       <div class="field">
         <label data-i18n="apollo_avatar_duration">Duration</label>
@@ -76,11 +77,11 @@
           <label data-i18n="apollo_avatar_ref_video">Reference video</label>
           <input id="ref_video_file" type="file" accept="video/*" />
           <video id="ref_video_preview" class="preview" controls preload="metadata">
-            {% if demo_ref_mp4 %}
-            <source src="{{ demo_ref_mp4 }}" type="video/mp4" />
+            {% if demo_15_mp4 %}
+            <source src="{{ demo_15_mp4 }}" type="video/mp4" />
             {% endif %}
           </video>
-          {% if not demo_ref_mp4 %}
+          {% if not demo_15_mp4 %}
           <div class="hint">Reference video is hosted on CDN. Set DEMO_ASSET_BASE_URL to enable preview.</div>
           {% endif %}
         </div>

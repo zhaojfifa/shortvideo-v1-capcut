@@ -15,6 +15,25 @@ from gateway.app.utils.pipeline_config import pipeline_config_to_storage
 router = APIRouter(prefix="/api/apollo/avatar", tags=["apollo-avatar"])
 
 
+def _dump(obj):
+    if obj is None:
+        return None
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    if hasattr(obj, "dict"):
+        return obj.dict()
+    try:
+        import dataclasses
+
+        if dataclasses.is_dataclass(obj):
+            return dataclasses.asdict(obj)
+    except Exception:
+        pass
+    if hasattr(obj, "__dict__"):
+        return dict(obj.__dict__)
+    return obj
+
+
 @router.post("/tasks")
 async def create_apollo_avatar_task(
     avatar_file: UploadFile = File(...),
@@ -140,13 +159,13 @@ async def generate_apollo_avatar(
             "status": "ready",
             "apollo_avatar_manifest_key": artifacts.manifest_url,
             "apollo_avatar_final_video_key": artifacts.final_video_url,
-            "apollo_avatar": artifacts.model_dump(),
+            "apollo_avatar": _dump(artifacts),
         },
     )
     return {
         "ok": True,
         "task_id": task_id,
-        "segments": [s.model_dump() for s in artifacts.segments],
+        "segments": [_dump(s) for s in artifacts.segments],
         "final_video_url": artifacts.final_video_url,
         "manifest_url": artifacts.manifest_url,
     }

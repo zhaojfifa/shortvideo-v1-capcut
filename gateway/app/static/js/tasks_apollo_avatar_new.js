@@ -109,25 +109,31 @@
     }
 
     const demoBase = (window.__DEMO_ASSET_BASE_URL__ || "").replace(/\/+$/, "");
+    const demoAvatar = demoBase ? `${demoBase}/apollo_avatar/demo_avatar.png` : "/static/demo/demo_avatar.png";
+    const demo15 = demoBase ? `${demoBase}/apollo_avatar/demo_15.mp4` : "/static/demo/demo_15.mp4";
+    const demo30 = demoBase ? `${demoBase}/apollo_avatar/demo_30.mp4` : "/static/demo/demo_30.mp4";
+
     const avatarPreview = $("avatar_preview");
     const refPreview = $("ref_video_preview");
-    if (demoBase) {
-      if (avatarPreview && !avatarPreview.getAttribute("src")) {
-        avatarPreview.src = `${demoBase}/demo_avatar.jpg`;
+    const setDemoVideo = () => {
+      if (!refPreview) return;
+      const demoSrc = getTargetDurationSec() === 30 ? demo30 : demo15;
+      let src = refPreview.querySelector("source");
+      if (!src) {
+        src = document.createElement("source");
+        src.setAttribute("type", "video/mp4");
+        refPreview.appendChild(src);
       }
-      if (refPreview && (!refPreview.querySelector("source") || !refPreview.querySelector("source")?.getAttribute("src"))) {
-        const s = refPreview.querySelector("source");
-        if (s) {
-          s.setAttribute("src", `${demoBase}/demo_ref.mp4`);
-        } else {
-          const src = document.createElement("source");
-          src.setAttribute("src", `${demoBase}/demo_ref.mp4`);
-          src.setAttribute("type", "video/mp4");
-          refPreview.appendChild(src);
-        }
+      if (!src.getAttribute("src")) {
+        src.setAttribute("src", demoSrc);
         refPreview.load();
       }
+    };
+
+    if (avatarPreview && !avatarPreview.getAttribute("src")) {
+      avatarPreview.src = demoAvatar;
     }
+    setDemoVideo();
 
     const avatarInput = $("avatar_file");
     if (avatarInput && avatarPreview) {
@@ -158,6 +164,13 @@
         }
       });
     }
+    document.querySelectorAll("input[name='duration_profile']").forEach((el) => {
+      el.addEventListener("change", () => {
+        if (!state.refVideoFile) {
+          setDemoVideo();
+        }
+      });
+    });
 
     $("btn_create")?.addEventListener("click", async () => {
       try {
