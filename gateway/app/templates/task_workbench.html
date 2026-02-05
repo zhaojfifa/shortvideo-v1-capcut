@@ -400,17 +400,6 @@
       </div>
     </div>
 
-    <details class="panel" id="process-log-panel">
-      <summary>日志与过程 / Process Log</summary>
-      <div style="margin-top:12px;">
-        <div class="copy-row" style="justify-content:space-between; margin-bottom:8px;">
-          <div class="muted t-secondary">Process events (manual refresh)</div>
-          <button type="button" id="btn-refresh-events" class="copy-btn">Refresh</button>
-        </div>
-        <pre id="events-output" class="output-log">-</pre>
-      </div>
-    </details>
-
     <details class="panel" id="debug-panel">
       <summary>{{ t("workbench.logs") }}</summary>
       <div style="margin-top:12px;">
@@ -459,40 +448,6 @@
       const now = new Date().toISOString();
       logEl.textContent += `\n[${now}] ${line}`;
       logEl.scrollTop = logEl.scrollHeight;
-    }
-
-    async function loadTaskEvents() {
-      const out = document.getElementById("events-output");
-      if (!out) return;
-      const taskId = window.currentTask?.task_id;
-      if (!taskId) {
-        out.textContent = "-";
-        return;
-      }
-      try {
-        const resp = await fetch(`/api/tasks/${taskId}/events`);
-        if (!resp.ok) {
-          out.textContent = `Failed to load events: HTTP ${resp.status}`;
-          return;
-        }
-        const payload = await resp.json();
-        const events = Array.isArray(payload.events) ? payload.events.slice().reverse() : [];
-        if (!events.length) {
-          out.textContent = "No events.";
-          return;
-        }
-        out.textContent = events
-          .map((e) => {
-            const ts = e.ts || "";
-            const level = e.level || "info";
-            const step = e.step || "-";
-            const msg = e.message || "";
-            return `[${ts}] [${level}] [${step}] ${msg}`;
-          })
-          .join("\n");
-      } catch (err) {
-        out.textContent = `Failed to load events: ${err.message || err}`;
-      }
     }
 
     function updateStatusBadge(data) {
@@ -1040,20 +995,10 @@
       });
     }
 
-    const refreshEventsBtn = document.getElementById("btn-refresh-events");
-    if (refreshEventsBtn) {
-      refreshEventsBtn.addEventListener("click", async () => {
-        await loadTaskEvents();
-      });
-    }
-
     document.addEventListener("DOMContentLoaded", () => {
       refreshTaskState().catch((err) => {
         console.error(err);
         appendLog("Initial refresh failed: " + err);
-      });
-      loadTaskEvents().catch((err) => {
-        console.error(err);
       });
     });
 
