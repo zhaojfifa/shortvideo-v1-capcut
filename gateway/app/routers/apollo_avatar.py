@@ -9,7 +9,6 @@ from gateway.app.domain.apollo_avatar import ApolloAvatarRequest
 from gateway.app.services.apollo_avatar_assets import save_avatar_image, save_ref_video
 from gateway.app.config import get_settings
 from gateway.app.services.steps_v1 import (
-    append_task_event,
     run_apollo_avatar_generate_step,
     run_post_generate_pipeline,
 )
@@ -38,6 +37,7 @@ async def create_apollo_avatar_task(
             "title": "ApolloAvatar",
             "source_url": None,
             "platform": "apollo_avatar",
+            "kind": "apollo_avatar",
             "category_key": "apollo_avatar",
             "content_lang": "mm",
             "ui_lang": "zh",
@@ -143,7 +143,6 @@ async def generate_apollo_avatar(
         repo=repo,
         live_enabled=live_enabled,
     )
-    append_task_event(repo, task_id, "pipeline", "AVATAR_POST_PIPELINE_START")
     background_tasks.add_task(
         run_post_generate_pipeline,
         task_id=task_id,

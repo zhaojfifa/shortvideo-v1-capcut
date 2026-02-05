@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Apollo Avatar Workbench</title>
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css" />
+  <style>
+    body { margin: 0; padding: 16px; background: #f3f4f6; color: #111827; }
+    .page { max-width: 980px; margin: 0 auto; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+    .muted { color: #6b7280; font-size: 13px; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .btn { border: none; border-radius: 10px; padding: 10px 14px; font-weight: 700; cursor: pointer; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .output { background: #0f172a; color: #e2e8f0; padding: 10px; border-radius: 8px; font-size: 12px; white-space: pre-wrap; }
+    .links a { display: inline-block; margin-right: 12px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    {% set topbar_title = "Apollo Avatar Workbench" %}
+    {% set topbar_subtitle = "Generate → Subtitles → Dub → Pack" %}
+    {% set topbar_nav = [
+      {"label": "数字人", "href": "/tasks?kind=apollo_avatar", "active": True},
+      {"label": "热点跟随", "href": "/tasks/hot-follow", "active": False},
+      {"label": "工具", "href": "/tools/hub", "active": False},
+    ] %}
+    {% set topbar_actions = [
+      {"label": "返回列表", "href": "/tasks?kind=apollo_avatar", "primary": False},
+    ] %}
+    {% include "_topbar.html" %}
+
+    <div class="card">
+      <h2 style="margin:0 0 6px;">Apollo Avatar Workbench</h2>
+      <div class="muted">Run generation, then continue in the standard pipeline.</div>
+      <div class="actions">
+        <button class="btn btn-primary" id="btn-apollo-generate">Generate</button>
+      </div>
+      <div class="muted" style="margin-top:8px;">Generate calls the avatar model and then runs subtitles/dub/pack automatically.</div>
+      <div style="margin-top:12px;">
+        <div class="muted">Result</div>
+        <pre id="apollo-result" class="output">-</pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 6px;">Process Log</h3>
+      <div class="actions">
+        <button class="btn" id="btn-refresh-events">Refresh</button>
+      </div>
+      <pre id="apollo-events" class="output">-</pre>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 6px;">Deliverables</h3>
+      <div class="links">
+        <a href="/v1/tasks/{{ task.task_id }}/raw" target="_blank" rel="noopener">raw.mp4</a>
+        <a href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">scenes.zip</a>
+        <a href="/v1/tasks/{{ task.task_id }}/pack" target="_blank" rel="noopener">pack.zip</a>
+        <a href="/v1/tasks/{{ task.task_id }}/publish_bundle" target="_blank" rel="noopener">publish bundle</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.__WORKBENCH_KIND__ = "{{ workbench_kind }}";
+    window.__TASK_ID__ = "{{ task.task_id }}";
+    window.__EVENTS_URL__ = "/api/tasks/{{ task.task_id }}/events";
+    window.__APOLLO_GENERATE_URL__ = "/api/apollo/avatar/{{ task.task_id }}/generate";
+  </script>
+  {% if workbench_js %}
+  <script src="{{ workbench_js }}"></script>
+  {% endif %}
+</body>
+</html>
