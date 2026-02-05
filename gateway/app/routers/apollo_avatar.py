@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+import httpx
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 
 from gateway.app.deps import get_task_repository
@@ -9,7 +11,9 @@ from gateway.app.domain.apollo_avatar import ApolloAvatarRequest
 from gateway.app.services.apollo_avatar_assets import save_avatar_image, save_ref_video
 from gateway.app.config import get_settings
 from gateway.app.services.apollo_avatar_service import ApolloAvatarService
+from gateway.app.services.artifact_storage import upload_task_artifact
 from gateway.app.task_repo_utils import normalize_task_payload
+from gateway.app.core.workspace import raw_path
 from gateway.app.utils.pipeline_config import pipeline_config_to_storage
 
 router = APIRouter(prefix="/api/apollo/avatar", tags=["apollo-avatar"])
@@ -143,6 +147,19 @@ async def generate_apollo_avatar(
 
     service = ApolloAvatarService(repo=repo)
     artifacts = await service.generate_stitch_only(task, req, live_enabled=live_enabled)
+    raw_key = None
+    final_url = getattr(artifacts, "final_video_url", None)
+    if final_url:
+        raw_file = raw_path(task_id)
+        raw_file.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            async with httpx.AsyncClient(timeout=300) as client:
+                resp = await client.get(final_url)
+                resp.raise_for_status()
+                raw_file.write_bytes(resp.content)
+            raw_key = upload_task_artifact(task, raw_file, "raw.mp4", task_id=task_id)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Failed to hydrate raw video: {exc}") from exc
     repo.upsert(
         task_id,
         {
@@ -151,6 +168,7 @@ async def generate_apollo_avatar(
             "apollo_avatar_manifest_key": artifacts.manifest_url,
             "apollo_avatar_final_video_key": artifacts.final_video_url,
             "apollo_avatar": _dump(artifacts),
+            "raw_path": raw_key,
         },
     )
     return {
