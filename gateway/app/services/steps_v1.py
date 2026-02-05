@@ -867,31 +867,84 @@ async def run_apollo_avatar_generate_step(
             level="error",
         )
         raise
-    _append_event(repo, task_id, channel="apollo_avatar", code="AVATAR_GEN_START", message="Generate started")
+    _append_event(
+        repo,
+        task_id,
+        channel="apollo_avatar",
+        code="prepare.start",
+        message="Prepare start",
+        extra={"task_id": task_id},
+    )
+    _append_event(
+        repo,
+        task_id,
+        channel="apollo_avatar",
+        code="generate.start",
+        message="Generate start",
+        extra={"target_duration_sec": getattr(req, "target_duration_sec", None)},
+    )
     service = ApolloAvatarService(repo=repo)
     artifacts = await service.generate_stitch_only(task, req, live_enabled=live_enabled)
-    _append_event(repo, task_id, channel="apollo_avatar", code="AVATAR_CALL_SERVICE_DONE", message="Model call done")
+    _append_event(
+        repo,
+        task_id,
+        channel="apollo_avatar",
+        code="generate.done",
+        message="Generate done",
+        extra={"final_video_url": getattr(artifacts, "final_video_url", None)},
+    )
+
+    plan = getattr(artifacts, "plan", None)
+    segments = []
+    if plan and getattr(plan, "segments", None):
+        segments = [
+            {"idx": s.idx, "duration_sec": s.duration_sec}
+            for s in plan.segments
+            if s is not None
+        ]
+    if segments:
+        _append_event(
+            repo,
+            task_id,
+            channel="apollo_avatar",
+            code="slice.done",
+            message="Slice done",
+            extra={"segments": segments},
+        )
 
     raw_key = None
     final_url = getattr(artifacts, "final_video_url", None)
     if final_url:
         raw_file = raw_path(task_id)
         raw_file.parent.mkdir(parents=True, exist_ok=True)
-        _append_event(repo, task_id, channel="apollo_avatar", code="AVATAR_HYDRATE_RAW_START", message="Hydrate raw start")
+        _append_event(
+            repo,
+            task_id,
+            channel="apollo_avatar",
+            code="assemble.start",
+            message="Assemble start",
+        )
         try:
             async with httpx.AsyncClient(timeout=300) as client:
                 resp = await client.get(final_url)
                 resp.raise_for_status()
                 raw_file.write_bytes(resp.content)
             raw_key = upload_task_artifact(task, raw_file, "raw.mp4", task_id=task_id)
-            _append_event(repo, task_id, channel="apollo_avatar", code="AVATAR_HYDRATE_RAW_DONE", message="Hydrate raw done")
+            _append_event(
+                repo,
+                task_id,
+                channel="apollo_avatar",
+                code="assemble.done",
+                message="Assemble done",
+                extra={"raw_key": raw_key},
+            )
         except Exception as exc:
             _append_event(
                 repo,
                 task_id,
                 channel="apollo_avatar",
-                code="AVATAR_HYDRATE_RAW_ERROR",
-                message="Hydrate raw error",
+                code="assemble.error",
+                message="Assemble error",
                 extra={"error": str(exc)},
             )
             raise
@@ -915,6 +968,14 @@ async def run_apollo_avatar_generate_step(
             "apollo_avatar": _dump(artifacts),
             "raw_path": raw_key,
         },
+    )
+    _append_event(
+        repo,
+        task_id,
+        channel="apollo_avatar",
+        code="prepare.done",
+        message="Prepare done",
+        extra={"raw_key": raw_key},
     )
     return {
         "ok": True,
@@ -961,7 +1022,13 @@ async def run_post_generate_pipeline(
     if pipeline_config.get("subtitles_mode") == "whisper-only":
         _translate = False
 
-    _append_event(repo, task_id, channel="apollo_avatar", code="AVATAR_POST_PIPELINE_START", message="Post pipeline start")
+    _append_event(
+        repo,
+        task_id,
+        channel="apollo_avatar",
+        code="post.start",
+        message="Post pipeline start",
+    )
 
     # --------- Step 1: Subtitles ---------
     subtitles_ready = (task.get("subtitles_status") == "ready") and bool(task.get("subtitles_key"))
@@ -974,6 +1041,14 @@ async def run_post_generate_pipeline(
                 translate=_translate,
             )
         except Exception:
+            _append_event(
+                repo,
+                task_id,
+                channel="apollo_avatar",
+                code="post.error",
+                message="Subtitles failed",
+                extra={"stage": "subtitles"},
+            )
             logger.exception("Post-generate subtitles failed", extra={"task_id": task_id})
             return
     else:
@@ -996,6 +1071,14 @@ async def run_post_generate_pipeline(
                 )
             )
         except Exception:
+            _append_event(
+                repo,
+                task_id,
+                channel="apollo_avatar",
+                code="post.error",
+                message="Dub failed",
+                extra={"stage": "dub"},
+            )
             logger.exception("Post-generate dub failed", extra={"task_id": task_id})
             return
     else:
@@ -1010,12 +1093,31 @@ async def run_post_generate_pipeline(
         try:
             await run_pack_step(PackRequest(task_id=task_id))
         except Exception:
+            _append_event(
+                repo,
+                task_id,
+                channel="apollo_avatar",
+                code="post.error",
+                message="Pack failed",
+                extra={"stage": "pack"},
+            )
             logger.exception("Post-generate pack failed", extra={"task_id": task_id})
             return
     else:
         logger.info("Post-generate: pack already ready; skip", extra={"task_id": task_id})
 
-    _append_event(repo, task_id, channel="apollo_avatar", code="AVATAR_POST_PIPELINE_DONE", message="Post pipeline done")
+    _append_event(
+        repo,
+        task_id,
+        channel="apollo_avatar",
+        code="post.done",
+        message="Post pipeline done",
+        extra={
+            "subtitles_status": task.get("subtitles_status"),
+            "dub_status": task.get("dub_status"),
+            "pack_status": task.get("pack_status"),
+        },
+    )
     logger.info("Post-generate pipeline done", extra={"task_id": task_id})
 
 

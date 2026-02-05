@@ -1,0 +1,969 @@
+
+=== gateway/app/main.py ===
+# gateway/app/main.py
+
+from pathlib import Path
+
+import importlib.util
+import logging
+import os
+import shutil
+from typing import Any, Dict
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+
+from gateway.app.auth import (
+    COOKIE_NAME,
+    load_auth_settings,
+    scopes_for_role,
+    verify_op_key,
+    verify_session,
+)
+from gateway.app.config import create_storage_service, get_settings
+from gateway.app.core.logging_config import configure_logging
+from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
+from gateway.app import models
+from gateway.app.ports.storage_provider import get_storage_service, set_storage_service
+from gateway.app.routers import admin_publish, admin_tools as admin_tools_router, publish as publish_router, tasks as tasks_router
+from gateway.app.routers import hot_follow_ui as hot_follow_ui_router
+from gateway.app.routers.api_tools import router as tools_api_router
+from gateway.app.routes.auth import router as auth_router
+from gateway.app.routes.v17_pack import router as v17_pack_router
+from gateway.app.web.templates import render_template
+from gateway.routes import v1_actions
+
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+UI_HTML_PATH = STATIC_DIR / "ui.html"
+AUDIO_DIR = Path(get_settings().workspace_root).expanduser().resolve() / "audio"
+WORKSPACE_ROOT = Path(
+    os.environ.get("VIDEO_WORKSPACE", "/opt/render/project/src/video_workspace")
+).resolve()
+ALLOWED_TOP_DIRS = {"raw", "tasks", "audio", "pack", "published"}
+
+configure_logging()
+
+app = FastAPI(title="ShortVideo Gateway", version="v1")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+app.mount("/audio", StaticFiles(directory=str(AUDIO_DIR), check_dir=False), name="audio")
+logger = logging.getLogger(__name__)
+tasks_html_path = Path(__file__).resolve().parent / "static" / "tasks.html"
+
+
+@app.on_event("startup")
+def on_startup() -> None:
+    # Initialize database schema on boot (safe no-op if tables already exist)
+    Base.metadata.create_all(bind=engine)
+    ensure_task_extra_columns(engine)
+    ensure_provider_config_table(engine)
+    set_storage_service(create_storage_service())
+    for d in (Path("scenes"), Path("scene_packs"), Path("deliver/packs"), AUDIO_DIR):
+        d.mkdir(parents=True, exist_ok=True)
+
+
+@app.on_event("startup")
+def warmup_whisper_on_startup() -> None:
+    try:
+        from gateway.app.providers import whisper_singleton
+
+        whisper_singleton.get_whisper_model()
+        whisper_singleton.warmup()
+    except Exception as exc:
+        logger.warning("startup whisper warmup failed: %s", exc)
+
+@app.on_event("startup")
+def log_routes_on_startup() -> None:
+    """Log route table to help spot duplicates in CI/logs (dev-only signal)."""
+    for route in app.routes:
+        methods = ",".join(sorted(getattr(route, "methods", []) or []))
+        path = getattr(route, "path", "")
+        name = getattr(route, "name", "")
+        logger.info("route=%s methods=%s name=%s", path, methods, name)
+
+app.include_router(tasks_router.pages_router)
+app.include_router(tasks_router.api_router)
+app.include_router(auth_router)
+app.include_router(tools_api_router)
+app.include_router(v1_actions.router, prefix="/v1")
+app.include_router(publish_router.router)
+app.include_router(admin_publish.router, tags=["admin"])
+app.include_router(admin_tools_router.router)
+app.include_router(v17_pack_router)
+app.include_router(hot_follow_ui_router.router)
+if get_settings().enable_apollo_avatar:
+    from gateway.app.routers.apollo_avatar import router as apollo_avatar_router
+
+    app.include_router(apollo_avatar_router)
+
+ALLOW_PREFIXES = (
+    "/health",
+    "/healthz",
+    "/static/",
+    "/auth/login",
+    "/api/auth/login",
+    "/api/auth/logout",
+    "/api/auth/me",
+)
+ADMIN_PREFIXES = ("/admin", "/api/admin")
+
+
+def _is_allowed_path(path: str) -> bool:
+    return any(path == p or path.startswith(p) for p in ALLOW_PREFIXES)
+
+
+def _is_api_path(path: str) -> bool:
+    return path.startswith("/api/") or path.startswith("/v1/")
+
+
+def _is_admin_area(path: str) -> bool:
+    return any(path == p or path.startswith(p) for p in ADMIN_PREFIXES)
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    path = request.url.path
+    if _is_allowed_path(path):
+        return await call_next(request)
+
+    s = load_auth_settings()
+    if s.auth_mode == "off":
+        return await call_next(request)
+
+    header_ok = False
+    if s.auth_mode in ("header", "both"):
+        hv = request.headers.get(s.header_name)
+        header_ok = verify_op_key(hv, s.op_access_key)
+        if header_ok:
+            request.state.op = "header"
+            request.state.role = "operator"
+            request.state.scopes = scopes_for_role("operator")
+
+    session_ok = False
+    if not header_ok and s.auth_mode in ("session", "both"):
+        token = request.cookies.get(COOKIE_NAME)
+        claims = verify_session(token, s.session_secret) if token else None
+        if claims:
+            role = claims.get("role", "operator")
+            request.state.op = claims.get("op", "ops")
+            request.state.role = role
+            request.state.scopes = scopes_for_role(role)
+            session_ok = True
+
+    if header_ok or session_ok:
+        if _is_admin_area(path):
+            role = getattr(request.state, "role", "")
+            if str(role).lower() != "admin":
+                return JSONResponse(status_code=403, content={"detail": "Admin only"})
+        return await call_next(request)
+
+    if _is_api_path(path):
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+    next_url = str(request.url.path)
+    if request.url.query:
+        next_url += "?" + request.url.query
+    return RedirectResponse(url=f"/auth/login?next={next_url}", status_code=302)
+
+
+@app.get("/auth/login", response_class=HTMLResponse, include_in_schema=False)
+def auth_login_page(request: Request, next: str = "/tasks"):
+    return render_template(
+        request=request,
+        name="auth_login.html",
+        ctx={
+            "next": next,
+            "topbar_title": None,
+            "topbar_nav": None,
+            "topbar_actions": None,
+        },
+    )
+
+
+@app.get("/admin/tools", response_class=HTMLResponse, include_in_schema=False)
+def admin_tools_page(request: Request):
+    return render_template(request=request, name="admin_tools.html")
+
+
+@app.get("/", include_in_schema=False)
+def root() -> Dict[str, Any]:
+    return {"ok": True}
+
+
+@app.head("/", include_in_schema=False)
+def root_head() -> Response:
+    return Response(status_code=200)
+
+
+@app.get("/healthz/build", tags=["health"])
+def healthz_build(response: Response) -> Dict[str, Any]:
+    """
+    Acceptance-only endpoint for v1.7.
+    Must remain read-only, no side effects, no dependency on external services.
+    """
+    git_sha = (
+        os.getenv("RENDER_GIT_COMMIT")
+        or os.getenv("GIT_SHA")
+        or os.getenv("COMMIT_SHA")
+        or "unknown"
+    )
+
+    # Check whether v1.7 Day1 module exists and is importable in the running container.
+    has_pack_v17_youcut = False
+    import_error = None
+    try:
+        from gateway.app.core.pack_v17_youcut import generate_youcut_pack  # noqa: F401
+
+        has_pack_v17_youcut = True
+    except Exception as e:
+        import_error = f"{type(e).__name__}: {e}"
+
+
+
+=== gateway/app/routers/apollo_avatar.py ===
+from __future__ import annotations
+
+from uuid import uuid4
+
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, UploadFile, File, Form
+from typing import Optional, Any, Dict
+
+from gateway.app.deps import get_task_repository
+from gateway.app.domain.apollo_avatar import ApolloAvatarRequest
+from gateway.app.services.apollo_avatar_assets import save_avatar_image, save_ref_video
+from gateway.app.config import get_settings
+from gateway.app.services.steps_v1 import (
+    run_apollo_avatar_generate_step,
+    run_post_generate_pipeline,
+)
+from gateway.app.task_repo_utils import normalize_task_payload
+from gateway.app.utils.pipeline_config import pipeline_config_to_storage
+
+router = APIRouter(prefix="/api/apollo/avatar", tags=["apollo-avatar"])
+
+
+@router.post("/tasks")
+async def create_apollo_avatar_task(
+    avatar_file: UploadFile = File(...),
+    ref_video_file: UploadFile = File(...),
+    duration_sec: int = Form(...),
+    prompt: str = Form(...),
+    seed: int | None = Form(default=None),
+    live_enabled: bool = Form(default=False),
+    repo=Depends(get_task_repository),
+):
+    if duration_sec not in (15, 30):
+        raise HTTPException(status_code=400, detail="duration_sec must be 15 or 30")
+    task_id = uuid4().hex[:12]
+    task_payload = normalize_task_payload(
+        {
+            "task_id": task_id,
+            "title": "ApolloAvatar",
+            "source_url": None,
+            "platform": "apollo_avatar",
+            "kind": "apollo_avatar",
+            "category_key": "apollo_avatar",
+            "content_lang": "mm",
+            "ui_lang": "zh",
+            "pipeline_config": pipeline_config_to_storage(
+                {"apollo_avatar_target_duration_sec": str(duration_sec)}
+            ),
+            "status": "pending",
+            "last_step": None,
+            "error_message": None,
+            "meta": {
+                "apollo_avatar": {
+                    "target_duration_sec": duration_sec,
+                    "live_enabled": bool(live_enabled),
+                    "avatar_image_url": "",
+                    "reference_video_url": "",
+                    "prompt": prompt,
+                    "seed": seed,
+                }
+            },
+        },
+        is_new=True,
+    )
+    repo.create(task_payload)
+    stored = repo.get(task_id)
+    if not stored:
+        raise HTTPException(status_code=500, detail="task persistence failed")
+
+    avatar_url = await save_avatar_image(stored, avatar_file)
+    ref_url = await save_ref_video(stored, ref_video_file)
+    meta = stored.get("meta") or {}
+    if isinstance(meta, str):
+        try:
+            import json
+
+            meta = json.loads(meta)
+        except Exception:
+            meta = {}
+    apollo_meta = meta.get("apollo_avatar") if isinstance(meta, dict) else {}
+    if not isinstance(apollo_meta, dict):
+        apollo_meta = {}
+    apollo_meta.update(
+        {
+            "avatar_image_url": avatar_url,
+            "reference_video_url": ref_url,
+            "target_duration_sec": duration_sec,
+            "live_enabled": bool(live_enabled),
+            "prompt": prompt,
+            "seed": seed,
+        }
+    )
+    meta["apollo_avatar"] = apollo_meta
+    repo.upsert(task_id, {"meta": meta})
+    return {
+        "ok": True,
+        "task_id": task_id,
+        "target_duration_sec": duration_sec,
+        "live_enabled": bool(live_enabled),
+    }
+
+
+@router.post("/{task_id}/generate")
+async def generate_apollo_avatar(
+    task_id: str,
+    background_tasks: BackgroundTasks,
+    payload: Optional[Dict[str, Any]] = Body(default=None),
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    meta = task.get("meta") or {}
+    if isinstance(meta, str):
+        try:
+            import json
+
+            meta = json.loads(meta)
+        except Exception:
+            meta = {}
+    apollo_meta = meta.get("apollo_avatar") if isinstance(meta, dict) else {}
+    if not isinstance(apollo_meta, dict):
+        apollo_meta = {}
+    settings = get_settings()
+    live_enabled = bool(payload.get("live_enabled")) if payload else bool(apollo_meta.get("live_enabled"))
+    if live_enabled and not bool(getattr(settings, "apollo_avatar_live_enabled", False)):
+        raise HTTPException(status_code=403, detail="Apollo Avatar live generation is disabled")
+
+    if payload:
+        req = ApolloAvatarRequest(**payload)
+    else:
+        req = ApolloAvatarRequest(
+        target_duration_sec=int(apollo_meta.get("target_duration_sec") or 15),
+        prompt=str(apollo_meta.get("prompt") or ""),
+        seed=apollo_meta.get("seed"),
+        avatar_image_url=str(apollo_meta.get("avatar_image_url") or ""),
+        reference_video_url=str(apollo_meta.get("reference_video_url") or ""),
+        live_enabled=live_enabled,
+        )
+    if live_enabled and not bool(apollo_meta.get("live_enabled")):
+        raise HTTPException(status_code=403, detail="Task is not enabled for live generation")
+
+    if not req.avatar_image_url or not req.reference_video_url:
+        raise HTTPException(status_code=400, detail="apollo_avatar assets missing: avatar/ref")
+
+    resp = await run_apollo_avatar_generate_step(
+        task=task,
+        task_id=task_id,
+        req=req,
+        repo=repo,
+        live_enabled=live_enabled,
+    )
+    background_tasks.add_task(
+        run_post_generate_pipeline,
+        task_id=task_id,
+        repo=repo,
+        target_lang=(task.get("content_lang") or "my"),
+        translate=True,
+        force=False,
+    )
+    return resp
+
+
+
+=== gateway/app/routers/tasks.py ===
+"""Task API and HTML routers for the gateway application."""
+
+import asyncio
+import json
+import hashlib
+import hmac
+import logging
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+import time
+import zipfile
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+from uuid import uuid4
+from typing import Any
+
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, Security, UploadFile
+from fastapi.security.api_key import APIKeyHeader
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
+from pydantic import BaseModel
+
+from ..config import get_settings
+from ..core.features import get_features
+from ..schemas import (
+    DubRequest,
+    DubResponse,
+    PackRequest,
+    ParseRequest,
+    SubtitlesRequest,
+    TaskCreate,
+    TaskDetail,
+    TaskListResponse,
+    TaskSummary,
+    TaskUpdate,
+)
+
+from gateway.app.web.templates import render_template
+from gateway.app.services.workbench_registry import resolve_workbench_spec
+from gateway.app.deps import get_task_repository
+from gateway.app.ports.storage_provider import get_storage_service  # 只保留这一处依赖注入入�?
+
+# Ports / typing
+from gateway.ports.repository import ITaskRepository  # 如路径不对，按你�?ports 实际文件�?
+
+# Canonical SSOT dubbing step (v1.62+)
+from gateway.app.steps.dubbing import run_dub_step as run_dub_step_ssot
+
+# Legacy v1 pipeline steps (parse/subtitles/pack). Dubbing 保留 v1 名称但必须显式别名，避免覆盖 SSOT
+from ..services.steps_v1 import (
+    compute_subtitles_params,
+    run_pack_step as run_pack_step_v1,
+    run_parse_step as run_parse_step_v1,
+    run_subtitles_step as run_subtitles_step_v1,
+    run_subtitles_step_entry,
+    run_dub_step as run_dub_step_v1,
+)
+def coerce_datetime(v: Any) -> Optional[datetime]:
+    """
+    Best-effort convert repository stored value into a timezone-aware datetime.
+    Accepts:
+      - datetime (naive/aware)
+      - ISO8601 string (with/without 'Z', with/without timezone)
+      - epoch seconds/ms (int/float or numeric string)
+    Returns:
+      - datetime (tz-aware, UTC) or None if cannot parse
+    """
+    if v is None:
+        return None
+
+    # already datetime
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+
+    # epoch seconds / milliseconds
+    if isinstance(v, (int, float)):
+        ts = float(v)
+        if ts > 1e12:  # ms
+            ts = ts / 1000.0
+        try:
+            return datetime.fromtimestamp(ts, tz=timezone.utc)
+        except Exception:
+            return None
+
+    # strings
+    if isinstance(v, str):
+        s = v.strip()
+        if not s:
+            return None
+
+        # numeric string -> epoch
+        if s.isdigit():
+            try:
+                ts = float(s)
+                if ts > 1e12:
+                    ts = ts / 1000.0
+                return datetime.fromtimestamp(ts, tz=timezone.utc)
+            except Exception:
+                return None
+
+        # ISO8601 variants
+        # handle "Z"
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+
+        # allow "YYYY-mm-dd HH:MM:SS" -> fromisoformat can parse, but ensure 'T' optional ok
+        try:
+            dt = datetime.fromisoformat(s)
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            return None
+
+    # unknown type
+    return None
+
+
+def coerce_datetime_or_epoch(v: Any) -> datetime:
+    """
+    Safe non-null datetime for response models that disallow None.
+    """
+    return coerce_datetime(v) or datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+# Artifact storage helpers（只 import 一次，禁止在文件底部重定义同名函数�?
+from gateway.app.services.artifact_storage import (
+    upload_task_artifact,
+    get_download_url,
+    get_object_bytes,
+    object_exists,
+)
+from gateway.app.ports.storage_provider import get_storage_service
+from gateway.app.services.scene_split import enqueue_scenes_build
+from gateway.app.services.publish_service import publish_task_pack, resolve_download_url
+from gateway.app.db import SessionLocal
+
+from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
+from gateway.app.services.task_cleanup import delete_task_record, purge_task_artifacts
+from gateway.app.utils.pipeline_config import parse_pipeline_config, pipeline_config_to_storage
+from gateway.app.utils.subtitle_probe import probe_subtitles
+
+from ..core.workspace import (
+    Workspace,
+    origin_srt_path,
+    deliver_pack_zip_path,
+    raw_path,
+    relative_to_workspace,
+    task_base_dir,
+)
+
+logger = logging.getLogger(__name__)
+
+AUDIO_MM_KEY_TEMPLATE = "deliver/tasks/{task_id}/audio_mm.mp3"
+OP_HEADER_KEY = "X-OP-KEY"
+
+
+class DubProviderRequest(BaseModel):
+    provider: str | None = None
+    voice_id: str | None = None
+    mm_text: str | None = None
+
+
+class EditedTextRequest(BaseModel):
+    text: str
+
+
+class ScenesRequest(BaseModel):
+    force: bool = False
+
+
+class SubtitlesTaskRequest(BaseModel):
+    target_lang: str | None = None
+    force: bool = False
+    translate: bool = True
+
+
+class ParseTaskRequest(BaseModel):
+    platform: str | None = None
+
+
+class PublishTaskRequest(BaseModel):
+    provider: str | None = None
+    force: bool = False
+
+
+pages_router = APIRouter()
+api_router = APIRouter(prefix="/api", tags=["tasks"])
+api_key_header = APIKeyHeader(name=OP_HEADER_KEY, auto_error=False)
+def _coerce_datetime(value) -> datetime:
+    # Pydantic TaskDetail.created_at expects datetime, so guarantee it.
+    if isinstance(value, datetime):
+        return value
+
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(value, tz=timezone.utc)
+
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return datetime.now(timezone.utc)
+
+        # unix seconds in string
+        if s.isdigit():
+            return datetime.fromtimestamp(int(s), tz=timezone.utc)
+
+        # ISO with Z
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+
+        # Try ISO formats
+        try:
+            dt = datetime.fromisoformat(s)
+
+
+=== gateway/app/services/task_events.py ===
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
+
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def append_task_event(
+    task: Dict[str, Any],
+    *,
+    channel: str,
+    code: str,
+    message: str,
+    extra: Optional[Dict[str, Any]] = None,
+) -> None:
+    if extra is None:
+        extra = {}
+    events = task.get("events")
+    if not isinstance(events, list):
+        events = []
+        task["events"] = events
+    events.append(
+        {
+            "ts": utc_now_iso(),
+            "channel": channel,
+            "code": code,
+            "message": message,
+            "extra": extra,
+        }
+    )
+
+
+=== gateway/app/static/js/workbench_apollo_avatar.js ===
+(function () {
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  async function fetchEvents() {
+    const out = $("apollo-events");
+    if (!out) return;
+    const url = window.__EVENTS_URL__;
+    if (!url) {
+      out.textContent = "-";
+      return;
+    }
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      out.textContent = `Failed to load events: HTTP ${resp.status}`;
+      return;
+    }
+    const payload = await resp.json();
+    const events = Array.isArray(payload.events) ? payload.events : [];
+    const filtered = events.filter((e) => e && e.channel === "apollo_avatar").reverse();
+    if (!filtered.length) {
+      out.textContent = "No events.";
+      return;
+    }
+    out.textContent = filtered
+      .map((e) => `[${e.ts || ""}] [${e.code || ""}] ${e.message || ""}`)
+      .join("\n");
+  }
+
+  async function runGenerate() {
+    const resultEl = $("apollo-result");
+    if (!window.__APOLLO_GENERATE_URL__) return;
+    const resp = await fetch(window.__APOLLO_GENERATE_URL__, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      if (resultEl) {
+        if (data.final_video_url) {
+          resultEl.innerHTML = `<a href="${data.final_video_url}" target="_blank" rel="noopener">final_video_url</a>`;
+        } else {
+          resultEl.textContent = JSON.stringify(data, null, 2);
+        }
+      }
+      await fetchEvents();
+      startPolling();
+      return;
+    }
+    let detail = null;
+    try {
+      detail = await resp.json();
+    } catch (_) {
+      detail = null;
+    }
+    if (resultEl) {
+      if (detail) {
+        resultEl.textContent = JSON.stringify(detail, null, 2);
+      } else {
+        resultEl.textContent = `${resp.status} ${resp.statusText}`;
+      }
+    }
+  }
+
+  let pollTimer = null;
+  let pollStart = 0;
+
+  function startPolling() {
+    if (pollTimer) {
+      clearTimeout(pollTimer);
+    }
+    pollStart = Date.now();
+    const tick = async () => {
+      await fetchEvents();
+      const elapsed = Date.now() - pollStart;
+      const interval = elapsed < 60000 ? 2000 : 5000;
+      pollTimer = setTimeout(tick, interval);
+    };
+    pollTimer = setTimeout(tick, 1000);
+  }
+
+  function bind() {
+    $("btn-apollo-generate")?.addEventListener("click", runGenerate);
+    $("btn-refresh-events")?.addEventListener("click", fetchEvents);
+    fetchEvents();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bind);
+  } else {
+    bind();
+  }
+})();
+
+
+=== gateway/app/templates/task_workbench.html ===
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ t("page.workbench.title") }} - {{ task.task_id }}</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
+  <link rel="stylesheet" href="/static/pipeline_lab.css" />
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css">
+  <style>
+    :root { color-scheme: light; }
+    .page.workbench {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .header-card {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .back-link {
+      color: #1d4ed8;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .btn-primary {
+      background: #2563eb;
+      color: #ffffff;
+      border: 1px solid #2563eb;
+    }
+    .btn-primary:hover { filter: brightness(.95); }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111827;
+      border: 1px solid #d1d5db;
+    }
+    .btn-secondary:hover { filter: brightness(.98); }
+    .btn-primary:disabled,
+    .btn-secondary:disabled {
+      opacity: 0.7;
+      color: #111827;
+    }
+    h1 { margin: 0; font-size: 1.6rem; font-weight: 800; }
+    .status-pill {
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      background: #e5e7eb;
+      color: #374151;
+    }
+    .badge-ready { background: #dcfce7; color: #15803d; }
+    .badge-processing { background: #fef3c7; color: #b45309; }
+    .badge-error { background: #fee2e2; color: #b91c1c; }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px 16px;
+    }
+    .meta-item { font-size: 0.95rem; color: #374151; }
+    .meta-item strong {
+      display: block;
+      color: #0f172a;
+      font-size: 0.8rem;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .muted { color: #64748b; font-size: 0.85rem; }
+    .deliverables-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .deliverable-card {
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #f8fafc;
+    }
+    .deliverable-card.primary { border-color: rgba(37, 99, 235, 0.35); background: #eef2ff; }
+    .deliverable-title { font-weight: 700; font-size: 1rem; color: #0f172a; }
+    .deliverable-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .download-link {
+      color: #1d4ed8;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .download-link.disabled { color: #9ca3af; pointer-events: none; }
+    .copy-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .copy-btn {
+      background: #e2e8f0;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: #cbd5f5; }
+    .info-row { display: flex; flex-wrap: wrap; gap: 12px; }
+    .info-pill {
+      background: #f1f5f9;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+    }
+    .publish-textarea { width: 100%; min-height: 120px; }
+    .steps-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .step-card {
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 14px;
+      padding: 12px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .step-card h3 { margin: 0; font-size: 1rem; }
+    pre.output-log {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 12px;
+      padding: 12px;
+      max-height: 240px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+    details.panel summary { cursor: pointer; font-weight: 700; }
+    @media (max-width: 768px) {
+      .header-row { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page workbench">
+    <div class="card header-card">
+{% set topbar_title = t("ui.workbench.title") %}
+{% set topbar_subtitle = t("page.workbench.subtitle", task_id=task.task_id) %}
+{% set topbar_nav = [
+  {"label": t("common.tasks"), "href": "/tasks", "active": True},
+  {"label": t("common.tools"), "href": "/tools/hub", "active": False},
+] %}
+{% set topbar_actions = [
+  {"label": t("common.back_task_board"), "href": "/tasks", "primary": False},
+] %}
+{% include "_topbar.html" %}
+      <div class="info-row" style="margin-top:8px;">
+        <div id="status-badge" class="status-pill">{{ task.status }}</div>
+      </div>
+      <div class="meta-grid">
+        <div class="meta-item"><strong>{{ t("workbench.meta.task_id") }}</strong><span>{{ task.task_id }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.platform") }}</strong><span>{{ task.platform or '-' }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.account") }}</strong><span>{{ task.account_id or '-' }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.category") }}</strong><span>{{ task.category_key or '-' }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.language") }}</strong><span>{{ task.content_lang or '-' }}</span></div>
+        <div class="meta-item">
+          <strong>{{ t("workbench.meta.subtitle_track") }}</strong>
+          <span>
+            {% set track = task.subtitle_track_kind %}
+            {% if track == "embedded" %}
+              {{ t("workbench.meta.subtitle_track.embedded") }}
+            {% elif track == "burned" %}
+              {{ t("workbench.meta.subtitle_track.burned") }}
+            {% elif track == "none" %}
+              {{ t("workbench.meta.subtitle_track.none") }}
+            {% elif track == "unknown" or not track %}
+              {{ t("workbench.meta.subtitle_track.unknown") }}
+            {% else %}
+              {{ track }}
+            {% endif %}
+          </span>
+        </div>
+        {% set pipeline = task.pipeline_config or {} %}
+        {% set subtitles_mode = pipeline.get("subtitles_mode", "whisper+gemini") %}
+        {% set dub_mode = pipeline.get("dub_mode", "auto-fallback") %}
+        {% set ingest_mode = pipeline.get("ingest_mode") %}
+        {% set subtitle_stream = pipeline.get("subtitle_stream") %}
+        {% set clean_generated = pipeline.get("clean_video_generated") %}
+        {% set hard_subtitles = pipeline.get("has_hard_subtitles") %}
+        <div class="meta-item"><strong>{{ t("workbench.meta.pipeline") }}</strong><span>{{ t("tasks.subtitles") }}: {{ subtitles_mode }} �� {{ t("tasks.dub") }}: {{ dub_mode }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.status") }}</strong><span>{{ task.status }}</span></div>
+        <div class="meta-item"><strong>{{ t("workbench.meta.created") }}</strong><span>{{ task.created_at }}</span></div>
+        <div class="meta-item">
+          <strong>{{ t("workbench.meta.source_url") }}</strong>
+          {% if task_view.source_url_open %}
+            <div><a href="{{ task_view.source_url_open }}" target="_blank" rel="noopener">{{ t("action.open") }}</a></div>
+          {% else %}
+            <div class="muted t-secondary">{{ t("workbench.source_url.empty") }}</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">
+        <h2>{{ t("workbench.deliverables") }}</h2>
+        <div class="secondary">{{ t("workbench.deliverables.subtitle") }}</div>
+      </div>
+      <div class="section-grid deliverables-grid">
+        <div class="deliverable-card primary">
+          <div class="deliverable-title">{{ t("workbench.pack") }}</div>
+          <div class="deliverable-actions">
+            <a id="pack-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/pack" target="_blank" rel="noopener">{{ t("action.download") }}</a>
+            <span id="pack-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
+          </div>
+          <div class="muted" style="margin-top:6px;">{{ t("workbench.deliverables.subtitle") }}</div>
+        </div>
+
+
