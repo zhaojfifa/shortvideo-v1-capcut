@@ -17,6 +17,7 @@
   let pollTimer = null;
   let pollStart = 0;
   let pollCount = 0;
+  let lastResult = null;
 
   function getTaskJson() {
     return window.__TASK_JSON__ || {};
@@ -40,6 +41,12 @@
       );
     }
     const apollo = task.apollo_avatar || {};
+    const advPrompt = $("adv-prompt");
+    const advSeed = $("adv-seed");
+    const advStrategy = $("adv-strategy");
+    if (advPrompt && apollo.prompt) advPrompt.value = apollo.prompt;
+    if (advSeed && apollo.seed !== undefined && apollo.seed !== null) advSeed.value = apollo.seed;
+    if (advStrategy && apollo.strategy) advStrategy.value = apollo.strategy;
     if (avatarImg) {
       avatarImg.src = apollo.avatar_image_url || "";
     }
@@ -115,6 +122,16 @@
       .join(" ");
   }
 
+  function setPreviewLink(result) {
+    const el = $("preview-link");
+    if (!el) return;
+    if (result && result.final_video_url) {
+      el.innerHTML = `<a href="${result.final_video_url}" target="_blank" rel="noopener">Open Video</a>`;
+      return;
+    }
+    el.textContent = "-";
+  }
+
   async function fetchEvents(appendOnly) {
     const out = $("apollo-events");
     if (!out) return [];
@@ -151,6 +168,14 @@
         .join("\n");
     }
     updateStepper(filtered);
+    const lastGenerate = filtered
+      .slice()
+      .reverse()
+      .find((e) => e.code === "generate.done" && e.extra && e.extra.final_video_url);
+    if (lastGenerate && !lastResult) {
+      lastResult = { final_video_url: lastGenerate.extra.final_video_url };
+      setPreviewLink(lastResult);
+    }
     return filtered;
   }
 
@@ -164,13 +189,11 @@
     });
     if (resp.ok) {
       const data = await resp.json();
+      lastResult = data;
       if (resultEl) {
-        if (data.final_video_url) {
-          resultEl.innerHTML = `<a href="${data.final_video_url}" target="_blank" rel="noopener">final_video_url</a>`;
-        } else {
-          resultEl.textContent = JSON.stringify(data, null, 2);
-        }
+        resultEl.textContent = JSON.stringify(data, null, 2);
       }
+      setPreviewLink(data);
       setOutputs(getTaskJson(), data);
       await fetchEvents();
       startPolling();
@@ -215,6 +238,7 @@
     $("btn-refresh-events")?.addEventListener("click", () => fetchEvents(false));
     setSummary();
     setOutputs(getTaskJson(), null);
+    setPreviewLink(null);
     fetchEvents(false);
   }
 

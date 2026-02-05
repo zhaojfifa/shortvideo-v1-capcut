@@ -16,6 +16,10 @@
     .btn-primary { background: #2563eb; color: #fff; }
     .output { background: #0f172a; color: #e2e8f0; padding: 10px; border-radius: 8px; font-size: 12px; white-space: pre-wrap; }
     .links a { display: inline-block; margin-right: 12px; }
+    .ops-advanced textarea { width: 100%; min-height: 140px; }
+    .ops-advanced input[type="text"], .ops-advanced input[type="number"] { width: 240px; }
+    .ops-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .ops-card { padding: 12px; border: 1px solid #eee; border-radius: 10px; }
   </style>
 </head>
 <body>
@@ -32,37 +36,15 @@
     ] %}
     {% include "_topbar.html" %}
 
-    <div class="card" id="ops-summary">
-      <h2 style="margin:0 0 6px;">Apollo Avatar Workbench</h2>
-      <div class="muted">Generate then continue in the standard pipeline.</div>
-      <div class="row" style="margin-top:12px;">
-        <div class="field">
-          <label>Avatar</label>
-          <img id="avatar-preview" class="preview" alt="avatar preview" />
-        </div>
-        <div class="field">
-          <label>Reference</label>
-          <video id="ref-preview" class="preview" controls preload="metadata"></video>
-        </div>
-        <div class="field">
-          <label>Params</label>
-          <pre id="param-summary" class="output">-</pre>
+    <div class="card ops-advanced" id="ops-advanced">
+      <h3 style="margin:0 0 6px;">Advanced</h3>
+      <div class="ops-row">
+        <div class="field" style="flex:1 1 360px;">
+          <label>Prompt</label>
+          <textarea id="adv-prompt" rows="5"></textarea>
         </div>
       </div>
-    </div>
-
-    <div class="card" id="ops-stepper">
-      <h3 style="margin:0 0 6px;">Process Stepper</h3>
-      <div class="row" id="stepper-list" style="gap:8px;"></div>
-    </div>
-
-    <div class="card" id="ops-advanced">
-      <h3 style="margin:0 0 6px;">Advanced</h3>
-      <div class="row">
-        <div class="field">
-          <label>Prompt</label>
-          <textarea id="adv-prompt" rows="4"></textarea>
-        </div>
+      <div class="ops-row">
         <div class="field">
           <label>Seed</label>
           <input id="adv-seed" type="number" placeholder="(optional)" />
@@ -83,13 +65,38 @@
       <div class="muted" style="margin-top:8px;">Generate calls the avatar model and then runs subtitles/dub/pack automatically.</div>
     </div>
 
+    <div class="card" id="ops-preview">
+      <h3 style="margin:0 0 6px;">Preview</h3>
+      <div class="ops-row">
+        <div class="field ops-card">
+          <label>Avatar</label>
+          <img id="avatar-preview" class="preview" alt="avatar preview" />
+        </div>
+        <div class="field ops-card">
+          <label>Reference</label>
+          <video id="ref-preview" class="preview" controls preload="metadata"></video>
+        </div>
+        <div class="field ops-card">
+          <label>Open Video</label>
+          <div id="preview-link"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="ops-stepper">
+      <h3 style="margin:0 0 6px;">Process Stepper</h3>
+      <div class="ops-row" id="stepper-list" style="gap:8px;"></div>
+    </div>
+
+    <details class="card" id="ops-debug">
+      <summary>Params / Debug JSON</summary>
+      <pre id="param-summary" class="output">-</pre>
+      <pre id="apollo-result" class="output">-</pre>
+    </details>
+
     <div class="card" id="ops-outputs">
       <h3 style="margin:0 0 6px;">Outputs</h3>
       <div class="links" id="outputs-links"></div>
-      <details style="margin-top:10px;">
-        <summary>Debug JSON</summary>
-        <pre id="apollo-result" class="output">-</pre>
-      </details>
     </div>
 
     <details class="card" id="ops-log">
