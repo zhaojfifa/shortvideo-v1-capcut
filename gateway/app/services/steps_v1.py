@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import HTTPException
@@ -66,6 +67,96 @@ def _env_int(name: str, default: int) -> int:
 def _truthy_env(name: str, default: str = "1") -> bool:
     v = os.getenv(name, default)
     return v is not None and v.strip().lower() not in ("0", "false", "no", "")
+
+
+async def _hydrate_raw_from_url(
+    *,
+    task_id: str,
+    task: dict,
+    final_video_url: str | None,
+    repo,
+    force: bool = False,
+) -> str:
+    raw_file = raw_path(task_id)
+    raw_file.parent.mkdir(parents=True, exist_ok=True)
+    raw_key = task.get("raw_path")
+
+    if raw_key and not force:
+        if raw_file.exists():
+            _append_event(
+                repo,
+                task_id,
+                channel="apollo_avatar",
+                code="hydrate_raw.skip",
+                message="Raw already present; skip hydrate",
+                extra={"raw_key": raw_key},
+            )
+            return raw_key
+        try:
+            _append_event(
+                repo,
+                task_id,
+                channel="apollo_avatar",
+                code="hydrate_raw.start",
+                message="Hydrate raw from storage",
+                extra={"raw_key": raw_key, "source": "storage"},
+            )
+            storage = get_storage_service()
+            storage.download_file(raw_key, str(raw_file))
+            _append_event(
+                repo,
+                task_id,
+                channel="apollo_avatar",
+                code="hydrate_raw.done",
+                message="Hydrate raw done",
+                extra={"raw_key": raw_key, "source": "storage"},
+            )
+            return raw_key
+        except Exception as exc:
+            _append_event(
+                repo,
+                task_id,
+                channel="apollo_avatar",
+                code="hydrate_raw.error",
+                message="Hydrate raw from storage failed",
+                extra={"raw_key": raw_key, "source": "storage", "message": str(exc)},
+            )
+            if not final_video_url:
+                raise
+
+    if not final_video_url:
+        _append_event(
+            repo,
+            task_id,
+            channel="apollo_avatar",
+            code="hydrate_raw.error",
+            message="Missing final_video_url for raw hydrate",
+        )
+        raise RuntimeError("final_video_url missing for raw hydrate")
+
+    host = urlparse(final_video_url).netloc if final_video_url else ""
+    _append_event(
+        repo,
+        task_id,
+        channel="apollo_avatar",
+        code="hydrate_raw.start",
+        message="Hydrate raw from url",
+        extra={"source": "url", "source_host": host},
+    )
+    async with httpx.AsyncClient(timeout=300) as client:
+        resp = await client.get(final_video_url)
+        resp.raise_for_status()
+        raw_file.write_bytes(resp.content)
+    raw_key = upload_task_artifact(task, raw_file, "raw.mp4", task_id=task_id)
+    _append_event(
+        repo,
+        task_id,
+        channel="apollo_avatar",
+        code="hydrate_raw.done",
+        message="Hydrate raw done",
+        extra={"raw_key": raw_key, "source": "url", "source_host": host},
+    )
+    return raw_key
 
 
 def _truthy_env(name: str, default: str = "1") -> bool:
@@ -968,9 +1059,7 @@ async def run_apollo_avatar_generate_step(
 
     raw_key = None
     final_url = getattr(artifacts, "final_video_url", None)
-    if final_url:
-        raw_file = raw_path(task_id)
-        raw_file.parent.mkdir(parents=True, exist_ok=True)
+    if final_url or task.get("raw_path"):
         _append_event(
             repo,
             task_id,
@@ -979,11 +1068,13 @@ async def run_apollo_avatar_generate_step(
             message="Assemble start",
         )
         try:
-            async with httpx.AsyncClient(timeout=300) as client:
-                resp = await client.get(final_url)
-                resp.raise_for_status()
-                raw_file.write_bytes(resp.content)
-            raw_key = upload_task_artifact(task, raw_file, "raw.mp4", task_id=task_id)
+            raw_key = await _hydrate_raw_from_url(
+                task_id=task_id,
+                task=task,
+                final_video_url=final_url,
+                repo=repo,
+                force=force,
+            )
             _append_event(
                 repo,
                 task_id,
@@ -1070,6 +1161,19 @@ async def run_post_generate_pipeline(
         return
 
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    raw_key = task.get("raw_path")
+    raw_file = raw_path(task_id)
+    if raw_key and not raw_file.exists():
+        try:
+            storage = get_storage_service()
+            raw_file.parent.mkdir(parents=True, exist_ok=True)
+            storage.download_file(raw_key, str(raw_file))
+        except Exception as exc:
+            logger.exception(
+                "Failed to hydrate raw file from raw_key before post pipeline",
+                extra={"task_id": task_id, "raw_key": raw_key, "error": str(exc)},
+            )
+            return
 
     _target_lang = target_lang or task.get("content_lang") or "my"
     _translate = True if translate is None else bool(translate)
