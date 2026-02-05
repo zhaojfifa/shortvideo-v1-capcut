@@ -4,13 +4,14 @@ from uuid import uuid4
 
 import httpx
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
 
 from gateway.app.deps import get_task_repository
 from gateway.app.domain.apollo_avatar import ApolloAvatarRequest
 from gateway.app.services.apollo_avatar_assets import save_avatar_image, save_ref_video
 from gateway.app.config import get_settings
 from gateway.app.services.apollo_avatar_service import ApolloAvatarService
+from gateway.app.services.steps_v1 import run_post_generate_pipeline
 from gateway.app.services.artifact_storage import upload_task_artifact
 from gateway.app.task_repo_utils import normalize_task_payload
 from gateway.app.core.workspace import raw_path
@@ -111,6 +112,7 @@ async def create_apollo_avatar_task(
 @router.post("/{task_id}/generate")
 async def generate_apollo_avatar(
     task_id: str,
+    background_tasks: BackgroundTasks,
     payload: ApolloAvatarRequest | None = None,
     repo=Depends(get_task_repository),
 ):
@@ -170,6 +172,14 @@ async def generate_apollo_avatar(
             "apollo_avatar": _dump(artifacts),
             "raw_path": raw_key,
         },
+    )
+    background_tasks.add_task(
+        run_post_generate_pipeline,
+        task_id=task_id,
+        repo=repo,
+        target_lang=(task.get("content_lang") or "my"),
+        translate=True,
+        force=False,
     )
     return {
         "ok": True,
