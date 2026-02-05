@@ -7,8 +7,10 @@
     const base0 = String(rawBase || "").trim().replace(/\/+$/, "");
     if (!base0) return "";
     const base1 = base0.replace(/\/apollo_avatar\/[^/]+\.(png|jpg|jpeg|mp4)$/i, "/apollo_avatar");
-    if (base1.endsWith("/apollo_avatar") || base1.endsWith("apollo_avatar")) return base1;
-    return `${base1}/apollo_avatar`;
+    if (base1.endsWith("/apollo_avatar") || base1.endsWith("apollo_avatar")) {
+      return base1.replace(/\/apollo_avatar$/, "");
+    }
+    return base1;
   }
 
   async function postJson(url, payload) {
@@ -55,7 +57,8 @@
     const liveChecked = !!$("live_enabled")?.checked;
     const gateOn = Number(window.__APOLLO_AVATAR_LIVE_ENABLED__ || 0) === 1;
     const seedVal = getSeed();
-    const demoRoot = normalizeDemoRoot(window.__DEMO_ASSET_BASE_URL__);
+    const demoBase = normalizeDemoRoot(window.__DEMO_ASSET_BASE_URL__);
+    const demoRoot = demoBase ? `${demoBase}/apollo_avatar` : "";
     const demoAvatar = demoRoot ? `${demoRoot}/demo_avatar.png` : "";
     const demoRef15 = demoRoot ? `${demoRoot}/demo_15.mp4` : "";
     return {
@@ -118,7 +121,8 @@
     const liveChecked = !!$("live_enabled")?.checked;
     const liveEnabled = isDemo ? false : (gateOn && liveChecked);
     if (isDemo && (!state.avatarFile || !state.refVideoFile)) {
-      const root = normalizeDemoRoot(window.__DEMO_ASSET_BASE_URL__);
+      const base = normalizeDemoRoot(window.__DEMO_ASSET_BASE_URL__);
+      const root = base ? `${base}/apollo_avatar` : "";
       const demoAvatar = root ? `${root}/demo_avatar.png` : "";
       const demoRef = root
         ? (getTargetDurationSec() === 30
@@ -141,7 +145,7 @@
         throw new Error("Create task first");
       }
     }
-    const payload = getPayload(isDemo);
+    const payload = isDemo ? getPayload(true) : null;
     const result = await postJson(`/api/apollo/avatar/${encodeURIComponent(currentTaskId)}/generate`, payload);
     setResult(result, false);
   }
@@ -157,7 +161,8 @@
       genBtn.disabled = !gateOn;
     }
 
-    const demoRoot = normalizeDemoRoot(window.__DEMO_ASSET_BASE_URL__);
+    const demoBase = normalizeDemoRoot(window.__DEMO_ASSET_BASE_URL__);
+    const demoRoot = demoBase ? `${demoBase}/apollo_avatar` : "";
     const demoAvatar = demoRoot ? `${demoRoot}/demo_avatar.png` : "";
     const demo15 = demoRoot ? `${demoRoot}/demo_15.mp4` : "";
     const demo30 = demoRoot ? `${demoRoot}/demo_30.mp4` : "";
