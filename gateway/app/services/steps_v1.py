@@ -26,7 +26,7 @@ from gateway.app.core.workspace import (
     translated_srt_path,
 )
 from gateway.app.db import SessionLocal
-from gateway.app import models
+from gateway.app import config, models
 from gateway.app.services.artifact_storage import upload_task_artifact
 from gateway.app.services.task_events import append_task_event as _append_task_event
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
@@ -855,6 +855,7 @@ async def run_apollo_avatar_generate_step(
     req,
     repo,
     live_enabled: bool,
+    force: bool = False,
 ) -> dict:
     try:
         from gateway.app.services.apollo_avatar_service import ApolloAvatarService
@@ -867,6 +868,7 @@ async def run_apollo_avatar_generate_step(
             level="error",
         )
         raise
+    provider_name = getattr(config.settings, "apollo_avatar_provider", "fal_wan26_flash")
     _append_event(
         repo,
         task_id,
@@ -881,17 +883,69 @@ async def run_apollo_avatar_generate_step(
         channel="apollo_avatar",
         code="generate.start",
         message="Generate start",
-        extra={"target_duration_sec": getattr(req, "target_duration_sec", None)},
+        extra={
+            "provider": provider_name,
+            "model": getattr(config.settings, "apollo_avatar_live_model", None),
+            "target_duration_sec": getattr(req, "target_duration_sec", None),
+            "seed": getattr(req, "seed", None),
+            "live": bool(live_enabled),
+        },
     )
+    existing_final = (
+        task.get("apollo_avatar_final_video_key")
+        or (task.get("apollo_avatar") or {}).get("final_video_url")
+        or (task.get("apollo_avatar") or {}).get("final_video_key")
+    )
+    if existing_final and not force:
+        _append_event(
+            repo,
+            task_id,
+            channel="apollo_avatar",
+            code="generate.skip",
+            message="Generate skipped (existing result)",
+            extra={"final_video_url": existing_final, "provider": provider_name},
+        )
+        return {
+            "ok": True,
+            "task_id": task_id,
+            "segments": (task.get("apollo_avatar") or {}).get("segments", []),
+            "final_video_url": existing_final,
+            "manifest_url": (task.get("apollo_avatar") or {}).get("manifest_url"),
+        }
     service = ApolloAvatarService(repo=repo)
-    artifacts = await service.generate_stitch_only(task, req, live_enabled=live_enabled)
+    try:
+        artifacts = await service.generate_stitch_only(task, req, live_enabled=live_enabled)
+    except Exception as exc:
+        _append_event(
+            repo,
+            task_id,
+            channel="apollo_avatar",
+            code="generate.error",
+            message="Generate error",
+            extra={
+                "provider": provider_name,
+                "stage": "generate",
+                "message": str(exc),
+            },
+        )
+        raise
+    first_req_id = None
+    if getattr(artifacts, "segments", None):
+        for seg in artifacts.segments:
+            if getattr(seg, "request_id", None):
+                first_req_id = seg.request_id
+                break
     _append_event(
         repo,
         task_id,
         channel="apollo_avatar",
         code="generate.done",
         message="Generate done",
-        extra={"final_video_url": getattr(artifacts, "final_video_url", None)},
+        extra={
+            "provider": provider_name,
+            "request_id": first_req_id,
+            "final_video_url": getattr(artifacts, "final_video_url", None),
+        },
     )
 
     plan = getattr(artifacts, "plan", None)

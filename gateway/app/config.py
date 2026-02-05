@@ -82,6 +82,11 @@ class Settings(BaseSettings):
     enable_apollo_avatar: bool = Field(False, env="ENABLE_APOLLO_AVATAR")
     apollo_avatar_live_enabled: bool = Field(False, env="APOLLO_AVATAR_LIVE_ENABLED")
     apollo_avatar_provider: str = Field("fal_wan26_flash", env="APOLLO_AVATAR_PROVIDER")
+    apollo_avatar_live_model: str = Field(
+        "wan/v2.6/image-to-video/flash",
+        env="APOLLO_AVATAR_LIVE_MODEL",
+    )
+    apollo_avatar_live_timeout_sec: int = Field(300, env="APOLLO_AVATAR_LIVE_TIMEOUT_SEC")
     demo_asset_base_url: str = Field("", env="DEMO_ASSET_BASE_URL")
 # === Storage Configuration (PR-0B) ===
     STORAGE_BACKEND: str = "local"  # 选项: "local", "s3"
@@ -138,6 +143,11 @@ WAN26_TIMEOUT_SEC = _env_int("WAN26_TIMEOUT_SEC", 900)
 WAN26_POLL_INTERVAL_SEC = _env_float("WAN26_POLL_INTERVAL_SEC", 2.0)
 WAN26_POLL_MAX_INTERVAL_SEC = _env_float("WAN26_POLL_MAX_INTERVAL_SEC", 8.0)
 WAN26_RESOLUTION = _env_str("WAN26_RESOLUTION", "1080p")
+APOLLO_AVATAR_LIVE_MODEL = _env_str(
+    "APOLLO_AVATAR_LIVE_MODEL",
+    FAL_WAN26_FLASH_MODEL or FAL_WAN26_MODEL_ID or "wan/v2.6/image-to-video/flash",
+)
+APOLLO_AVATAR_LIVE_TIMEOUT_SEC = _env_int("APOLLO_AVATAR_LIVE_TIMEOUT_SEC", 300)
 # ============================================================
 #  Dependency Injection Factory (PR-0B)
 # ============================================================
