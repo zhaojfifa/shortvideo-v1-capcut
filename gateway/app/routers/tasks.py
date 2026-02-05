@@ -46,6 +46,7 @@ from ..schemas import (
 )
 
 from gateway.app.web.templates import render_template
+from gateway.app.services.workbench_registry import resolve_workbench_spec
 from gateway.app.deps import get_task_repository
 from gateway.app.ports.storage_provider import get_storage_service  # 只保留这一处依赖注入入口
 
@@ -1476,15 +1477,18 @@ async def task_workbench_page(
     }
     task_view = {"source_url_open": _extract_first_http_url(task.get("source_url"))}
 
+    spec = resolve_workbench_spec(task)
     return render_template(
         request=request,
-        name="task_workbench.html",
+        name=spec.template,
         ctx={
             "task": detail,
             "task_json": task_json,
             "task_view": task_view,
             "env_summary": env_summary,
             "features": get_features(),
+            "workbench_kind": spec.kind,
+            "workbench_js": spec.js,
         },
     )
 
