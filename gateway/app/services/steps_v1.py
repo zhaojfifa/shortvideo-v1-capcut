@@ -867,6 +867,17 @@ async def run_apollo_avatar_generate_step(
     repo,
     live_enabled: bool,
 ) -> dict:
+    try:
+        from gateway.app.services.apollo_avatar_service import ApolloAvatarService
+    except Exception as e:
+        append_task_event(
+            repo,
+            task_id,
+            "AVATAR_IMPORT_ERROR",
+            f"Import ApolloAvatarService failed: {e}",
+            level="error",
+        )
+        raise
     append_task_event(repo, task_id, "apollo_avatar", "AVATAR_GEN_START")
     service = ApolloAvatarService(repo=repo)
     artifacts = await service.generate_stitch_only(task, req, live_enabled=live_enabled)
