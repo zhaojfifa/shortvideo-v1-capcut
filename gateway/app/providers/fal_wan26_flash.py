@@ -5,12 +5,20 @@ from typing import Optional
 
 from gateway.app.ports.video_gen_provider import GeneratedVideo, VideoGenProvider
 
-FAL_ENDPOINT = "https://fal.ai/models/wan/v2.6/image-to-video/flash"
+FAL_ENDPOINT = "https://fal.ai/models"
 
 
 class FalWan26FlashProvider(VideoGenProvider):
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, *, model: str, timeout_sec: int = 300, retries: int = 1):
         self.api_key = api_key
+        self.model = model
+        self.timeout_sec = timeout_sec
+        self.retries = retries
+
+    def _resolve_endpoint(self) -> str:
+        if self.model.startswith("http://") or self.model.startswith("https://"):
+            return self.model
+        return f"{FAL_ENDPOINT}/{self.model}"
 
     async def generate_segment(
         self,
@@ -33,10 +41,23 @@ class FalWan26FlashProvider(VideoGenProvider):
             payload["seed"] = int(seed)
 
         headers = {"Authorization": f"Key {self.api_key}"}
-        async with httpx.AsyncClient(timeout=120) as client:
-            r = await client.post(f"{FAL_ENDPOINT}/api", json=payload, headers=headers)
-            r.raise_for_status()
-            data = r.json()
+        endpoint = self._resolve_endpoint()
+        last_err: Exception | None = None
+        for attempt in range(self.retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout_sec) as client:
+                    r = await client.post(f"{endpoint}/api", json=payload, headers=headers)
+                    r.raise_for_status()
+                    data = r.json()
+                last_err = None
+                break
+            except Exception as exc:
+                last_err = exc
+                if attempt >= self.retries:
+                    raise
+                continue
+        if last_err is not None:
+            raise last_err
 
         out_url = (
             data.get("video", {}).get("url")

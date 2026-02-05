@@ -126,17 +126,32 @@ async def generate_apollo_avatar(
     if live_enabled and not bool(getattr(settings, "apollo_avatar_live_enabled", False)):
         raise HTTPException(status_code=403, detail="Apollo Avatar live generation is disabled")
 
-    if payload:
-        req = ApolloAvatarRequest(**payload)
-    else:
-        req = ApolloAvatarRequest(
-        target_duration_sec=int(apollo_meta.get("target_duration_sec") or 15),
-        prompt=str(apollo_meta.get("prompt") or ""),
-        seed=apollo_meta.get("seed"),
-        avatar_image_url=str(apollo_meta.get("avatar_image_url") or ""),
-        reference_video_url=str(apollo_meta.get("reference_video_url") or ""),
+    force = bool(payload.get("force")) if payload else False
+
+    req = ApolloAvatarRequest(
+        target_duration_sec=int(
+            (payload.get("target_duration_sec") if payload else None)
+            or apollo_meta.get("target_duration_sec")
+            or 15
+        ),
+        prompt=str(
+            (payload.get("prompt") if payload else None)
+            or apollo_meta.get("prompt")
+            or ""
+        ),
+        seed=(payload.get("seed") if payload else apollo_meta.get("seed")),
+        avatar_image_url=str(
+            (payload.get("avatar_image_url") if payload else None)
+            or apollo_meta.get("avatar_image_url")
+            or ""
+        ),
+        reference_video_url=str(
+            (payload.get("reference_video_url") if payload else None)
+            or apollo_meta.get("reference_video_url")
+            or ""
+        ),
         live_enabled=live_enabled,
-        )
+    )
     if live_enabled and not bool(apollo_meta.get("live_enabled")):
         raise HTTPException(status_code=403, detail="Task is not enabled for live generation")
 
@@ -149,6 +164,7 @@ async def generate_apollo_avatar(
         req=req,
         repo=repo,
         live_enabled=live_enabled,
+        force=force,
     )
     background_tasks.add_task(
         run_post_generate_pipeline,
