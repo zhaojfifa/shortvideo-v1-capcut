@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, UploadFile, File, Form
+from typing import Optional, Any, Dict
 
 from gateway.app.deps import get_task_repository
 from gateway.app.domain.apollo_avatar import ApolloAvatarRequest
@@ -102,7 +103,7 @@ async def create_apollo_avatar_task(
 async def generate_apollo_avatar(
     task_id: str,
     background_tasks: BackgroundTasks,
-    payload: ApolloAvatarRequest | None = None,
+    payload: Optional[Dict[str, Any]] = Body(default=None),
     repo=Depends(get_task_repository),
 ):
     task = repo.get(task_id)
@@ -121,20 +122,26 @@ async def generate_apollo_avatar(
     if not isinstance(apollo_meta, dict):
         apollo_meta = {}
     settings = get_settings()
-    live_enabled = bool(payload.live_enabled) if payload else bool(apollo_meta.get("live_enabled"))
+    live_enabled = bool(payload.get("live_enabled")) if payload else bool(apollo_meta.get("live_enabled"))
     if live_enabled and not bool(getattr(settings, "apollo_avatar_live_enabled", False)):
         raise HTTPException(status_code=403, detail="Apollo Avatar live generation is disabled")
 
-    req = payload or ApolloAvatarRequest(
+    if payload:
+        req = ApolloAvatarRequest(**payload)
+    else:
+        req = ApolloAvatarRequest(
         target_duration_sec=int(apollo_meta.get("target_duration_sec") or 15),
         prompt=str(apollo_meta.get("prompt") or ""),
         seed=apollo_meta.get("seed"),
         avatar_image_url=str(apollo_meta.get("avatar_image_url") or ""),
         reference_video_url=str(apollo_meta.get("reference_video_url") or ""),
         live_enabled=live_enabled,
-    )
+        )
     if live_enabled and not bool(apollo_meta.get("live_enabled")):
         raise HTTPException(status_code=403, detail="Task is not enabled for live generation")
+
+    if not req.avatar_image_url or not req.reference_video_url:
+        raise HTTPException(status_code=400, detail="apollo_avatar assets missing: avatar/ref")
 
     resp = await run_apollo_avatar_generate_step(
         task=task,

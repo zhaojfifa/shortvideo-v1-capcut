@@ -3,21 +3,6 @@
     return document.getElementById(id);
   }
 
-  async function postJson(url, payload) {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload || {}),
-    });
-    const text = await res.text();
-    let data = null;
-    try { data = JSON.parse(text); } catch (_) {}
-    if (!res.ok) {
-      throw new Error(data?.detail || text || `HTTP ${res.status}`);
-    }
-    return data || {};
-  }
-
   async function fetchEvents() {
     const out = $("apollo-events");
     if (!out) return;
@@ -46,16 +31,35 @@
   async function runGenerate() {
     const resultEl = $("apollo-result");
     if (!window.__APOLLO_GENERATE_URL__) return;
-    try {
-      const data = await postJson(window.__APOLLO_GENERATE_URL__, {});
+    const resp = await fetch(window.__APOLLO_GENERATE_URL__, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
       if (resultEl) {
-        resultEl.textContent = JSON.stringify(data, null, 2);
+        if (data.final_video_url) {
+          resultEl.innerHTML = `<a href="${data.final_video_url}" target="_blank" rel="noopener">final_video_url</a>`;
+        } else {
+          resultEl.textContent = JSON.stringify(data, null, 2);
+        }
       }
       await fetchEvents();
       startPolling();
-    } catch (err) {
-      if (resultEl) {
-        resultEl.textContent = err.message || String(err);
+      return;
+    }
+    let detail = null;
+    try {
+      detail = await resp.json();
+    } catch (_) {
+      detail = null;
+    }
+    if (resultEl) {
+      if (detail) {
+        resultEl.textContent = JSON.stringify(detail, null, 2);
+      } else {
+        resultEl.textContent = `${resp.status} ${resp.statusText}`;
       }
     }
   }
