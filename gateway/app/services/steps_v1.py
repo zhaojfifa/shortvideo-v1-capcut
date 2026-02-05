@@ -9,7 +9,6 @@ import shutil
 import subprocess
 import tempfile
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -29,6 +28,7 @@ from gateway.app.core.workspace import (
 from gateway.app.db import SessionLocal
 from gateway.app import models
 from gateway.app.services.artifact_storage import upload_task_artifact
+from gateway.app.services.task_events import append_task_event as _append_task_event
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.parse import detect_platform, parse_video
 from gateway.app.services.subtitles import generate_subtitles
@@ -39,29 +39,18 @@ from gateway.app.utils.timing import log_step_timing
 logger = logging.getLogger(__name__)
 
 
-def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def append_task_event(repo, task_id: str, step: str, message: str, level: str = "info", data=None) -> None:
+def _append_event(repo, task_id: str, *, channel: str, code: str, message: str, extra=None) -> None:
     task = repo.get(task_id)
     if not task:
         return
-    events = task.get("events") or []
-    if not isinstance(events, list):
-        events = []
-    events.append(
-        {
-            "ts": utc_now_iso(),
-            "level": level,
-            "step": step,
-            "message": message,
-            "data": data or {},
-        }
+    _append_task_event(
+        task,
+        channel=channel,
+        code=code,
+        message=message,
+        extra=extra,
     )
-    if len(events) > 200:
-        events = events[-200:]
-    repo.upsert(task_id, {"events": events})
+    repo.upsert(task_id, {"events": task.get("events") or []})
 
 
 def _env_int(name: str, default: int) -> int:
@@ -878,32 +867,32 @@ async def run_apollo_avatar_generate_step(
             level="error",
         )
         raise
-    append_task_event(repo, task_id, "apollo_avatar", "AVATAR_GEN_START")
+    _append_event(repo, task_id, channel="apollo_avatar", code="AVATAR_GEN_START", message="Generate started")
     service = ApolloAvatarService(repo=repo)
     artifacts = await service.generate_stitch_only(task, req, live_enabled=live_enabled)
-    append_task_event(repo, task_id, "apollo_avatar", "AVATAR_CALL_SERVICE_DONE")
+    _append_event(repo, task_id, channel="apollo_avatar", code="AVATAR_CALL_SERVICE_DONE", message="Model call done")
 
     raw_key = None
     final_url = getattr(artifacts, "final_video_url", None)
     if final_url:
         raw_file = raw_path(task_id)
         raw_file.parent.mkdir(parents=True, exist_ok=True)
-        append_task_event(repo, task_id, "apollo_avatar", "AVATAR_HYDRATE_RAW_START")
+        _append_event(repo, task_id, channel="apollo_avatar", code="AVATAR_HYDRATE_RAW_START", message="Hydrate raw start")
         try:
             async with httpx.AsyncClient(timeout=300) as client:
                 resp = await client.get(final_url)
                 resp.raise_for_status()
                 raw_file.write_bytes(resp.content)
             raw_key = upload_task_artifact(task, raw_file, "raw.mp4", task_id=task_id)
-            append_task_event(repo, task_id, "apollo_avatar", "AVATAR_HYDRATE_RAW_DONE")
+            _append_event(repo, task_id, channel="apollo_avatar", code="AVATAR_HYDRATE_RAW_DONE", message="Hydrate raw done")
         except Exception as exc:
-            append_task_event(
+            _append_event(
                 repo,
                 task_id,
-                "apollo_avatar",
-                "AVATAR_HYDRATE_RAW_ERROR",
-                level="error",
-                data={"error": str(exc)},
+                channel="apollo_avatar",
+                code="AVATAR_HYDRATE_RAW_ERROR",
+                message="Hydrate raw error",
+                extra={"error": str(exc)},
             )
             raise
 
@@ -972,7 +961,7 @@ async def run_post_generate_pipeline(
     if pipeline_config.get("subtitles_mode") == "whisper-only":
         _translate = False
 
-    append_task_event(repo, task_id, "pipeline", "AVATAR_POST_PIPELINE_START")
+    _append_event(repo, task_id, channel="apollo_avatar", code="AVATAR_POST_PIPELINE_START", message="Post pipeline start")
 
     # --------- Step 1: Subtitles ---------
     subtitles_ready = (task.get("subtitles_status") == "ready") and bool(task.get("subtitles_key"))
@@ -1026,7 +1015,7 @@ async def run_post_generate_pipeline(
     else:
         logger.info("Post-generate: pack already ready; skip", extra={"task_id": task_id})
 
-    append_task_event(repo, task_id, "pipeline", "AVATAR_POST_PIPELINE_DONE")
+    _append_event(repo, task_id, channel="apollo_avatar", code="AVATAR_POST_PIPELINE_DONE", message="Post pipeline done")
     logger.info("Post-generate pipeline done", extra={"task_id": task_id})
 
 

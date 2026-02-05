@@ -2068,7 +2068,8 @@ def get_task_events(
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    return {"task_id": task_id, "events": task.get("events") or []}
+    kind = task.get("kind") if isinstance(task, dict) else getattr(task, "kind", None)
+    return {"task_id": task_id, "kind": kind, "events": task.get("events") or []}
 
 
 @api_router.get("/tasks/{task_id}/publish_hub")
