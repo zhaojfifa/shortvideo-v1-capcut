@@ -57,9 +57,11 @@ from gateway.app.steps.dubbing import run_dub_step as run_dub_step_ssot
 
 # Legacy v1 pipeline steps (parse/subtitles/pack). Dubbing 保留 v1 名称但必须显式别名，避免覆盖 SSOT
 from ..services.steps_v1 import (
+    compute_subtitles_params,
     run_pack_step as run_pack_step_v1,
     run_parse_step as run_parse_step_v1,
     run_subtitles_step as run_subtitles_step_v1,
+    run_subtitles_step_entry,
     run_dub_step as run_dub_step_v1,
 )
 def coerce_datetime(v: Any) -> Optional[datetime]:
@@ -2054,6 +2056,17 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
     return payload
 
 
+@api_router.get("/tasks/{task_id}/events")
+def get_task_events(
+    task_id: str,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"task_id": task_id, "events": task.get("events") or []}
+
+
 @api_router.get("/tasks/{task_id}/publish_hub")
 def get_publish_hub(
     request: Request,
@@ -2153,14 +2166,14 @@ def _run_subtitles_job(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    subs_req = SubtitlesRequest(
-        task_id=task_id,
-        target_lang=target_lang,
-        force=force,
-        translate=translate,
-        with_scenes=True,
+    asyncio.run(
+        run_subtitles_step_entry(
+            task_id=task_id,
+            target_lang=target_lang,
+            force=force,
+            translate=translate,
+        )
     )
-    asyncio.run(run_subtitles_step_v1(subs_req))
 
     workspace = Workspace(task_id)
     origin_key = (
@@ -2574,12 +2587,7 @@ def build_subtitles(
                 "error": None,
             }
 
-        target_lang = (payload.target_lang if payload else None) or task.get("content_lang") or "my"
-        force = payload.force if payload else False
-        translate = payload.translate if payload else True
-        pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
-        if pipeline_config.get("subtitles_mode") == "whisper-only":
-            translate = False
+        target_lang, force, translate = compute_subtitles_params(task, payload)
 
         run_async = os.getenv("RUN_STEPS_ASYNC", "1").strip().lower() not in ("0", "false", "no")
         repo.upsert(

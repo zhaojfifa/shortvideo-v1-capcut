@@ -9,10 +9,12 @@ import shutil
 import subprocess
 import tempfile
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import HTTPException
+import httpx
 
 from gateway.app.ports.storage_provider import get_storage_service
 from gateway.app.core.workspace import (
@@ -37,6 +39,31 @@ from gateway.app.utils.timing import log_step_timing
 logger = logging.getLogger(__name__)
 
 
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def append_task_event(repo, task_id: str, step: str, message: str, level: str = "info", data=None) -> None:
+    task = repo.get(task_id)
+    if not task:
+        return
+    events = task.get("events") or []
+    if not isinstance(events, list):
+        events = []
+    events.append(
+        {
+            "ts": utc_now_iso(),
+            "level": level,
+            "step": step,
+            "message": message,
+            "data": data or {},
+        }
+    )
+    if len(events) > 200:
+        events = events[-200:]
+    repo.upsert(task_id, {"events": events})
+
+
 def _env_int(name: str, default: int) -> int:
     value = os.getenv(name)
     if value is None:
@@ -45,6 +72,11 @@ def _env_int(name: str, default: int) -> int:
         return int(value)
     except ValueError:
         return default
+
+
+def _truthy_env(name: str, default: str = "1") -> bool:
+    v = os.getenv(name, default)
+    return v is not None and v.strip().lower() not in ("0", "false", "no", "")
 
 
 def _truthy_env(name: str, default: str = "1") -> bool:
@@ -798,6 +830,193 @@ async def run_pack_step(req: PackRequest):
             step="pack",
             start_time=start_time,
         )
+
+
+def compute_subtitles_params(task: dict, payload) -> tuple[str, bool, bool]:
+    target_lang = (payload.target_lang if payload else None) or task.get("content_lang") or "my"
+    force = payload.force if payload else False
+    translate = payload.translate if payload else True
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    if pipeline_config.get("subtitles_mode") == "whisper-only":
+        translate = False
+    return target_lang, bool(force), bool(translate)
+
+
+async def run_subtitles_step_entry(
+    *,
+    task_id: str,
+    target_lang: str,
+    force: bool,
+    translate: bool,
+):
+    return await run_subtitles_step(
+        SubtitlesRequest(
+            task_id=task_id,
+            target_lang=target_lang,
+            force=force,
+            translate=translate,
+        )
+    )
+
+
+async def run_apollo_avatar_generate_step(
+    *,
+    task: dict,
+    task_id: str,
+    req,
+    repo,
+    live_enabled: bool,
+) -> dict:
+    append_task_event(repo, task_id, "apollo_avatar", "AVATAR_GEN_START")
+    service = ApolloAvatarService(repo=repo)
+    artifacts = await service.generate_stitch_only(task, req, live_enabled=live_enabled)
+    append_task_event(repo, task_id, "apollo_avatar", "AVATAR_CALL_SERVICE_DONE")
+
+    raw_key = None
+    final_url = getattr(artifacts, "final_video_url", None)
+    if final_url:
+        raw_file = raw_path(task_id)
+        raw_file.parent.mkdir(parents=True, exist_ok=True)
+        append_task_event(repo, task_id, "apollo_avatar", "AVATAR_HYDRATE_RAW_START")
+        try:
+            async with httpx.AsyncClient(timeout=300) as client:
+                resp = await client.get(final_url)
+                resp.raise_for_status()
+                raw_file.write_bytes(resp.content)
+            raw_key = upload_task_artifact(task, raw_file, "raw.mp4", task_id=task_id)
+            append_task_event(repo, task_id, "apollo_avatar", "AVATAR_HYDRATE_RAW_DONE")
+        except Exception as exc:
+            append_task_event(
+                repo,
+                task_id,
+                "apollo_avatar",
+                "AVATAR_HYDRATE_RAW_ERROR",
+                level="error",
+                data={"error": str(exc)},
+            )
+            raise
+
+    def _dump(obj):
+        if obj is None:
+            return None
+        if hasattr(obj, "model_dump"):
+            return obj.model_dump()
+        if hasattr(obj, "dict"):
+            return obj.dict()
+        return obj
+
+    repo.upsert(
+        task_id,
+        {
+            "last_step": "apollo_avatar_generate",
+            "status": "ready",
+            "apollo_avatar_manifest_key": artifacts.manifest_url,
+            "apollo_avatar_final_video_key": artifacts.final_video_url,
+            "apollo_avatar": _dump(artifacts),
+            "raw_path": raw_key,
+        },
+    )
+    return {
+        "ok": True,
+        "task_id": task_id,
+        "segments": [_dump(s) for s in (getattr(artifacts, "segments", None) or [])],
+        "final_video_url": artifacts.final_video_url,
+        "manifest_url": artifacts.manifest_url,
+    }
+
+
+async def run_post_generate_pipeline(
+    *,
+    task_id: str,
+    repo,
+    target_lang: str | None = None,
+    translate: bool | None = None,
+    voice_id: str | None = None,
+    force: bool = False,
+):
+    """
+    After a task got its raw.mp4 hydrated (apollo_avatar_generate),
+    run subtitles -> dub -> pack in order.
+
+    - Idempotent: skips steps already ready.
+    - Extensible: centralized orchestration for future kinds/steps.
+    """
+
+    if not _truthy_env("AUTO_RUN_PIPELINE_AFTER_GENERATE", "1"):
+        logger.info(
+            "AUTO_RUN_PIPELINE_AFTER_GENERATE disabled; skip post-generate pipeline",
+            extra={"task_id": task_id},
+        )
+        return
+
+    task = repo.get(task_id)
+    if not task:
+        logger.warning("Task not found in post-generate pipeline", extra={"task_id": task_id})
+        return
+
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+
+    _target_lang = target_lang or task.get("content_lang") or "my"
+    _translate = True if translate is None else bool(translate)
+    if pipeline_config.get("subtitles_mode") == "whisper-only":
+        _translate = False
+
+    append_task_event(repo, task_id, "pipeline", "AVATAR_POST_PIPELINE_START")
+
+    # --------- Step 1: Subtitles ---------
+    subtitles_ready = (task.get("subtitles_status") == "ready") and bool(task.get("subtitles_key"))
+    if not subtitles_ready or force:
+        try:
+            await run_subtitles_step_entry(
+                task_id=task_id,
+                target_lang=_target_lang,
+                force=force,
+                translate=_translate,
+            )
+        except Exception:
+            logger.exception("Post-generate subtitles failed", extra={"task_id": task_id})
+            return
+    else:
+        logger.info("Post-generate: subtitles already ready; skip", extra={"task_id": task_id})
+
+    task = repo.get(task_id) or task
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+
+    # --------- Step 2: Dub ---------
+    audio_key = task.get("mm_audio_key") or task.get("mm_audio_path")
+    dub_ready = (task.get("dub_status") == "ready") and bool(audio_key)
+    if not dub_ready or force:
+        try:
+            _voice_id = voice_id or pipeline_config.get("voice_id") or pipeline_config.get("dub_voice_id")
+            await run_dub_step(
+                DubRequest(
+                    task_id=task_id,
+                    voice_id=_voice_id,
+                    force=force,
+                )
+            )
+        except Exception:
+            logger.exception("Post-generate dub failed", extra={"task_id": task_id})
+            return
+    else:
+        logger.info("Post-generate: dub already ready; skip", extra={"task_id": task_id})
+
+    task = repo.get(task_id) or task
+
+    # --------- Step 3: Pack ---------
+    pack_key = task.get("pack_key") or task.get("pack_path")
+    pack_ready = (task.get("pack_status") == "ready") and bool(pack_key)
+    if not pack_ready or force:
+        try:
+            await run_pack_step(PackRequest(task_id=task_id))
+        except Exception:
+            logger.exception("Post-generate pack failed", extra={"task_id": task_id})
+            return
+    else:
+        logger.info("Post-generate: pack already ready; skip", extra={"task_id": task_id})
+
+    append_task_event(repo, task_id, "pipeline", "AVATAR_POST_PIPELINE_DONE")
+    logger.info("Post-generate pipeline done", extra={"task_id": task_id})
 
 
 def _update_task(task_id: str, **fields) -> None:
