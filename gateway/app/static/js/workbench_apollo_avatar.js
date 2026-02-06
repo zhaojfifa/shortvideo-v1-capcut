@@ -14,6 +14,7 @@
   let pollInFlight = false;
   let pollStopped = false;
   let pollAbort = null;
+  let eventsInFlight = false;
 
   function mergeState(prev, next) {
     if (!prev) return next;
@@ -47,6 +48,15 @@
 
   function getTaskJson() {
     return window.__TASK_JSON__ || {};
+  }
+
+  function eventTs(e) {
+    const t = e?.ts;
+    if (!t) return 0;
+    const n = Number(t);
+    if (Number.isFinite(n)) return n;
+    const d = Date.parse(String(t));
+    return Number.isFinite(d) ? d : 0;
   }
 
   function setSummary() {
@@ -108,7 +118,8 @@
     const code = String(evt.code || "").toLowerCase();
     if (code.includes("error") || code.includes("fail") || code.endsWith(".failed")) return "error";
     if (code.endsWith(".start")) return "running";
-    if (code.endsWith(".done") || code.endsWith(".ready") || code.includes(".skip")) return "done";
+    if (code.endsWith(".done") || code.endsWith(".ready")) return "done";
+    if (code.includes(".skip")) return "skipped";
     return null;
   }
 
@@ -147,9 +158,7 @@
 
     // Events: process in chronological order to avoid regressions caused by reverse rendering
     const sorted = (Array.isArray(events) ? events.slice() : []).sort((a, b) => {
-      const ta = Date.parse(a.ts || "") || 0;
-      const tb = Date.parse(b.ts || "") || 0;
-      return ta - tb;
+      return eventTs(a) - eventTs(b);
     });
 
     sorted.forEach((evt) => {
@@ -196,7 +205,7 @@
     }
   }
 
-  async function setOutputs(task, result) {
+  async function setOutputs(task, result, events) {
     const links = $("outputs-links");
     if (!links) return;
     const taskId = task.task_id || window.__TASK_ID__;
@@ -207,20 +216,10 @@
     const scenesFailed = scenesStatus === "failed";
     const items = [];
 
-    if (result && result.final_video_url) {
-      items.push({ label: "final_video_url", href: result.final_video_url, ready: true, kind: "external" });
-    }
-
     if (d && d.raw_mp4 && d.raw_mp4.url) {
       items.push({ label: d.raw_mp4.label || "raw.mp4", href: d.raw_mp4.url, ready: true });
     } else {
       items.push({ label: "raw.mp4", href: `/v1/tasks/${taskId}/raw`, ready: true });
-    }
-
-    if (d && d.pack_zip && d.pack_zip.url) {
-      items.push({ label: d.pack_zip.label || "pack.zip", href: d.pack_zip.url, ready: true, kind: "link" });
-    } else {
-      items.push({ label: "pack.zip", ready: false, kind: "muted" });
     }
 
     if (scenesSkipped) {
@@ -231,6 +230,18 @@
       items.push({ label: d.scenes_zip.label || "scenes.zip", href: d.scenes_zip.url, ready: true, kind: "link" });
     } else {
       items.push({ label: "scenes.zip", ready: false, kind: "muted" });
+    }
+
+    if (d && d.pack_zip && d.pack_zip.url) {
+      items.push({ label: d.pack_zip.label || "pack.zip", href: d.pack_zip.url, ready: true, kind: "link" });
+    } else {
+      items.push({ label: "pack.zip", ready: false, kind: "muted" });
+    }
+
+    if (d && d.edit_bundle_zip && d.edit_bundle_zip.url) {
+      items.push({ label: "publish bundle", href: d.edit_bundle_zip.url, ready: true, kind: "link" });
+    } else {
+      items.push({ label: "publish bundle", ready: false, kind: "muted" });
     }
 
     items.push({ label: "Publish Hub", href: `/tasks/${taskId}/publish`, ready: true, kind: "link" });
@@ -263,6 +274,8 @@
       out.textContent = "-";
       return [];
     }
+    if (eventsInFlight) return [];
+    eventsInFlight = true;
     if (pollAbort) {
       try { pollAbort.abort(); } catch (_) {}
     }
@@ -271,15 +284,18 @@
     try {
       resp = await fetch(url, { signal: pollAbort.signal, cache: "no-store" });
     } catch (_) {
+      eventsInFlight = false;
       return [];
     }
     if (!resp.ok) {
       out.textContent = `Failed to load events: HTTP ${resp.status}`;
+      eventsInFlight = false;
       return [];
     }
     const payload = await resp.json();
     const events = Array.isArray(payload.events) ? payload.events : [];
     const filtered = events.filter((e) => e && e.channel === "apollo_avatar");
+    const filteredSorted = filtered.slice().sort((a, b) => eventTs(a) - eventTs(b));
     const fresh = [];
     filtered.forEach((e) => {
       const key = `${e.ts || ""}|${e.code || ""}|${e.message || ""}`;
@@ -289,7 +305,7 @@
       }
     });
     if (!appendOnly) {
-      out.textContent = filtered
+      out.textContent = filteredSorted
         .slice()
         .reverse()
         .map((e) => `[${e.ts || ""}] [${e.code || ""}] ${e.message || ""}`)
@@ -299,8 +315,8 @@
         .map((e) => `[${e.ts || ""}] [${e.code || ""}] ${e.message || ""}`)
         .join("\n");
     }
-    updateStepper(filtered);
-    const lastGenerate = filtered
+    updateStepper(filteredSorted);
+    const lastGenerate = filteredSorted
       .slice()
       .reverse()
       .find((e) => e.code === "generate.done" && e.extra && e.extra.final_video_url);
@@ -308,7 +324,8 @@
       lastResult = { final_video_url: lastGenerate.extra.final_video_url };
       setPreviewLink(lastResult);
     }
-    return filtered;
+    eventsInFlight = false;
+    return filteredSorted;
   }
 
   function stopPolling() {
@@ -397,7 +414,7 @@
       pollInFlight = true;
       try {
         const evts = await fetchEvents(true);
-        await setOutputs(getTaskJson(), lastResult);
+        await setOutputs(getTaskJson(), lastResult, evts);
         const task = getTaskJson();
         if (isTerminalByEvents(evts) || isTerminalByTask(task)) {
           stopPolling();
@@ -425,7 +442,7 @@
     setPreviewLink(null);
     updateStepper([]);
     fetchEvents(false).then(async (evts) => {
-      await setOutputs(getTaskJson(), lastResult);
+      await setOutputs(getTaskJson(), lastResult, evts);
       const task = getTaskJson();
       if (!isTerminalByEvents(evts) && !isTerminalByTask(task)) startPolling();
     });
