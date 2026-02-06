@@ -25,6 +25,7 @@
 
   function setSummary() {
     const task = getTaskJson();
+    const meta = task.meta || {};
     const avatarImg = $("avatar-preview");
     const refVideo = $("ref-preview");
     const summary = $("param-summary");
@@ -182,10 +183,25 @@
   async function runGenerate() {
     const resultEl = $("apollo-result");
     if (!window.__APOLLO_GENERATE_URL__) return;
+    const task = getTaskJson();
+    const meta = task.meta || {};
+    const apollo = task.apollo_avatar || {};
+    const liveFlag = Boolean(apollo.live_enabled ?? meta.live);
+    const payload = {
+      live: liveFlag,
+      prompt: $("adv-prompt")?.value?.trim() || apollo.prompt || "",
+      seed: (() => {
+        const raw = $("adv-seed")?.value?.trim();
+        const val = raw ? Number(raw) : null;
+        return Number.isFinite(val) ? val : null;
+      })(),
+      strategy: $("adv-strategy")?.value?.trim() || apollo.strategy || "default",
+      force: Boolean($("adv-force")?.checked),
+    };
     const resp = await fetch(window.__APOLLO_GENERATE_URL__, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify(payload),
     });
     if (resp.ok) {
       const data = await resp.json();

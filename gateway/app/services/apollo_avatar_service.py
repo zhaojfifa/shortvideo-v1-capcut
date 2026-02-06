@@ -73,6 +73,8 @@ class ApolloAvatarService:
             if demo_base:
                 artifacts.final_video_url = f"{demo_base}/demo_{req.target_duration_sec}.mp4"
             return artifacts
+        if not getattr(config.settings, "apollo_avatar_live_enabled", False):
+            raise RuntimeError("Live gate disabled")
 
         provider = get_video_gen_provider()
 

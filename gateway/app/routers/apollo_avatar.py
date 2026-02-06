@@ -13,6 +13,7 @@ from gateway.app.services.steps_v1 import (
     run_apollo_avatar_generate_step,
     run_post_generate_pipeline,
 )
+from gateway.app.services.task_events import append_task_event as _append_task_event
 from gateway.app.task_repo_utils import normalize_task_payload
 from gateway.app.utils.pipeline_config import pipeline_config_to_storage
 
@@ -49,6 +50,7 @@ async def create_apollo_avatar_task(
             "last_step": None,
             "error_message": None,
             "meta": {
+                "live": bool(live_enabled),
                 "apollo_avatar": {
                     "target_duration_sec": duration_sec,
                     "live_enabled": bool(live_enabled),
@@ -87,9 +89,11 @@ async def create_apollo_avatar_task(
             "live_enabled": bool(live_enabled),
             "prompt": prompt,
             "seed": seed,
+            "strategy": apollo_meta.get("strategy"),
         }
     )
     meta["apollo_avatar"] = apollo_meta
+    meta["live"] = bool(live_enabled)
     repo.upsert(task_id, {"meta": meta})
     return {
         "ok": True,
@@ -122,9 +126,20 @@ async def generate_apollo_avatar(
     if not isinstance(apollo_meta, dict):
         apollo_meta = {}
     settings = get_settings()
-    live_enabled = bool(payload.get("live_enabled")) if payload else bool(apollo_meta.get("live_enabled"))
-    if live_enabled and not bool(getattr(settings, "apollo_avatar_live_enabled", False)):
-        raise HTTPException(status_code=403, detail="Apollo Avatar live generation is disabled")
+    live_requested = bool(payload.get("live")) if payload and "live" in payload else bool(
+        (apollo_meta.get("live_enabled") if isinstance(apollo_meta, dict) else None)
+        or (meta.get("live") if isinstance(meta, dict) else None)
+    )
+    if live_requested and not bool(getattr(settings, "apollo_avatar_live_enabled", False)):
+        _append_task_event(
+            task,
+            channel="apollo_avatar",
+            code="generate.error",
+            message="Live gate disabled",
+            extra={"reason": "live_gate_disabled", "live": True},
+        )
+        repo.upsert(task_id, {"events": task.get("events") or []})
+        raise HTTPException(status_code=403, detail="Live gate disabled")
 
     force = bool(payload.get("force")) if payload else False
 
@@ -150,9 +165,9 @@ async def generate_apollo_avatar(
             or apollo_meta.get("reference_video_url")
             or ""
         ),
-        live_enabled=live_enabled,
+        live_enabled=live_requested,
     )
-    if live_enabled and not bool(apollo_meta.get("live_enabled")):
+    if live_requested and not bool(apollo_meta.get("live_enabled")):
         raise HTTPException(status_code=403, detail="Task is not enabled for live generation")
 
     if not req.avatar_image_url or not req.reference_video_url:
@@ -163,7 +178,7 @@ async def generate_apollo_avatar(
         task_id=task_id,
         req=req,
         repo=repo,
-        live_enabled=live_enabled,
+        live_enabled=live_requested,
         force=force,
     )
     background_tasks.add_task(
