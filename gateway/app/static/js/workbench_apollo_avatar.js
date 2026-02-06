@@ -3,39 +3,47 @@
     return document.getElementById(id);
   }
 
-  const STEPS = [
-    "Prepare",
-    "Slice",
-    "Generate",
-    "Assemble",
-    "Post",
-    "Deliverables",
-  ];
+  const STEPS = ["Prepare", "Generate", "Slice", "Assemble", "Post", "Deliverables"];
 
   const stepState = {};
-  // --- Stable step states (monotonic, precedence-based) ---
-  const STATE_RANK = {
-    pending: 0,
-    skipped: 1,
-    done: 2,
-    running: 3,
-    warning: 4,
-    error: 5,
-  };
-
-  function mergeState(prev, next) {
-    const p = prev || "pending";
-    const n = next || "pending";
-    // never downgrade; always keep higher rank
-    return STATE_RANK[n] >= STATE_RANK[p] ? n : p;
-  }
   const eventIndex = new Set();
   let pollTimer = null;
   let pollStart = 0;
   let pollCount = 0;
   let lastResult = null;
-  let inFlight = false;
-  let stopped = false;
+  let pollInFlight = false;
+  let pollStopped = false;
+  let pollAbort = null;
+
+  function mergeState(prev, next) {
+    if (!prev) return next;
+    if (prev === "error") return "error";
+    if (next === "error") return "error";
+    if (prev === "done") return "done";
+    if (prev === "running" && next === "pending") return "running";
+    if (prev === "running" && next === "done") return "done";
+    return next || prev;
+  }
+
+  function isTerminalByTask(task) {
+    const pack = String(task.pack_status || "").toLowerCase();
+    const pub = String(task.publish_status || "").toLowerCase();
+    const sub = String(task.subtitles_status || "").toLowerCase();
+    const dub = String(task.dub_status || "").toLowerCase();
+    const status = String(task.status || "").toLowerCase();
+
+    const anyFailed = [pack, pub, sub, dub, status].some((s) => ["failed", "error"].includes(s));
+    const allDone = (pack && ["done", "ready"].includes(pack)) && (pub ? ["done", "ready"].includes(pub) : true);
+
+    return anyFailed || allDone || ["done", "failed", "error"].includes(status);
+  }
+
+  function isTerminalByEvents(events) {
+    return events.some((e) => {
+      const code = String(e.code || "").toLowerCase();
+      return code === "post.done" || code.includes("post.error") || code.includes("post.fail");
+    });
+  }
 
   function getTaskJson() {
     return window.__TASK_JSON__ || {};
@@ -76,26 +84,31 @@
   }
 
   function stageFromEvent(evt) {
-    const text = `${evt.code || ""} ${evt.message || ""}`.toLowerCase();
-    if (/(prepare|hydrate|ffprobe|input)/.test(text)) return "Prepare";
-    if (/(slice|split|decompose|segment)/.test(text)) return "Slice";
-    if (/(generate|call_service|model)/.test(text)) return "Generate";
-    if (/(assemble|stitch|concat|xfade)/.test(text)) return "Assemble";
-    if (/(sub2|dub3|pack|post)/.test(text)) return "Post";
-    if (/(deliver|publish|upload|manifest)/.test(text)) return "Deliverables";
+    const code = String(evt.code || "").toLowerCase();
+
+    if (code.startsWith("prepare.") || code.startsWith("hydrate_raw.") || code.includes("ffprobe") || code.includes("input")) {
+      return "Prepare";
+    }
+
+    if (code.startsWith("generate.")) return "Generate";
+    if (code.startsWith("slice.") || code.includes(".segment")) return "Slice";
+
+    if (code.startsWith("assemble.") || code.includes("stitch") || code.includes("concat") || code.includes("xfade")) {
+      return "Assemble";
+    }
+
+    if (code.startsWith("post.") || code.startsWith("sub2_") || code.startsWith("dub3_") || code.includes(".pack.")) {
+      return "Post";
+    }
+
     return null;
   }
 
   function statusFromEvent(evt) {
-    const code = `${evt.code || ""}`.toLowerCase();
-    // explicit error first
-    if (/(error|fail|failed|exception)/.test(code)) return "error";
-    // explicit skipped
-    if (/(skip|skipped)/.test(code)) return "skipped";
-    // explicit running
-    if (/(start|begin|running)/.test(code)) return "running";
-    // explicit done
-    if (/(done|ready|success|completed)/.test(code)) return "done";
+    const code = String(evt.code || "").toLowerCase();
+    if (code.includes("error") || code.includes("fail") || code.endsWith(".failed")) return "error";
+    if (code.endsWith(".start")) return "running";
+    if (code.endsWith(".done") || code.endsWith(".ready") || code.includes(".skip")) return "done";
     return null;
   }
 
@@ -109,7 +122,6 @@
     const subStatus = String(task.subtitles_status || "").toLowerCase();
     const dubStatus = String(task.dub_status || "").toLowerCase();
     const packStatus = String(task.pack_status || "").toLowerCase();
-    const scenesStatus = String(task.scenes_status || "").toLowerCase();
     const publishStatus = String(task.publish_status || "").toLowerCase();
 
     // Post step: driven by subtitles/dub/pack outcomes (monotonic)
@@ -127,12 +139,10 @@
     if (postErr) stepState["Post"] = mergeState(stepState["Post"], "error");
 
     // Deliverables: publish_status / pack_status / scenes_status
-    if (["ready", "done"].includes(publishStatus) || ["ready", "done"].includes(packStatus)) {
+    if (["done", "ready"].includes(packStatus) || ["done", "ready"].includes(publishStatus)) {
       stepState["Deliverables"] = mergeState(stepState["Deliverables"], "done");
-    } else if (scenesStatus === "skipped") {
-      stepState["Deliverables"] = mergeState(stepState["Deliverables"], "skipped");
-    } else if (scenesStatus === "failed") {
-      stepState["Deliverables"] = mergeState(stepState["Deliverables"], "warning");
+    } else if (["failed", "error"].includes(packStatus) || ["failed", "error"].includes(publishStatus)) {
+      stepState["Deliverables"] = mergeState(stepState["Deliverables"], "error");
     }
 
     // Events: process in chronological order to avoid regressions caused by reverse rendering
@@ -192,35 +202,46 @@
     const taskId = task.task_id || window.__TASK_ID__;
     const hub = await fetchPublishHub();
     const d = hub && hub.deliverables ? hub.deliverables : null;
+    const scenesStatus = String(task.scenes_status || "").toLowerCase();
+    const scenesSkipped = scenesStatus === "skipped";
+    const scenesFailed = scenesStatus === "failed";
     const items = [];
 
     if (result && result.final_video_url) {
       items.push({ label: "final_video_url", href: result.final_video_url, ready: true, kind: "external" });
     }
 
-    if (d && d.final_mp4 && d.final_mp4.url) {
-      items.push({ label: d.final_mp4.label || "raw.mp4", href: d.final_mp4.url, ready: true });
-    } else if (d && d.raw_mp4 && d.raw_mp4.url) {
+    if (d && d.raw_mp4 && d.raw_mp4.url) {
       items.push({ label: d.raw_mp4.label || "raw.mp4", href: d.raw_mp4.url, ready: true });
     } else {
       items.push({ label: "raw.mp4", href: `/v1/tasks/${taskId}/raw`, ready: true });
     }
 
     if (d && d.pack_zip && d.pack_zip.url) {
-      items.push({ label: d.pack_zip.label || "pack.zip", href: d.pack_zip.url, ready: true });
-    }
-
-    if (d && d.edit_bundle_zip && d.edit_bundle_zip.url) {
-      items.push({ label: d.edit_bundle_zip.label || "edit_bundle.zip", href: d.edit_bundle_zip.url, ready: true });
+      items.push({ label: d.pack_zip.label || "pack.zip", href: d.pack_zip.url, ready: true, kind: "link" });
     } else {
-      const packReady = ["ready", "done"].includes(String(task.pack_status || "").toLowerCase());
-      if (packReady) items.push({ label: "edit_bundle.zip", href: `/v1/tasks/${taskId}/publish_bundle`, ready: true });
+      items.push({ label: "pack.zip", ready: false, kind: "muted" });
     }
 
-    items.push({ label: "publish hub", href: `/tasks/${taskId}/publish`, ready: true, kind: "internal" });
+    if (scenesSkipped) {
+      items.push({ label: "scenes skipped", ready: false, kind: "muted" });
+    } else if (scenesFailed) {
+      items.push({ label: "scenes failed", ready: false, kind: "muted" });
+    } else if (d && d.scenes_zip && d.scenes_zip.url) {
+      items.push({ label: d.scenes_zip.label || "scenes.zip", href: d.scenes_zip.url, ready: true, kind: "link" });
+    } else {
+      items.push({ label: "scenes.zip", ready: false, kind: "muted" });
+    }
+
+    items.push({ label: "Publish Hub", href: `/tasks/${taskId}/publish`, ready: true, kind: "link" });
 
     links.innerHTML = items
-      .map((i) => `<a href="${i.href}" target="_blank" rel="noopener">${i.label}</a>`)
+      .map((i) => {
+        if (i.kind === "link") {
+          return `<a href="${i.href}" target="_blank" rel="noopener">${i.label}</a>`;
+        }
+        return `<span class="muted">${i.label}</span>`;
+      })
       .join(" ");
   }
 
@@ -242,7 +263,16 @@
       out.textContent = "-";
       return [];
     }
-    const resp = await fetch(url);
+    if (pollAbort) {
+      try { pollAbort.abort(); } catch (_) {}
+    }
+    pollAbort = new AbortController();
+    let resp;
+    try {
+      resp = await fetch(url, { signal: pollAbort.signal, cache: "no-store" });
+    } catch (_) {
+      return [];
+    }
     if (!resp.ok) {
       out.textContent = `Failed to load events: HTTP ${resp.status}`;
       return [];
@@ -281,24 +311,21 @@
     return filtered;
   }
 
-  function isTerminal(task, events) {
-    const status = String(task.status || "").toLowerCase();
-    if (["done", "failed", "error"].includes(status)) return true;
-
-    const publishStatus = String(task.publish_status || "").toLowerCase();
-    if (["done", "ready"].includes(publishStatus)) return true;
-
-    const hasPostDone = Array.isArray(events) && events.some((e) => e && e.code === "post.done");
-    if (hasPostDone) return true;
-
-    return false;
-  }
-
   function stopPolling() {
-    stopped = true;
+    pollStopped = true;
     if (pollTimer) clearTimeout(pollTimer);
     pollTimer = null;
-    inFlight = false;
+    if (pollAbort) {
+      try { pollAbort.abort(); } catch (_) {}
+    }
+    pollAbort = null;
+  }
+
+  function nextIntervalMs(elapsedMs) {
+    if (elapsedMs < 30000) return 1200;
+    if (elapsedMs < 120000) return 2500;
+    if (elapsedMs < 300000) return 5000;
+    return 8000;
   }
 
   async function runGenerate() {
@@ -330,9 +357,10 @@
       if (resultEl) {
         resultEl.textContent = JSON.stringify(data, null, 2);
       }
+      stepState["Generate"] = mergeState(stepState["Generate"], "running");
+      renderStepper();
       setPreviewLink(data);
-      await setOutputs(getTaskJson(), data);
-      await fetchEvents();
+      await fetchEvents(false);
       startPolling();
       return;
     }
@@ -353,38 +381,38 @@
 
   function startPolling() {
     stopPolling();
-    stopped = false;
+    pollStopped = false;
     pollStart = Date.now();
     pollCount = 0;
     const tick = async () => {
-      if (stopped) return;
-      if (inFlight) {
+      if (pollStopped) return;
+      if (document.visibilityState === "hidden") {
+        stopPolling();
+        return;
+      }
+      if (pollInFlight) {
         pollTimer = setTimeout(tick, 800);
         return;
       }
-      inFlight = true;
+      pollInFlight = true;
       try {
         const evts = await fetchEvents(true);
         await setOutputs(getTaskJson(), lastResult);
         const task = getTaskJson();
-        if (isTerminal(task, evts)) {
+        if (isTerminalByEvents(evts) || isTerminalByTask(task)) {
           stopPolling();
           return;
         }
       } finally {
-        inFlight = false;
+        pollInFlight = false;
       }
       pollCount += 1;
       const elapsed = Date.now() - pollStart;
-      if (pollCount > 80 || elapsed > 4 * 60 * 1000) {
+      if (pollCount > 120) {
         stopPolling();
         return;
       }
-      const interval =
-        elapsed < 30000 ? 1200 :
-        elapsed < 90000 ? 2000 :
-        3000;
-      pollTimer = setTimeout(tick, interval);
+      pollTimer = setTimeout(tick, nextIntervalMs(elapsed));
     };
     pollTimer = setTimeout(tick, 800);
   }
@@ -399,7 +427,7 @@
     fetchEvents(false).then(async (evts) => {
       await setOutputs(getTaskJson(), lastResult);
       const task = getTaskJson();
-      if (!isTerminal(task, evts)) startPolling();
+      if (!isTerminalByEvents(evts) && !isTerminalByTask(task)) startPolling();
     });
   }
 
@@ -408,4 +436,8 @@
   } else {
     bind();
   }
+  window.addEventListener("beforeunload", stopPolling);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") stopPolling();
+  });
 })();
