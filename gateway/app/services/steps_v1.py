@@ -1017,6 +1017,8 @@ async def run_apollo_avatar_generate_step(
                 "provider": provider_name,
                 "stage": "generate",
                 "message": str(exc),
+                "live": bool(live_enabled),
+                "model": getattr(config.settings, "apollo_avatar_live_model", None),
             },
         )
         raise
@@ -1026,6 +1028,21 @@ async def run_apollo_avatar_generate_step(
             if getattr(seg, "request_id", None):
                 first_req_id = seg.request_id
                 break
+    if live_enabled and not first_req_id:
+        _append_event(
+            repo,
+            task_id,
+            channel="apollo_avatar",
+            code="generate.error",
+            message="Generate error: missing request_id",
+            extra={
+                "provider": provider_name,
+                "stage": "generate",
+                "message": "missing request_id",
+                "live": True,
+            },
+        )
+        raise RuntimeError("Live generate missing request_id")
     _append_event(
         repo,
         task_id,

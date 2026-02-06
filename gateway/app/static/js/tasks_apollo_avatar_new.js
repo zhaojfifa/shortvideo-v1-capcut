@@ -63,7 +63,7 @@
     const demoRef15 = demoRoot ? `${demoRoot}/demo_15.mp4` : "";
     return {
       target_duration_sec: getTargetDurationSec(),
-      live_enabled: isDemo ? false : (gateOn && liveChecked),
+      live: isDemo ? false : (gateOn && liveChecked),
       avatar_image_url: isDemo ? demoAvatar : ($("avatar_image_url")?.value?.trim() || ""),
       reference_video_url: isDemo ? demoRef15 : ($("ref_video_url")?.value?.trim() || ""),
       prompt: $("prompt")?.value?.trim() || "",
@@ -145,7 +145,12 @@
         throw new Error("Create task first");
       }
     }
-    const payload = isDemo ? getPayload(true) : null;
+    const payload = isDemo ? getPayload(true) : {
+      live: true,
+      prompt: $("prompt")?.value?.trim() || "",
+      seed: getSeed(),
+      force: false,
+    };
     const result = await postJson(`/api/apollo/avatar/${encodeURIComponent(currentTaskId)}/generate`, payload);
     setResult(result, false);
   }
