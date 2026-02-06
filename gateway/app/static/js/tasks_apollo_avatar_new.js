@@ -79,6 +79,7 @@
   }
 
   let currentTaskId = null;
+  let busy = false;
   const state = {
     avatarFile: null,
     refVideoFile: null,
@@ -116,7 +117,26 @@
     return form;
   }
 
+  function setBusy(state) {
+    busy = state;
+    const btns = ["btn_create", "btn_create_demo", "btn_generate"]
+      .map((id) => $(id))
+      .filter(Boolean);
+    btns.forEach((b) => {
+      if (state) {
+        b.setAttribute("data-prev-disabled", b.disabled ? "1" : "0");
+        b.disabled = true;
+      } else {
+        const prev = b.getAttribute("data-prev-disabled");
+        b.disabled = prev === "1";
+        b.removeAttribute("data-prev-disabled");
+      }
+    });
+  }
+
   async function onCreate(isDemo) {
+    if (busy) return;
+    setBusy(true);
     const gateOn = Number(window.__APOLLO_AVATAR_LIVE_ENABLED__ || 0) === 1;
     const liveChecked = !!$("live_enabled")?.checked;
     const liveEnabled = isDemo ? false : (gateOn && liveChecked);
@@ -133,26 +153,37 @@
       state.refVideoFile = state.refVideoFile || await fetchAsFile(demoRef, "demo_ref.mp4", "video/mp4");
     }
     const form = buildCreateFormData(liveEnabled);
-    const result = await postForm("/api/apollo/avatar/tasks", form);
-    currentTaskId = result.task_id || result.id || null;
-    setResult(result, false);
+    try {
+      const result = await postForm("/api/apollo/avatar/tasks", form);
+      currentTaskId = result.task_id || result.id || null;
+      setResult(result, false);
+      return result;
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function onGenerate(isDemo) {
-    if (!currentTaskId) {
-      await onCreate(isDemo);
+    if (busy) return;
+    setBusy(true);
+    try {
       if (!currentTaskId) {
-        throw new Error("Create task first");
+        await onCreate(isDemo);
+        if (!currentTaskId) {
+          throw new Error("Create task first");
+        }
       }
+      const payload = isDemo ? getPayload(true) : {
+        live: true,
+        prompt: $("prompt")?.value?.trim() || "",
+        seed: getSeed(),
+        force: false,
+      };
+      const result = await postJson(`/api/apollo/avatar/${encodeURIComponent(currentTaskId)}/generate`, payload);
+      setResult(result, false);
+    } finally {
+      setBusy(false);
     }
-    const payload = isDemo ? getPayload(true) : {
-      live: true,
-      prompt: $("prompt")?.value?.trim() || "",
-      seed: getSeed(),
-      force: false,
-    };
-    const result = await postJson(`/api/apollo/avatar/${encodeURIComponent(currentTaskId)}/generate`, payload);
-    setResult(result, false);
   }
 
   function bind() {

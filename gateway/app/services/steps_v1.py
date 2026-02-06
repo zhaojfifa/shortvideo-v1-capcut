@@ -1265,6 +1265,10 @@ async def run_post_generate_pipeline(
         logger.info("Post-generate: dub already ready; skip", extra={"task_id": task_id})
 
     task = repo.get(task_id) or task
+    if str(task.get("subtitles_status") or "").lower() == "ready":
+        _update({"subtitles_status": "done"})
+    if str(task.get("dub_status") or "").lower() == "ready":
+        _update({"dub_status": "done"})
 
     # --------- Step 3: Scenes ---------
     scenes_key = task.get("scenes_key")
@@ -1308,6 +1312,8 @@ async def run_post_generate_pipeline(
         logger.info("Post-generate: scenes already ready; skip", extra={"task_id": task_id})
 
     task = repo.get(task_id) or task
+    if str(task.get("scenes_status") or "").lower() == "ready":
+        _update({"scenes_status": "done"})
 
     # --------- Step 3: Pack ---------
     pack_key = task.get("pack_key") or task.get("pack_path")
@@ -1352,6 +1358,8 @@ async def run_post_generate_pipeline(
         logger.info("Post-generate: pack already ready; skip", extra={"task_id": task_id})
 
     task = repo.get(task_id) or task
+    if str(task.get("pack_status") or "").lower() == "ready":
+        _update({"pack_status": "done"})
 
     # --------- Step 4: Publish bundle ---------
     publish_key = task.get("publish_key")
@@ -1413,12 +1421,14 @@ async def run_post_generate_pipeline(
     if pack_key:
         _update(
             {
-                "status": "ready",
+                "status": "done",
                 "last_step": "publish" if task.get("publish_key") else "pack",
                 "error_message": None,
                 "error_reason": None,
             }
         )
+    if str(task.get("publish_status") or "").lower() == "ready":
+        _update({"publish_status": "done"})
 
     _append_event(
         repo,
@@ -1498,96 +1508,3 @@ def _get_task_mm_audio_key(task_id: str) -> str | None:
         db.close()
 
 
-# === Auto pipeline orchestration (post-generate) ===
-
-async def run_post_generate_pipeline(
-    *,
-    task_id: str,
-    repo,
-    target_lang: str | None = None,
-    translate: bool | None = None,
-    voice_id: str | None = None,
-    force: bool = False,
-):
-    """
-    After a task got its raw.mp4 hydrated (apollo_avatar_generate),
-    run subtitles -> dub -> pack in order.
-
-    - Idempotent: skips steps already ready.
-    - Extensible: centralized orchestration for future kinds/steps.
-    """
-
-    if not _truthy_env("AUTO_RUN_PIPELINE_AFTER_GENERATE", "1"):
-        logger.info(
-            "AUTO_RUN_PIPELINE_AFTER_GENERATE disabled; skip post-generate pipeline",
-            extra={"task_id": task_id},
-        )
-        return
-
-    task = repo.get(task_id)
-    if not task:
-        logger.warning("Task not found in post-generate pipeline", extra={"task_id": task_id})
-        return
-
-    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
-
-    _target_lang = target_lang or task.get("content_lang") or "my"
-    _translate = True if translate is None else bool(translate)
-    if pipeline_config.get("subtitles_mode") == "whisper-only":
-        _translate = False
-
-    # --------- Step 1: Subtitles ---------
-    subtitles_ready = (task.get("subtitles_status") == "ready") and bool(task.get("subtitles_key"))
-    if not subtitles_ready or force:
-        try:
-            await run_subtitles_step(
-                SubtitlesRequest(
-                    task_id=task_id,
-                    target_lang=_target_lang,
-                    force=force,
-                    translate=_translate,
-                )
-            )
-        except Exception:
-            logger.exception("Post-generate subtitles failed", extra={"task_id": task_id})
-            return
-    else:
-        logger.info("Post-generate: subtitles already ready; skip", extra={"task_id": task_id})
-
-    task = repo.get(task_id) or task
-    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
-
-    # --------- Step 2: Dub ---------
-    audio_key = task.get("mm_audio_key") or task.get("mm_audio_path")
-    dub_ready = (task.get("dub_status") == "ready") and bool(audio_key)
-    if not dub_ready or force:
-        try:
-            _voice_id = voice_id or pipeline_config.get("voice_id") or pipeline_config.get("dub_voice_id")
-            await run_dub_step(
-                DubRequest(
-                    task_id=task_id,
-                    voice_id=_voice_id,
-                    force=force,
-                )
-            )
-        except Exception:
-            logger.exception("Post-generate dub failed", extra={"task_id": task_id})
-            return
-    else:
-        logger.info("Post-generate: dub already ready; skip", extra={"task_id": task_id})
-
-    task = repo.get(task_id) or task
-
-    # --------- Step 3: Pack ---------
-    pack_key = task.get("pack_key") or task.get("pack_path")
-    pack_ready = (task.get("pack_status") == "ready") and bool(pack_key)
-    if not pack_ready or force:
-        try:
-            await run_pack_step(PackRequest(task_id=task_id))
-        except Exception:
-            logger.exception("Post-generate pack failed", extra={"task_id": task_id})
-            return
-    else:
-        logger.info("Post-generate: pack already ready; skip", extra={"task_id": task_id})
-
-    logger.info("Post-generate pipeline done", extra={"task_id": task_id})

@@ -80,6 +80,23 @@
     STEPS.forEach((s) => {
       if (!stepState[s]) stepState[s] = "pending";
     });
+    const task = getTaskJson();
+    const subStatus = String(task.subtitles_status || "").toLowerCase();
+    const dubStatus = String(task.dub_status || "").toLowerCase();
+    const packStatus = String(task.pack_status || "").toLowerCase();
+    const scenesStatus = String(task.scenes_status || "").toLowerCase();
+    if (["ready", "done"].includes(subStatus) || ["ready", "done"].includes(dubStatus) || ["ready", "done"].includes(packStatus)) {
+      stepState["Post"] = "done";
+    }
+    if (["error", "failed"].includes(subStatus) || ["error", "failed"].includes(dubStatus) || ["error", "failed"].includes(packStatus)) {
+      stepState["Post"] = "error";
+    }
+    if (packStatus === "ready" || packStatus === "done") {
+      stepState["Deliverables"] = "done";
+    }
+    if (scenesStatus === "skipped") {
+      stepState["Deliverables"] = stepState["Deliverables"] || "pending";
+    }
     events.forEach((evt) => {
       const stage = stageFromEvent(evt);
       if (!stage) return;
@@ -109,17 +126,24 @@
     const links = $("outputs-links");
     if (!links) return;
     const taskId = task.task_id || window.__TASK_ID__;
+    const packReady = ["ready", "done"].includes(String(task.pack_status || "").toLowerCase());
+    const scenesReady = ["ready", "done"].includes(String(task.scenes_status || "").toLowerCase());
     const items = [
-      { label: "raw.mp4", href: `/v1/tasks/${taskId}/raw` },
-      { label: "scenes.zip", href: `/v1/tasks/${taskId}/scenes` },
-      { label: "pack.zip", href: `/v1/tasks/${taskId}/pack` },
-      { label: "publish bundle", href: `/v1/tasks/${taskId}/publish_bundle` },
+      { label: "raw.mp4", href: `/v1/tasks/${taskId}/raw`, ready: true },
+      { label: "scenes.zip", href: `/v1/tasks/${taskId}/scenes`, ready: scenesReady },
+      { label: "pack.zip", href: `/v1/tasks/${taskId}/pack`, ready: packReady },
+      { label: "publish bundle", href: `/v1/tasks/${taskId}/publish_bundle`, ready: packReady },
     ];
     if (result && result.final_video_url) {
-      items.unshift({ label: "final_video_url", href: result.final_video_url });
+      items.unshift({ label: "final_video_url", href: result.final_video_url, ready: true });
     }
     links.innerHTML = items
-      .map((i) => `<a href="${i.href}" target="_blank" rel="noopener">${i.label}</a>`)
+      .map((i) => {
+        if (!i.ready) {
+          return `<span class="muted" title="Not ready">${i.label}</span>`;
+        }
+        return `<a href="${i.href}" target="_blank" rel="noopener">${i.label}</a>`;
+      })
       .join(" ");
   }
 
@@ -255,6 +279,7 @@
     setSummary();
     setOutputs(getTaskJson(), null);
     setPreviewLink(null);
+    updateStepper([]);
     fetchEvents(false);
   }
 
