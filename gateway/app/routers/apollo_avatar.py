@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, UploadFile, File, Form, Security
+from fastapi.responses import JSONResponse
 from typing import Optional, Any, Dict
 
 from gateway.app.deps import get_task_repository
@@ -20,6 +22,7 @@ from gateway.app.routers.tasks import api_key_header, _op_key_valid_value
 from gateway.app.scenes.apollo_avatar.publish_hub import build_apollo_avatar_publish_hub
 
 router = APIRouter(prefix="/api/apollo/avatar", tags=["apollo-avatar"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/tasks")
@@ -112,86 +115,108 @@ async def generate_apollo_avatar(
     payload: Optional[Dict[str, Any]] = Body(default=None),
     repo=Depends(get_task_repository),
 ):
-    task = repo.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    try:
+        task = repo.get(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
 
-    meta = task.get("meta") or {}
-    if isinstance(meta, str):
-        try:
-            import json
+        meta = task.get("meta") or {}
+        if isinstance(meta, str):
+            try:
+                import json
 
-            meta = json.loads(meta)
-        except Exception:
-            meta = {}
-    apollo_meta = meta.get("apollo_avatar") if isinstance(meta, dict) else {}
-    if not isinstance(apollo_meta, dict):
-        apollo_meta = {}
-    settings = get_settings()
-    live_requested = bool(payload.get("live")) if payload and "live" in payload else bool(
-        (apollo_meta.get("live_enabled") if isinstance(apollo_meta, dict) else None)
-        or (meta.get("live") if isinstance(meta, dict) else None)
-    )
-    if live_requested and not bool(getattr(settings, "apollo_avatar_live_enabled", False)):
-        _append_task_event(
-            task,
-            channel="apollo_avatar",
-            code="generate.error",
-            message="Live gate disabled",
-            extra={"reason": "live_gate_disabled", "live": True},
+                meta = json.loads(meta)
+            except Exception:
+                meta = {}
+        apollo_meta = meta.get("apollo_avatar") if isinstance(meta, dict) else {}
+        if not isinstance(apollo_meta, dict):
+            apollo_meta = {}
+        settings = get_settings()
+        live_requested = bool(payload.get("live")) if payload and "live" in payload else bool(
+            (apollo_meta.get("live_enabled") if isinstance(apollo_meta, dict) else None)
+            or (meta.get("live") if isinstance(meta, dict) else None)
         )
-        repo.upsert(task_id, {"events": task.get("events") or []})
-        raise HTTPException(status_code=403, detail="Live gate disabled")
+        logger.info(
+            "ApolloAvatar generate request",
+            extra={
+                "task_id": task_id,
+                "live": live_requested,
+                "target_duration_sec": apollo_meta.get("target_duration_sec"),
+            },
+        )
+        if live_requested and not bool(getattr(settings, "apollo_avatar_live_enabled", False)):
+            _append_task_event(
+                task,
+                channel="apollo_avatar",
+                code="generate.error",
+                message="Live gate disabled",
+                extra={"reason": "live_gate_disabled", "live": True},
+            )
+            repo.upsert(task_id, {"events": task.get("events") or []})
+            raise HTTPException(status_code=403, detail="Live gate disabled")
 
-    force = bool(payload.get("force")) if payload else False
+        force = bool(payload.get("force")) if payload else False
 
-    req = ApolloAvatarRequest(
-        target_duration_sec=int(
-            (payload.get("target_duration_sec") if payload else None)
-            or apollo_meta.get("target_duration_sec")
-            or 15
-        ),
-        prompt=str(
-            (payload.get("prompt") if payload else None)
-            or apollo_meta.get("prompt")
-            or ""
-        ),
-        seed=(payload.get("seed") if payload else apollo_meta.get("seed")),
-        avatar_image_url=str(
-            (payload.get("avatar_image_url") if payload else None)
-            or apollo_meta.get("avatar_image_url")
-            or ""
-        ),
-        reference_video_url=str(
-            (payload.get("reference_video_url") if payload else None)
-            or apollo_meta.get("reference_video_url")
-            or ""
-        ),
-        live_enabled=live_requested,
-    )
-    if live_requested and not bool(apollo_meta.get("live_enabled")):
-        raise HTTPException(status_code=403, detail="Task is not enabled for live generation")
+        req = ApolloAvatarRequest(
+            target_duration_sec=int(
+                (payload.get("target_duration_sec") if payload else None)
+                or apollo_meta.get("target_duration_sec")
+                or 15
+            ),
+            prompt=str(
+                (payload.get("prompt") if payload else None)
+                or apollo_meta.get("prompt")
+                or ""
+            ),
+            seed=(payload.get("seed") if payload else apollo_meta.get("seed")),
+            avatar_image_url=str(
+                (payload.get("avatar_image_url") if payload else None)
+                or apollo_meta.get("avatar_image_url")
+                or ""
+            ),
+            reference_video_url=str(
+                (payload.get("reference_video_url") if payload else None)
+                or apollo_meta.get("reference_video_url")
+                or ""
+            ),
+            live_enabled=live_requested,
+        )
+        if live_requested and not bool(apollo_meta.get("live_enabled")):
+            raise HTTPException(status_code=403, detail="Task is not enabled for live generation")
 
-    if not req.avatar_image_url or not req.reference_video_url:
-        raise HTTPException(status_code=400, detail="apollo_avatar assets missing: avatar/ref")
+        if not req.avatar_image_url or not req.reference_video_url:
+            raise HTTPException(status_code=400, detail="apollo_avatar assets missing: avatar/ref")
 
-    resp = await run_apollo_avatar_generate_step(
-        task=task,
-        task_id=task_id,
-        req=req,
-        repo=repo,
-        live_enabled=live_requested,
-        force=force,
-    )
-    background_tasks.add_task(
-        run_post_generate_pipeline,
-        task_id=task_id,
-        repo=repo,
-        target_lang=(task.get("content_lang") or "my"),
-        translate=True,
-        force=False,
-    )
-    return resp
+        resp = await run_apollo_avatar_generate_step(
+            task=task,
+            task_id=task_id,
+            req=req,
+            repo=repo,
+            live_enabled=live_requested,
+            force=force,
+        )
+        background_tasks.add_task(
+            run_post_generate_pipeline,
+            task_id=task_id,
+            repo=repo,
+            target_lang=(task.get("content_lang") or "my"),
+            translate=True,
+            force=False,
+        )
+        return resp
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("ApolloAvatar generate failed", extra={"task_id": task_id})
+        return JSONResponse(
+            status_code=500,
+            content={
+                "ok": False,
+                "error": "apollo_avatar_generate_failed",
+                "message": str(exc),
+                "task_id": task_id,
+            },
+        )
 
 
 @router.get("/{task_id}/publish_hub")

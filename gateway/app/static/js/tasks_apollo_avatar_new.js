@@ -13,19 +13,33 @@
     return base1;
   }
 
+  async function safeReadResponse(res) {
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    if (ct.includes("application/json")) {
+      return { kind: "json", data: await res.json() };
+    }
+    const text = await res.text();
+    return { kind: "text", data: text.slice(0, 4000) };
+  }
+
   async function postJson(url, payload) {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payload || {}),
     });
-    const text = await res.text();
-    let data = null;
-    try { data = JSON.parse(text); } catch (_) {}
+    const parsed = await safeReadResponse(res);
     if (!res.ok) {
-      throw new Error(data?.detail || text || `HTTP ${res.status}`);
+      const msg = parsed.kind === "json"
+        ? (parsed.data?.detail || parsed.data?.error || JSON.stringify(parsed.data))
+        : parsed.data;
+      const err = new Error(`HTTP ${res.status}: ${msg || res.statusText}`);
+      err.status = res.status;
+      err.payload = parsed.data;
+      err.contentType = parsed.kind;
+      throw err;
     }
-    return data || {};
+    return parsed.kind === "json" ? parsed.data : { ok: true, raw: parsed.data };
   }
 
   async function postForm(url, formData) {
@@ -33,13 +47,18 @@
       method: "POST",
       body: formData,
     });
-    const text = await res.text();
-    let data = null;
-    try { data = JSON.parse(text); } catch (_) {}
+    const parsed = await safeReadResponse(res);
     if (!res.ok) {
-      throw new Error(data?.detail || text || `HTTP ${res.status}`);
+      const msg = parsed.kind === "json"
+        ? (parsed.data?.detail || parsed.data?.error || JSON.stringify(parsed.data))
+        : parsed.data;
+      const err = new Error(`HTTP ${res.status}: ${msg || res.statusText}`);
+      err.status = res.status;
+      err.payload = parsed.data;
+      err.contentType = parsed.kind;
+      throw err;
     }
-    return data || {};
+    return parsed.kind === "json" ? parsed.data : { ok: true, raw: parsed.data };
   }
 
   function getTargetDurationSec() {
@@ -181,6 +200,11 @@
       };
       const result = await postJson(`/api/apollo/avatar/${encodeURIComponent(currentTaskId)}/generate`, payload);
       setResult(result, false);
+    } catch (err) {
+      const status = err?.status ? `status=${err.status}` : "";
+      const msg = err?.payload ? JSON.stringify(err.payload, null, 2) : (err?.message || String(err));
+      setResult(`Generate failed ${status}\n${msg}`.trim(), true);
+      console.warn("ApolloAvatar generate failed", { status: err?.status, contentType: err?.contentType });
     } finally {
       setBusy(false);
     }
