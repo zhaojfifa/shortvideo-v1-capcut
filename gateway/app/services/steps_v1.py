@@ -28,7 +28,7 @@ from gateway.app.core.workspace import (
 )
 from gateway.app.db import SessionLocal
 from gateway.app import config, models
-from gateway.app.services.artifact_storage import upload_task_artifact
+from gateway.app.services.artifact_storage import upload_task_artifact, get_download_url, object_exists
 from gateway.app.services.task_events import append_task_event as _append_task_event
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.parse import detect_platform, parse_video
@@ -1439,8 +1439,21 @@ async def run_post_generate_pipeline(
         try:
             res = publish_task_pack(task_id, db, task_repo=repo, provider=None, force=force)
             publish_key = res.get("publish_key")
+            publish_provider = res.get("provider")
+            publish_url = res.get("download_url") or ""
+            uploaded = False
+            if publish_key and not object_exists(str(publish_key)):
+                local_path = Path(str(publish_key))
+                if local_path.exists():
+                    uploaded_key = upload_task_artifact(
+                        task, local_path, "deliver/publish/capcut_pack.zip", task_id=task_id
+                    )
+                    publish_key = uploaded_key
+                    publish_provider = "artifact"
+                    publish_url = get_download_url(str(uploaded_key))
+                    uploaded = True
             task_db = db.query(models.Task).filter(models.Task.id == task_id).first()
-            if task_db:
+            if task_db and not uploaded:
                 _update(
                     {
                         "publish_provider": task_db.publish_provider,
@@ -1453,8 +1466,9 @@ async def run_post_generate_pipeline(
             else:
                 _update(
                     {
-                        "publish_provider": res.get("provider"),
+                        "publish_provider": publish_provider,
                         "publish_key": publish_key,
+                        "publish_url": publish_url,
                         "publish_status": "done" if publish_key else "failed",
                     }
                 )
