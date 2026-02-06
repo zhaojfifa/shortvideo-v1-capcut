@@ -536,8 +536,11 @@ def download_scenes(task_id: str, repo=Depends(get_task_repository)):
     if not task:
         raise HTTPException(status_code=404, detail="Scenes not found")
     scenes_key = _task_value(task, "scenes_key")
-    if str(_task_value(task, "scenes_status") or "").lower() == "skipped":
-        return _not_ready_response(task, "scenes", ["scenes_skipped"])
+    scenes_status = str(_task_value(task, "scenes_status") or "").lower()
+    if scenes_status == "skipped":
+        return _not_ready_response(task, "scenes", ["scenes_skipped"], reason="not_applicable")
+    if scenes_status == "failed":
+        return _not_ready_response(task, "scenes", ["scenes_failed"], reason="failed")
     if not scenes_key or not object_exists(str(scenes_key)):
         return _not_ready_response(task, "scenes", ["scenes_key"])
     return RedirectResponse(url=get_download_url(str(scenes_key)), status_code=302)
@@ -866,12 +869,12 @@ def _require_storage_key(task: dict, field: str, not_found: str) -> str:
     return key
 
 
-def _not_ready_response(task: dict, artifact: str, missing: list[str]) -> JSONResponse:
+def _not_ready_response(task: dict, artifact: str, missing: list[str], *, reason: str = "not_ready") -> JSONResponse:
     return JSONResponse(
         status_code=409,
         content={
             "ok": False,
-            "reason": "not_ready",
+            "reason": reason,
             "task_id": str(_task_value(task, "task_id") or _task_value(task, "id") or ""),
             "artifact": artifact,
             "missing": missing,

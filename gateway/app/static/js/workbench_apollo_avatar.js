@@ -93,9 +93,11 @@
     }
     if (packStatus === "ready" || packStatus === "done") {
       stepState["Deliverables"] = "done";
+    } else if (scenesStatus === "skipped") {
+      stepState["Deliverables"] = "skipped";
     }
-    if (scenesStatus === "skipped") {
-      stepState["Deliverables"] = stepState["Deliverables"] || "pending";
+    if (scenesStatus === "failed") {
+      stepState["Deliverables"] = stepState["Deliverables"] === "done" ? "done" : "warning";
     }
     events.forEach((evt) => {
       const stage = stageFromEvent(evt);
@@ -117,7 +119,8 @@
       el.className = "card";
       el.style.padding = "10px";
       el.style.minWidth = "140px";
-      el.innerHTML = `<div style="font-weight:700;">${s}</div><div class="muted">${state.toUpperCase()}</div>`;
+      const label = state === "skipped" ? "SKIPPED" : state === "warning" ? "WARNING" : state.toUpperCase();
+      el.innerHTML = `<div style="font-weight:700;">${s}</div><div class="muted">${label}</div>`;
       list.appendChild(el);
     });
   }
@@ -128,6 +131,8 @@
     const taskId = task.task_id || window.__TASK_ID__;
     const packReady = ["ready", "done"].includes(String(task.pack_status || "").toLowerCase());
     const scenesReady = ["ready", "done"].includes(String(task.scenes_status || "").toLowerCase());
+    const scenesSkipped = String(task.scenes_status || "").toLowerCase() === "skipped";
+    const scenesFailed = String(task.scenes_status || "").toLowerCase() === "failed";
     const items = [
       { label: "raw.mp4", href: `/v1/tasks/${taskId}/raw`, ready: true },
       { label: "scenes.zip", href: `/v1/tasks/${taskId}/scenes`, ready: scenesReady },
@@ -139,6 +144,12 @@
     }
     links.innerHTML = items
       .map((i) => {
+        if (i.label === "scenes.zip" && scenesSkipped) {
+          return `<span class="muted" title="Not applicable">scenes skipped</span>`;
+        }
+        if (i.label === "scenes.zip" && scenesFailed) {
+          return `<span class="muted" title="Failed">scenes failed</span>`;
+        }
         if (!i.ready) {
           return `<span class="muted" title="Not ready">${i.label}</span>`;
         }
