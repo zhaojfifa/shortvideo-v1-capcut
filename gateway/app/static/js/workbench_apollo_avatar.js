@@ -13,11 +13,29 @@
   ];
 
   const stepState = {};
+  // --- Stable step states (monotonic, precedence-based) ---
+  const STATE_RANK = {
+    pending: 0,
+    skipped: 1,
+    done: 2,
+    running: 3,
+    warning: 4,
+    error: 5,
+  };
+
+  function mergeState(prev, next) {
+    const p = prev || "pending";
+    const n = next || "pending";
+    // never downgrade; always keep higher rank
+    return STATE_RANK[n] >= STATE_RANK[p] ? n : p;
+  }
   const eventIndex = new Set();
   let pollTimer = null;
   let pollStart = 0;
   let pollCount = 0;
   let lastResult = null;
+  let inFlight = false;
+  let stopped = false;
 
   function getTaskJson() {
     return window.__TASK_JSON__ || {};
@@ -70,43 +88,68 @@
 
   function statusFromEvent(evt) {
     const code = `${evt.code || ""}`.toLowerCase();
-    if (code.includes("start")) return "running";
-    if (code.includes("done") || code.includes("ready") || code.includes("success")) return "done";
-    if (code.includes("skip") || code.includes("skipped")) return "done";
-    if (code.includes("error") || code.includes("fail")) return "error";
+    // explicit error first
+    if (/(error|fail|failed|exception)/.test(code)) return "error";
+    // explicit skipped
+    if (/(skip|skipped)/.test(code)) return "skipped";
+    // explicit running
+    if (/(start|begin|running)/.test(code)) return "running";
+    // explicit done
+    if (/(done|ready|success|completed)/.test(code)) return "done";
     return null;
   }
 
   function updateStepper(events) {
+    // init
     STEPS.forEach((s) => {
       if (!stepState[s]) stepState[s] = "pending";
     });
+
     const task = getTaskJson();
     const subStatus = String(task.subtitles_status || "").toLowerCase();
     const dubStatus = String(task.dub_status || "").toLowerCase();
     const packStatus = String(task.pack_status || "").toLowerCase();
     const scenesStatus = String(task.scenes_status || "").toLowerCase();
-    if (["ready", "done"].includes(subStatus) || ["ready", "done"].includes(dubStatus) || ["ready", "done"].includes(packStatus)) {
-      stepState["Post"] = "done";
-    }
-    if (["error", "failed"].includes(subStatus) || ["error", "failed"].includes(dubStatus) || ["error", "failed"].includes(packStatus)) {
-      stepState["Post"] = "error";
-    }
-    if (packStatus === "ready" || packStatus === "done") {
-      stepState["Deliverables"] = "done";
+    const publishStatus = String(task.publish_status || "").toLowerCase();
+
+    // Post step: driven by subtitles/dub/pack outcomes (monotonic)
+    const postDone =
+      ["ready", "done"].includes(subStatus) ||
+      ["ready", "done"].includes(dubStatus) ||
+      ["ready", "done"].includes(packStatus);
+
+    const postErr =
+      ["error", "failed"].includes(subStatus) ||
+      ["error", "failed"].includes(dubStatus) ||
+      ["error", "failed"].includes(packStatus);
+
+    if (postDone) stepState["Post"] = mergeState(stepState["Post"], "done");
+    if (postErr) stepState["Post"] = mergeState(stepState["Post"], "error");
+
+    // Deliverables: publish_status / pack_status / scenes_status
+    if (["ready", "done"].includes(publishStatus) || ["ready", "done"].includes(packStatus)) {
+      stepState["Deliverables"] = mergeState(stepState["Deliverables"], "done");
     } else if (scenesStatus === "skipped") {
-      stepState["Deliverables"] = "skipped";
+      stepState["Deliverables"] = mergeState(stepState["Deliverables"], "skipped");
+    } else if (scenesStatus === "failed") {
+      stepState["Deliverables"] = mergeState(stepState["Deliverables"], "warning");
     }
-    if (scenesStatus === "failed") {
-      stepState["Deliverables"] = stepState["Deliverables"] === "done" ? "done" : "warning";
-    }
-    events.forEach((evt) => {
+
+    // Events: process in chronological order to avoid regressions caused by reverse rendering
+    const sorted = (Array.isArray(events) ? events.slice() : []).sort((a, b) => {
+      const ta = Date.parse(a.ts || "") || 0;
+      const tb = Date.parse(b.ts || "") || 0;
+      return ta - tb;
+    });
+
+    sorted.forEach((evt) => {
       const stage = stageFromEvent(evt);
       if (!stage) return;
-      const status = statusFromEvent(evt);
-      if (!status) return;
-      stepState[stage] = status;
+      const st = statusFromEvent(evt);
+      if (!st) return;
+      stepState[stage] = mergeState(stepState[stage], st);
     });
+
     renderStepper();
   }
 
@@ -126,40 +169,58 @@
     });
   }
 
-  function setOutputs(task, result) {
+  async function fetchPublishHub() {
+    const task = getTaskJson();
+    const taskId = task.task_id || window.__TASK_ID__;
+    const url =
+      window.__APOLLO_PUBLISH_HUB_URL__ ||
+      window.__PUBLISH_HUB_URL__ ||
+      (taskId ? `/api/apollo/avatar/${taskId}/publish_hub` : null);
+    if (!url) return null;
+    try {
+      const resp = await fetch(url, { headers: { "Accept": "application/json" } });
+      if (!resp.ok) return null;
+      return await resp.json();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function setOutputs(task, result) {
     const links = $("outputs-links");
     if (!links) return;
     const taskId = task.task_id || window.__TASK_ID__;
-    const packReady = ["ready", "done"].includes(String(task.pack_status || "").toLowerCase());
-    const scenesReady = ["ready", "done"].includes(String(task.scenes_status || "").toLowerCase());
-    const scenesSkipped = String(task.scenes_status || "").toLowerCase() === "skipped";
-    const scenesFailed = String(task.scenes_status || "").toLowerCase() === "failed";
-    const items = [
-      { label: "raw.mp4", href: `/v1/tasks/${taskId}/raw`, ready: true },
-      { label: "scenes.zip", href: `/v1/tasks/${taskId}/scenes`, ready: scenesReady },
-      { label: "pack.zip", href: `/v1/tasks/${taskId}/pack`, ready: packReady },
-      { label: "publish bundle", href: `/v1/tasks/${taskId}/publish_bundle`, ready: packReady },
-      { label: "publish hub", href: `/tasks/${taskId}/publish`, ready: true },
-    ];
+    const hub = await fetchPublishHub();
+    const d = hub && hub.deliverables ? hub.deliverables : null;
+    const items = [];
+
     if (result && result.final_video_url) {
-      items.unshift({ label: "final_video_url", href: result.final_video_url, ready: true });
+      items.push({ label: "final_video_url", href: result.final_video_url, ready: true, kind: "external" });
     }
+
+    if (d && d.final_mp4 && d.final_mp4.url) {
+      items.push({ label: d.final_mp4.label || "raw.mp4", href: d.final_mp4.url, ready: true });
+    } else if (d && d.raw_mp4 && d.raw_mp4.url) {
+      items.push({ label: d.raw_mp4.label || "raw.mp4", href: d.raw_mp4.url, ready: true });
+    } else {
+      items.push({ label: "raw.mp4", href: `/v1/tasks/${taskId}/raw`, ready: true });
+    }
+
+    if (d && d.pack_zip && d.pack_zip.url) {
+      items.push({ label: d.pack_zip.label || "pack.zip", href: d.pack_zip.url, ready: true });
+    }
+
+    if (d && d.edit_bundle_zip && d.edit_bundle_zip.url) {
+      items.push({ label: d.edit_bundle_zip.label || "edit_bundle.zip", href: d.edit_bundle_zip.url, ready: true });
+    } else {
+      const packReady = ["ready", "done"].includes(String(task.pack_status || "").toLowerCase());
+      if (packReady) items.push({ label: "edit_bundle.zip", href: `/v1/tasks/${taskId}/publish_bundle`, ready: true });
+    }
+
+    items.push({ label: "publish hub", href: `/tasks/${taskId}/publish`, ready: true, kind: "internal" });
+
     links.innerHTML = items
-      .map((i) => {
-        if (i.label === "scenes.zip" && scenesSkipped) {
-          return `<span class="muted" title="Not applicable">scenes skipped</span>`;
-        }
-        if (i.label === "scenes.zip" && scenesFailed) {
-          return `<span class="muted" title="Failed">scenes failed</span>`;
-        }
-        if (!i.ready) {
-          if (i.label === "publish bundle") {
-            return `<span class="muted" title="Not ready">see publish page</span>`;
-          }
-          return `<span class="muted" title="Not ready">${i.label}</span>`;
-        }
-        return `<a href="${i.href}" target="_blank" rel="noopener">${i.label}</a>`;
-      })
+      .map((i) => `<a href="${i.href}" target="_blank" rel="noopener">${i.label}</a>`)
       .join(" ");
   }
 
@@ -213,11 +274,31 @@
       .slice()
       .reverse()
       .find((e) => e.code === "generate.done" && e.extra && e.extra.final_video_url);
-    if (lastGenerate && !lastResult) {
+    if (lastGenerate) {
       lastResult = { final_video_url: lastGenerate.extra.final_video_url };
       setPreviewLink(lastResult);
     }
     return filtered;
+  }
+
+  function isTerminal(task, events) {
+    const status = String(task.status || "").toLowerCase();
+    if (["done", "failed", "error"].includes(status)) return true;
+
+    const publishStatus = String(task.publish_status || "").toLowerCase();
+    if (["done", "ready"].includes(publishStatus)) return true;
+
+    const hasPostDone = Array.isArray(events) && events.some((e) => e && e.code === "post.done");
+    if (hasPostDone) return true;
+
+    return false;
+  }
+
+  function stopPolling() {
+    stopped = true;
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = null;
+    inFlight = false;
   }
 
   async function runGenerate() {
@@ -250,7 +331,7 @@
         resultEl.textContent = JSON.stringify(data, null, 2);
       }
       setPreviewLink(data);
-      setOutputs(getTaskJson(), data);
+      await setOutputs(getTaskJson(), data);
       await fetchEvents();
       startPolling();
       return;
@@ -271,22 +352,41 @@
   }
 
   function startPolling() {
-    if (pollTimer) {
-      clearTimeout(pollTimer);
-    }
+    stopPolling();
+    stopped = false;
     pollStart = Date.now();
     pollCount = 0;
     const tick = async () => {
-      await fetchEvents(true);
-      const elapsed = Date.now() - pollStart;
-      pollCount += 1;
-      if (pollCount > 60) {
+      if (stopped) return;
+      if (inFlight) {
+        pollTimer = setTimeout(tick, 800);
         return;
       }
-      const interval = elapsed < 60000 ? 1200 : elapsed < 120000 ? 2000 : 3000;
+      inFlight = true;
+      try {
+        const evts = await fetchEvents(true);
+        await setOutputs(getTaskJson(), lastResult);
+        const task = getTaskJson();
+        if (isTerminal(task, evts)) {
+          stopPolling();
+          return;
+        }
+      } finally {
+        inFlight = false;
+      }
+      pollCount += 1;
+      const elapsed = Date.now() - pollStart;
+      if (pollCount > 80 || elapsed > 4 * 60 * 1000) {
+        stopPolling();
+        return;
+      }
+      const interval =
+        elapsed < 30000 ? 1200 :
+        elapsed < 90000 ? 2000 :
+        3000;
       pollTimer = setTimeout(tick, interval);
     };
-    pollTimer = setTimeout(tick, 1000);
+    pollTimer = setTimeout(tick, 800);
   }
 
   function bind() {
@@ -296,7 +396,11 @@
     setOutputs(getTaskJson(), null);
     setPreviewLink(null);
     updateStepper([]);
-    fetchEvents(false);
+    fetchEvents(false).then(async (evts) => {
+      await setOutputs(getTaskJson(), lastResult);
+      const task = getTaskJson();
+      if (!isTerminal(task, evts)) startPolling();
+    });
   }
 
   if (document.readyState === "loading") {
