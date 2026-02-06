@@ -15,6 +15,17 @@
   let pollStopped = false;
   let pollAbort = null;
   let eventsInFlight = false;
+  let __PUBLISH_HUB_TRIED = false;
+  let __PUBLISH_HUB_DISABLED = false;
+  let __PUBLISH_HUB_CACHE = null;
+
+  function __buildPublishHubPageUrl(taskId) {
+    return taskId ? `/tasks/${taskId}/publish` : null;
+  }
+
+  function __buildPublishBundleUrl(taskId) {
+    return taskId ? `/v1/tasks/${taskId}/publish_bundle` : null;
+  }
 
   function mergeState(prev, next) {
     if (!prev) return next;
@@ -189,6 +200,10 @@
   }
 
   async function fetchPublishHub() {
+    if (__PUBLISH_HUB_DISABLED) return null;
+    if (__PUBLISH_HUB_TRIED) return __PUBLISH_HUB_CACHE;
+
+    __PUBLISH_HUB_TRIED = true;
     const task = getTaskJson();
     const taskId = task.task_id || window.__TASK_ID__;
     const url =
@@ -197,9 +212,19 @@
       (taskId ? `/api/apollo/avatar/${taskId}/publish_hub` : null);
     if (!url) return null;
     try {
-      const resp = await fetch(url, { headers: { "Accept": "application/json" } });
-      if (!resp.ok) return null;
-      return await resp.json();
+      const resp = await fetch(url, {
+        headers: { "Accept": "application/json" },
+        credentials: "same-origin",
+      });
+      if (!resp.ok) {
+        if (resp.status === 401 || resp.status === 403) {
+          __PUBLISH_HUB_DISABLED = true;
+        }
+        return null;
+      }
+      const json = await resp.json();
+      __PUBLISH_HUB_CACHE = json;
+      return json;
     } catch (_) {
       return null;
     }
@@ -211,6 +236,8 @@
     const taskId = task.task_id || window.__TASK_ID__;
     const hub = await fetchPublishHub();
     const d = hub && hub.deliverables ? hub.deliverables : null;
+    const hubPageUrl = __buildPublishHubPageUrl(taskId);
+    const publishBundleUrl = __buildPublishBundleUrl(taskId);
     const scenesStatus = String(task.scenes_status || "").toLowerCase();
     const scenesSkipped = scenesStatus === "skipped";
     const scenesFailed = scenesStatus === "failed";
@@ -238,13 +265,17 @@
       items.push({ label: "pack.zip", ready: false, kind: "muted" });
     }
 
-    if (d && d.edit_bundle_zip && d.edit_bundle_zip.url) {
-      items.push({ label: "publish bundle", href: d.edit_bundle_zip.url, ready: true, kind: "link" });
+    const packStatus = String(task.pack_status || "").toLowerCase();
+    const packReady = packStatus === "ready" || packStatus === "done";
+    if (publishBundleUrl && (packReady || (hub && hub.deliverables))) {
+      items.push({ label: "publish bundle", href: publishBundleUrl, ready: true, kind: "link" });
     } else {
       items.push({ label: "publish bundle", ready: false, kind: "muted" });
     }
 
-    items.push({ label: "Publish Hub", href: `/tasks/${taskId}/publish`, ready: true, kind: "link" });
+    if (hubPageUrl) {
+      items.push({ label: "Publish Hub", href: hubPageUrl, ready: true, kind: "link" });
+    }
 
     links.innerHTML = items
       .map((i) => {
