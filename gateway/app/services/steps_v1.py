@@ -32,6 +32,8 @@ from gateway.app.services.artifact_storage import upload_task_artifact
 from gateway.app.services.task_events import append_task_event as _append_task_event
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.parse import detect_platform, parse_video
+from gateway.app.services.publish_service import publish_task_pack
+from gateway.app.services.scene_split import run_scenes_build
 from gateway.app.services.subtitles import generate_subtitles
 from gateway.app.utils.pipeline_config import parse_pipeline_config, pipeline_config_to_storage
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
@@ -1124,7 +1126,7 @@ async def run_apollo_avatar_generate_step(
         task_id,
         {
             "last_step": "apollo_avatar_generate",
-            "status": "ready",
+            "status": "processing",
             "apollo_avatar_manifest_key": artifacts.manifest_url,
             "apollo_avatar_final_video_key": artifacts.final_video_url,
             "apollo_avatar": _dump(artifacts),
@@ -1205,6 +1207,9 @@ async def run_post_generate_pipeline(
         message="Post pipeline start",
     )
 
+    def _update(fields: dict) -> None:
+        repo.upsert(task_id, fields)
+
     # --------- Step 1: Subtitles ---------
     subtitles_ready = (task.get("subtitles_status") == "ready") and bool(task.get("subtitles_key"))
     if not subtitles_ready or force:
@@ -1261,12 +1266,77 @@ async def run_post_generate_pipeline(
 
     task = repo.get(task_id) or task
 
+    # --------- Step 3: Scenes ---------
+    scenes_key = task.get("scenes_key")
+    scenes_ready = (task.get("scenes_status") == "ready") and bool(scenes_key)
+    if not scenes_ready or force:
+        logger.info("APOLLO_AVATAR_BUILD_SCENES_START", extra={"task_id": task_id})
+        _append_event(
+            repo,
+            task_id,
+            channel="apollo_avatar",
+            code="post.scenes.start",
+            message="Scenes build start",
+        )
+        try:
+            res = run_scenes_build(task_id, _update)
+            scenes_key = res.get("scenes_key")
+            _append_event(
+                repo,
+                task_id,
+                channel="apollo_avatar",
+                code="post.scenes.done",
+                message="Scenes build done",
+                extra={"scenes_key": scenes_key},
+            )
+            logger.info(
+                "APOLLO_AVATAR_BUILD_SCENES_DONE",
+                extra={"task_id": task_id, "scenes_key": scenes_key},
+            )
+        except Exception:
+            _append_event(
+                repo,
+                task_id,
+                channel="apollo_avatar",
+                code="post.error",
+                message="Scenes build failed",
+                extra={"stage": "scenes"},
+            )
+            logger.exception("Post-generate scenes failed", extra={"task_id": task_id})
+            return
+    else:
+        logger.info("Post-generate: scenes already ready; skip", extra={"task_id": task_id})
+
+    task = repo.get(task_id) or task
+
     # --------- Step 3: Pack ---------
     pack_key = task.get("pack_key") or task.get("pack_path")
     pack_ready = (task.get("pack_status") == "ready") and bool(pack_key)
     if not pack_ready or force:
+        logger.info("APOLLO_AVATAR_BUILD_PACK_START", extra={"task_id": task_id})
+        _append_event(
+            repo,
+            task_id,
+            channel="apollo_avatar",
+            code="post.pack.start",
+            message="Pack build start",
+        )
         try:
             await run_pack_step(PackRequest(task_id=task_id))
+            task = repo.get(task_id) or task
+            pack_key = task.get("pack_key") or task.get("pack_path")
+            _append_event(
+                repo,
+                task_id,
+                channel="apollo_avatar",
+                code="post.pack.done",
+                message="Pack build done",
+                extra={"pack_key": pack_key},
+            )
+            logger.info(
+                "APOLLO_AVATAR_BUILD_PACK_DONE",
+                extra={"task_id": task_id, "pack_key": pack_key},
+            )
         except Exception:
             _append_event(
                 repo,
@@ -1281,6 +1351,75 @@ async def run_post_generate_pipeline(
     else:
         logger.info("Post-generate: pack already ready; skip", extra={"task_id": task_id})
 
+    task = repo.get(task_id) or task
+
+    # --------- Step 4: Publish bundle ---------
+    publish_key = task.get("publish_key")
+    publish_ready = (task.get("publish_status") == "ready") and bool(publish_key)
+    if not publish_ready or force:
+        logger.info("APOLLO_AVATAR_BUILD_PUBLISH_BUNDLE_START", extra={"task_id": task_id})
+        _append_event(
+            repo,
+            task_id,
+            channel="apollo_avatar",
+            code="post.publish.start",
+            message="Publish bundle build start",
+        )
+        db = SessionLocal()
+        try:
+            res = publish_task_pack(task_id, db, provider=None, force=force)
+            publish_key = res.get("publish_key")
+            task_db = db.query(models.Task).filter(models.Task.id == task_id).first()
+            if task_db:
+                _update(
+                    {
+                        "publish_provider": task_db.publish_provider,
+                        "publish_key": task_db.publish_key,
+                        "publish_url": task_db.publish_url,
+                        "publish_status": task_db.publish_status,
+                        "published_at": task_db.published_at,
+                    }
+                )
+            _append_event(
+                repo,
+                task_id,
+                channel="apollo_avatar",
+                code="post.publish.done",
+                message="Publish bundle build done",
+                extra={"publish_key": publish_key},
+            )
+            logger.info(
+                "APOLLO_AVATAR_BUILD_PUBLISH_BUNDLE_DONE",
+                extra={"task_id": task_id, "publish_key": publish_key},
+            )
+        except Exception:
+            _append_event(
+                repo,
+                task_id,
+                channel="apollo_avatar",
+                code="post.error",
+                message="Publish bundle failed",
+                extra={"stage": "publish_bundle"},
+            )
+            logger.exception("Post-generate publish bundle failed", extra={"task_id": task_id})
+            return
+        finally:
+            db.close()
+    else:
+        logger.info("Post-generate: publish bundle already ready; skip", extra={"task_id": task_id})
+
+    task = repo.get(task_id) or task
+    pack_key = task.get("pack_key") or task.get("pack_path")
+    if pack_key:
+        _update(
+            {
+                "status": "ready",
+                "last_step": "publish" if task.get("publish_key") else "pack",
+                "error_message": None,
+                "error_reason": None,
+            }
+        )
+
     _append_event(
         repo,
         task_id,
@@ -1291,6 +1430,8 @@ async def run_post_generate_pipeline(
             "subtitles_status": task.get("subtitles_status"),
             "dub_status": task.get("dub_status"),
             "pack_status": task.get("pack_status"),
+            "scenes_status": task.get("scenes_status"),
+            "publish_status": task.get("publish_status"),
         },
     )
     logger.info("Post-generate pipeline done", extra={"task_id": task_id})
