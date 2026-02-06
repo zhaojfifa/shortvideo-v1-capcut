@@ -25,7 +25,7 @@ def backfill(limit: int = 50, provider: str | None = None, force: bool = False):
         out = []
         for task in tasks:
             try:
-                res = publish_task_pack(task.id, db, provider=provider, force=force)
+                res = publish_task_pack(task.id, db, task_repo=None, provider=provider, force=force)
                 out.append(
                     {
                         "task_id": task.id,

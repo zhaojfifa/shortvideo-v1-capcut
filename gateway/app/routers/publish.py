@@ -13,7 +13,7 @@ router = APIRouter()
 @router.post("/v1/publish", response_model=schemas.PublishResponse)
 def publish(req: schemas.PublishRequest, db: Session = Depends(get_db)):
     try:
-        res = publish_task_pack(req.task_id, db, provider=req.provider, force=req.force)
+        res = publish_task_pack(req.task_id, db, task_repo=None, provider=req.provider, force=req.force)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
