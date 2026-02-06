@@ -337,6 +337,7 @@
   <script src="/static/js/i18n_v185.js"></script>
   <script>
     const TASK_ID = "{{ task.task_id }}";
+    const TASK_KIND = "{{ task.category_key or task.kind or task.platform or '' }}";
     const OP_KEY_STORAGE = "op_access_key";
     const LANG_STORAGE = "ui_lang_publish_hub";
 
@@ -526,7 +527,11 @@ function resolveLang(serverLang) {
         showGate(window.__V185_I18N__.t("publish.gate.need_key"));
         return;
       }
-      const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish_hub`, {
+      const kind = (TASK_KIND || "").toLowerCase();
+      const publishHubUrl = kind === "apollo_avatar"
+        ? `/api/apollo/avatar/${encodeURIComponent(TASK_ID)}/publish_hub`
+        : `/api/tasks/${encodeURIComponent(TASK_ID)}/publish_hub`;
+      const resp = await fetch(publishHubUrl, {
         headers: { "X-OP-KEY": opKey },
       });
       if (resp.status === 401 || resp.status === 403) {

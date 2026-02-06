@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, UploadFile, File, Form, Security
 from typing import Optional, Any, Dict
 
 from gateway.app.deps import get_task_repository
@@ -16,6 +16,8 @@ from gateway.app.services.steps_v1 import (
 from gateway.app.services.task_events import append_task_event as _append_task_event
 from gateway.app.task_repo_utils import normalize_task_payload
 from gateway.app.utils.pipeline_config import pipeline_config_to_storage
+from gateway.app.routers.tasks import api_key_header, _op_key_valid_value
+from gateway.app.scenes.apollo_avatar.publish_hub import build_apollo_avatar_publish_hub
 
 router = APIRouter(prefix="/api/apollo/avatar", tags=["apollo-avatar"])
 
@@ -190,4 +192,18 @@ async def generate_apollo_avatar(
         force=False,
     )
     return resp
+
+
+@router.get("/{task_id}/publish_hub")
+def apollo_avatar_publish_hub(
+    task_id: str,
+    repo=Depends(get_task_repository),
+    op_key: str | None = Security(api_key_header),
+):
+    if not _op_key_valid_value(op_key):
+        raise HTTPException(status_code=401, detail="OP key required")
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return build_apollo_avatar_publish_hub(task)
 
