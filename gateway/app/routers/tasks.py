@@ -476,7 +476,9 @@ def download_mm_subs(
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="burmese subtitles not found")
-    key = _require_storage_key(task, "mm_srt_path", "burmese subtitles not found")
+    key = _task_key(task, "mm_srt_path")
+    if not key or not object_exists(key):
+        return _not_ready_response(task, "subs_mm", ["mm_srt_path"])
     return _text_or_redirect(key, inline=inline)
 
 
@@ -489,10 +491,12 @@ def download_mm_txt(
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="mm txt not found")
-    mm_key = _require_storage_key(task, "mm_srt_path", "mm txt not found")
+    mm_key = _task_key(task, "mm_srt_path")
+    if not mm_key or not object_exists(mm_key):
+        return _not_ready_response(task, "mm_txt", ["mm_srt_path"])
     txt_key = mm_key[:-4] + ".txt" if mm_key.endswith(".srt") else f"{mm_key}.txt"
     if not object_exists(txt_key):
-        raise HTTPException(status_code=404, detail="mm txt not found")
+        return _not_ready_response(task, "mm_txt", ["mm_txt_path"])
     return _text_or_redirect(txt_key, inline=inline)
 
 
@@ -502,8 +506,8 @@ def download_audio_mm(task_id: str, repo=Depends(get_task_repository)):
     if not task:
         raise HTTPException(status_code=404, detail="dubbed audio not found")
     key = _task_value(task, "mm_audio_key")
-    if not key:
-        raise HTTPException(status_code=404, detail="dubbed audio not found")
+    if not key or not object_exists(str(key)):
+        return _not_ready_response(task, "audio_mm", ["mm_audio_key"])
     logger.info("audio_mm download: task_id=%s key=%s", task_id, key)
     return RedirectResponse(url=get_download_url(str(key)), status_code=302)
 
@@ -517,12 +521,12 @@ def download_pack(task_id: str, repo=Depends(get_task_repository)):
     if pack_type == "capcut_v18":
         pack_key = _task_value(task, "pack_key") or _task_value(task, "pack_path")
         if not pack_key or not object_exists(str(pack_key)):
-            raise HTTPException(status_code=404, detail="Pack not found")
+            return _not_ready_response(task, "pack", ["pack_key"])
         return RedirectResponse(url=get_download_url(str(pack_key)), status_code=302)
 
     key = _task_value(task, "pack_key") or _task_value(task, "pack_path")
     if not key or not object_exists(str(key)):
-        raise HTTPException(status_code=404, detail="Pack not found")
+        return _not_ready_response(task, "pack", ["pack_key"])
     return RedirectResponse(url=get_download_url(str(key)), status_code=302)
 
 
@@ -532,8 +536,10 @@ def download_scenes(task_id: str, repo=Depends(get_task_repository)):
     if not task:
         raise HTTPException(status_code=404, detail="Scenes not found")
     scenes_key = _task_value(task, "scenes_key")
+    if str(_task_value(task, "scenes_status") or "").lower() == "skipped":
+        return _not_ready_response(task, "scenes", ["scenes_skipped"])
     if not scenes_key or not object_exists(str(scenes_key)):
-        raise HTTPException(status_code=404, detail="Scenes not ready")
+        return _not_ready_response(task, "scenes", ["scenes_key"])
     return RedirectResponse(url=get_download_url(str(scenes_key)), status_code=302)
 
 
@@ -556,6 +562,14 @@ def download_publish_bundle(task_id: str, repo=Depends(get_task_repository)):
 
     pack_key = _task_value(task, "pack_key") or _task_value(task, "pack_path")
     scenes_key = _task_value(task, "scenes_key")
+    missing = []
+    if not pack_key or not object_exists(str(pack_key)):
+        missing.append("pack_key")
+    if str(_task_value(task, "scenes_status") or "").lower() != "skipped":
+        if not scenes_key or not object_exists(str(scenes_key)):
+            missing.append("scenes_key")
+    if missing:
+        return _not_ready_response(task, "publish_bundle", missing)
     pack_local = Path(tmpdir.name) / "pack.zip"
     scenes_local = Path(tmpdir.name) / "scenes.zip"
 
@@ -850,6 +864,27 @@ def _require_storage_key(task: dict, field: str, not_found: str) -> str:
     if not key or not object_exists(key):
         raise HTTPException(status_code=404, detail=not_found)
     return key
+
+
+def _not_ready_response(task: dict, artifact: str, missing: list[str]) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={
+            "ok": False,
+            "reason": "not_ready",
+            "task_id": str(_task_value(task, "task_id") or _task_value(task, "id") or ""),
+            "artifact": artifact,
+            "missing": missing,
+            "status": {
+                "subtitles": _task_value(task, "subtitles_status"),
+                "dub": _task_value(task, "dub_status"),
+                "scenes": _task_value(task, "scenes_status"),
+                "pack": _task_value(task, "pack_status"),
+                "publish": _task_value(task, "publish_status"),
+            },
+            "hint": "Call generate or wait for pipeline to finish.",
+        },
+    )
 
 
 def _text_or_redirect(key: str, inline: bool) -> Response:
