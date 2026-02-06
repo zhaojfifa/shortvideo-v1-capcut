@@ -77,11 +77,17 @@ def _local_publish_copy(task_id: str, src_zip: Path) -> Tuple[str, str]:
 
 def publish_task_pack(
     task_id: str,
-    db: Session,
+    db: Session | None = None,
+    *,
+    task_repo=None,
     provider: Optional[str] = None,
     force: bool = False,
 ) -> dict[str, str]:
-    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    task = None
+    if task_repo is not None:
+        task = task_repo.get(task_id)
+    if task is None and db is not None:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         raise RuntimeError(f"Task not found: {task_id}")
 
@@ -91,18 +97,18 @@ def publish_task_pack(
     if not zip_path.exists():
         raise RuntimeError(f"Pack zip not found for task {task_id}: {zip_path}")
 
-    chosen = (provider or task.publish_provider or PUBLISH_PROVIDER_DEFAULT).lower()
+    chosen = (provider or getattr(task, "publish_provider", None) or PUBLISH_PROVIDER_DEFAULT).lower()
     if (
-        task.publish_status == "published"
-        and task.publish_key
+        getattr(task, "publish_status", None) == "published"
+        and getattr(task, "publish_key", None)
         and not force
-        and chosen == (task.publish_provider or chosen)
+        and chosen == (getattr(task, "publish_provider", None) or chosen)
     ):
         return {
-            "provider": task.publish_provider or chosen,
-            "publish_key": task.publish_key,
-            "download_url": task.publish_url or "",
-            "published_at": task.published_at or "",
+            "provider": getattr(task, "publish_provider", None) or chosen,
+            "publish_key": getattr(task, "publish_key", None),
+            "download_url": getattr(task, "publish_url", None) or "",
+            "published_at": getattr(task, "published_at", None) or "",
         }
 
     published_at = datetime.utcnow().isoformat()
@@ -115,12 +121,13 @@ def publish_task_pack(
             download_url = f"{R2_PUBLIC_BASE_URL.rstrip('/')}/{key}"
         else:
             download_url = ""
-        task.publish_provider = "r2"
-        task.publish_key = key
-        task.publish_url = download_url
-        task.publish_status = "published"
-        task.published_at = published_at
-        db.commit()
+        if db is not None and isinstance(task, models.Task):
+            task.publish_provider = "r2"
+            task.publish_key = key
+            task.publish_url = download_url
+            task.publish_status = "published"
+            task.published_at = published_at
+            db.commit()
         return {
             "provider": "r2",
             "publish_key": key,
@@ -129,12 +136,13 @@ def publish_task_pack(
         }
 
     publish_key, rel = _local_publish_copy(task_id, zip_path)
-    task.publish_provider = "local"
-    task.publish_key = publish_key
-    task.publish_url = ""
-    task.publish_status = "published"
-    task.published_at = published_at
-    db.commit()
+    if db is not None and isinstance(task, models.Task):
+        task.publish_provider = "local"
+        task.publish_key = publish_key
+        task.publish_url = ""
+        task.publish_status = "published"
+        task.published_at = published_at
+        db.commit()
     return {
         "provider": "local",
         "publish_key": publish_key,

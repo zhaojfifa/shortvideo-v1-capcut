@@ -2581,6 +2581,7 @@ def publish_task(
         res = publish_task_pack(
             task_id,
             db,
+            task_repo=repo,
             provider=(payload.provider if payload else None),
             force=(payload.force if payload else False),
         )

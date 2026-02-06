@@ -1437,7 +1437,7 @@ async def run_post_generate_pipeline(
         )
         db = SessionLocal()
         try:
-            res = publish_task_pack(task_id, db, provider=None, force=force)
+            res = publish_task_pack(task_id, db, task_repo=repo, provider=None, force=force)
             publish_key = res.get("publish_key")
             task_db = db.query(models.Task).filter(models.Task.id == task_id).first()
             if task_db:
@@ -1448,6 +1448,14 @@ async def run_post_generate_pipeline(
                         "publish_url": task_db.publish_url,
                         "publish_status": task_db.publish_status,
                         "published_at": task_db.published_at,
+                    }
+                )
+            else:
+                _update(
+                    {
+                        "publish_provider": res.get("provider"),
+                        "publish_key": publish_key,
+                        "publish_status": "done" if publish_key else "failed",
                     }
                 )
             _append_event(
@@ -1473,7 +1481,9 @@ async def run_post_generate_pipeline(
             )
             logger.exception("Post-generate publish bundle failed", extra={"task_id": task_id})
             _update({"publish_status": "failed", "publish_error": str(exc)})
-            return
+            # non-blocking for apollo_avatar
+            if not is_apollo:
+                return
         finally:
             db.close()
     else:
