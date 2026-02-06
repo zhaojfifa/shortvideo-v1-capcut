@@ -20,6 +20,9 @@
     .ops-advanced input[type="text"], .ops-advanced input[type="number"] { width: 240px; }
     .ops-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
     .ops-card { padding: 12px; border: 1px solid #eee; border-radius: 10px; }
+    .outputs-row { display: flex; align-items: center; }
+    .outputs-links { display: flex; gap: 12px; flex-wrap: wrap; width: 100%; }
+    .outputs-links a:last-child { margin-left: auto; }
   </style>
 </head>
 <body>
@@ -96,9 +99,8 @@
 
     <div class="card" id="ops-outputs">
       <h3 style="margin:0 0 6px;">Outputs</h3>
-      <div class="links" id="outputs-links"></div>
-      <div class="actions" style="margin-top:10px;">
-        <a class="btn btn-primary" href="/tasks/{{ task.task_id }}/publish">Publish</a>
+      <div class="outputs-row">
+        <div class="links outputs-links" id="outputs-links"></div>
       </div>
     </div>
 
