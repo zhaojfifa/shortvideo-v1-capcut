@@ -1381,9 +1381,21 @@ async def run_post_generate_pipeline(
             message="Pack build start",
         )
         try:
-            await run_pack_step(PackRequest(task_id=task_id))
+            pack_resp = await run_pack_step(PackRequest(task_id=task_id))
             task = repo.get(task_id) or task
-            pack_key = task.get("pack_key") or task.get("pack_path")
+            pack_key = (
+                (pack_resp or {}).get("pack_key")
+                or task.get("pack_key")
+                or task.get("pack_path")
+            )
+            if pack_key:
+                _update(
+                    {
+                        "pack_key": pack_key,
+                        "pack_status": "done",
+                        "pack_provider": task.get("pack_provider") or "capcut",
+                    }
+                )
             _append_event(
                 repo,
                 task_id,

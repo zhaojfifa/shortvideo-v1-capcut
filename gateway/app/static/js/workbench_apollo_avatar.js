@@ -72,6 +72,7 @@
     const code = `${evt.code || ""}`.toLowerCase();
     if (code.includes("start")) return "running";
     if (code.includes("done") || code.includes("ready") || code.includes("success")) return "done";
+    if (code.includes("skip") || code.includes("skipped")) return "done";
     if (code.includes("error") || code.includes("fail")) return "error";
     return null;
   }

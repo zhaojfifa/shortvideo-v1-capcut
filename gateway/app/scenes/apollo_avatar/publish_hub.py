@@ -74,6 +74,7 @@ def build_apollo_avatar_publish_hub(task: dict) -> dict[str, object]:
     resolved = []
     missing = []
     for key, label in (
+        ("final_mp4", "raw.mp4"),
         ("pack_zip", "pack.zip"),
         ("scenes_zip", "scenes.zip"),
         ("origin_srt", "origin.srt"),
