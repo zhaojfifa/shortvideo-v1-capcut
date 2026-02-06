@@ -138,6 +138,7 @@
       { label: "scenes.zip", href: `/v1/tasks/${taskId}/scenes`, ready: scenesReady },
       { label: "pack.zip", href: `/v1/tasks/${taskId}/pack`, ready: packReady },
       { label: "publish bundle", href: `/v1/tasks/${taskId}/publish_bundle`, ready: packReady },
+      { label: "publish hub", href: `/tasks/${taskId}/publish`, ready: true },
     ];
     if (result && result.final_video_url) {
       items.unshift({ label: "final_video_url", href: result.final_video_url, ready: true });
@@ -151,6 +152,9 @@
           return `<span class="muted" title="Failed">scenes failed</span>`;
         }
         if (!i.ready) {
+          if (i.label === "publish bundle") {
+            return `<span class="muted" title="Not ready">see publish page</span>`;
+          }
           return `<span class="muted" title="Not ready">${i.label}</span>`;
         }
         return `<a href="${i.href}" target="_blank" rel="noopener">${i.label}</a>`;
