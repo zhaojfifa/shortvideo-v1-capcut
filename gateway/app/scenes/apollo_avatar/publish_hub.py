@@ -16,7 +16,7 @@ KIND_MAP = {
     "mm_txt": "mm_txt",
     "mm_audio": "mm_audio",
     "edit_bundle_zip": "publish_bundle",
-    "final_mp4": "raw",
+    "raw_mp4": "raw",
 }
 
 
@@ -74,7 +74,7 @@ def build_apollo_avatar_publish_hub(task: dict) -> dict[str, object]:
     resolved = []
     missing = []
     for key, label in (
-        ("final_mp4", "raw.mp4"),
+        ("raw_mp4", "raw.mp4"),
         ("pack_zip", "pack.zip"),
         ("scenes_zip", "scenes.zip"),
         ("origin_srt", "origin.srt"),
@@ -92,6 +92,16 @@ def build_apollo_avatar_publish_hub(task: dict) -> dict[str, object]:
 
     short_code = tasks_router._download_code(task_id)
     short_url = f"/d/{short_code}"
+    copy_bundle = tasks_router._build_copy_bundle(task)
+    copy_bundle["link_text"] = short_url
+    sop_markdown = "\n".join(
+        [
+            "1) Download edit_bundle.zip (recommended) or pack.zip",
+            "2) Import into CapCut and finish edits",
+            "3) Copy caption/hashtags from Copy Bundle",
+            "4) Publish manually",
+        ]
+    )
 
     logger.info(
         "apollo_avatar publish_hub deliverables",
@@ -99,13 +109,14 @@ def build_apollo_avatar_publish_hub(task: dict) -> dict[str, object]:
             "task_id": task_id,
             "resolved": resolved,
             "missing": missing,
+            "link_text": short_url,
         },
     )
     return {
         "task_id": task_id,
         "gate_enabled": tasks_router._op_gate_enabled(),
         "deliverables": deliverables,
-        "copy_bundle": tasks_router._build_copy_bundle(task),
+        "copy_bundle": copy_bundle,
         "download_code": short_code,
         "mobile": {
             "qr_target": short_url,
@@ -113,7 +124,7 @@ def build_apollo_avatar_publish_hub(task: dict) -> dict[str, object]:
             "short_url": short_url,
             "qr_url": short_url,
         },
-        "sop_markdown": tasks_router._publish_sop_markdown(),
+        "sop_markdown": sop_markdown,
         "archive": {
             "publish_provider": _task_value(task, "publish_provider") or "-",
             "publish_key": _task_value(task, "publish_key") or "-",
