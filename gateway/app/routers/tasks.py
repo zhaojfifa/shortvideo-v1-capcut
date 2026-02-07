@@ -612,6 +612,14 @@ def download_publish_bundle(task_id: str, repo=Depends(get_task_repository)):
     return StreamingResponse(iterfile(), media_type="application/zip", headers=headers)
 
 
+@pages_router.get("/v1/tasks/{task_id}/publish_hub")
+def v1_task_publish_hub(task_id: str, repo=Depends(get_task_repository)):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return _publish_hub_payload(task)
+
+
 @pages_router.get("/v1/tasks/{task_id}/status")
 def task_status(task_id: str, repo=Depends(get_task_repository)):
     task = repo.get(task_id)
