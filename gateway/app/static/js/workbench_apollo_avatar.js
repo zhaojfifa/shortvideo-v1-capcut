@@ -207,9 +207,9 @@
     const task = getTaskJson();
     const taskId = task.task_id || window.__TASK_ID__;
     const url =
-      window.__APOLLO_PUBLISH_HUB_URL__ ||
-      window.__PUBLISH_HUB_URL__ ||
-      (taskId ? `/api/apollo/avatar/${taskId}/publish_hub` : null);
+      window.__APOLLO_PUBLISH_HUB_URL_ ||
+      window.__PUBLISH_HUB_URL_ ||
+      (taskId ? `/v1/tasks/${taskId}/publish_hub` : null);
     if (!url) return null;
     try {
       const resp = await fetch(url, {
@@ -219,6 +219,23 @@
       if (!resp.ok) {
         if (resp.status === 401 || resp.status === 403) {
           __PUBLISH_HUB_DISABLED = true;
+          return null;
+        }
+        if (resp.status === 404 && taskId) {
+          const fallbackUrl = `/api/tasks/${taskId}/publish_hub`;
+          const fb = await fetch(fallbackUrl, {
+            headers: { "Accept": "application/json" },
+            credentials: "same-origin",
+          });
+          if (!fb.ok) {
+            if (fb.status === 401 || fb.status === 403) {
+              __PUBLISH_HUB_DISABLED = true;
+            }
+            return null;
+          }
+          const json = await fb.json();
+          __PUBLISH_HUB_CACHE = json;
+          return json;
         }
         return null;
       }
