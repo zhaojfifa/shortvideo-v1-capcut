@@ -1516,18 +1516,43 @@ async def run_post_generate_pipeline(
         logger.info("Post-generate: publish bundle already ready; skip", extra={"task_id": task_id})
 
     task = repo.get(task_id) or task
+    if is_apollo:
+        cur_status = str(task.get("status") or "").lower()
+        pack_status = str(task.get("pack_status") or "").lower()
+        pub_status = str(task.get("publish_status") or "").lower()
+        if cur_status not in ("failed", "error"):
+            updates = {}
+            if pack_status not in ("failed", "error"):
+                updates["pack_status"] = "ready"
+            if pub_status not in ("failed", "error"):
+                updates["publish_status"] = "ready"
+            if updates:
+                updates["status"] = "ready"
+                repo.upsert(task_id, updates)
+            task = repo.get(task_id) or task
     pack_key = task.get("pack_key") or task.get("pack_path")
     if pack_key:
-        _update(
-            {
-                "status": "done",
-                "last_step": "publish" if task.get("publish_key") else "pack",
-                "error_message": None,
-                "error_reason": None,
-            }
-        )
+        if is_apollo:
+            _update(
+                {
+                    "status": "ready",
+                    "last_step": "publish" if task.get("publish_key") else "pack",
+                    "error_message": None,
+                    "error_reason": None,
+                }
+            )
+        else:
+            _update(
+                {
+                    "status": "done",
+                    "last_step": "publish" if task.get("publish_key") else "pack",
+                    "error_message": None,
+                    "error_reason": None,
+                }
+            )
     if str(task.get("publish_status") or "").lower() == "ready":
-        _update({"publish_status": "done"})
+        if not is_apollo:
+            _update({"publish_status": "done"})
 
     _append_event(
         repo,
