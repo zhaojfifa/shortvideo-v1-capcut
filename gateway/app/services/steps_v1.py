@@ -30,7 +30,7 @@ from gateway.app.db import SessionLocal
 from gateway.app import config, models
 from gateway.app.services.artifact_storage import upload_task_artifact, get_download_url, object_exists
 from gateway.app.services.task_events import append_task_event as _append_task_event
-from gateway.app.services.status_policy.registry import get_policy
+from gateway.app.services.status_policy.registry import get_status_policy
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.parse import detect_platform, parse_video
 from gateway.app.services.publish_service import publish_task_pack
@@ -1222,13 +1222,13 @@ async def run_post_generate_pipeline(
     )
 
     # Status policy hook (no-op by default; apollo_avatar prevents READY regression when publish bundle exists)
-    _kind = str(task.get("kind") or task.get("task_kind") or task.get("category") or "apollo_avatar")
-    _policy = get_policy(_kind)
+    _policy = get_status_policy(task)
 
     def _update(fields: dict) -> None:
         nonlocal task
         patched = _policy.reconcile_after_step(task, step="post", updates=dict(fields or {}), force=force)
-        repo.upsert(task_id, patched)
+        if patched:
+            repo.upsert(task_id, patched)
         # refresh local cache to avoid stale merges across steps
         task = repo.get(task_id) or task
 
