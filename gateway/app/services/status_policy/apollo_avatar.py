@@ -5,10 +5,14 @@ from typing import Dict, Any
 from .base import StatusPolicy
 
 
+_TERMINAL_BAD = {"failed", "error"}
+_REGRESSION_BAD = {"failed", "error", "processing"}
+
+
 class ApolloAvatarStatusPolicy(StatusPolicy):
     """
-    Rule: if publish bundle exists (publish_key present), the task must be READY and should not regress.
-    This is intentionally conservative: it uses setdefault so explicit failure writes are not overridden.
+    Prevent READY/DONE task from regressing to FAILED/ERROR/PROCESSING due to unrelated upserts.
+    Only applies when deliverable is already present (publish_key/url/status done).
     """
 
     def reconcile_after_step(
@@ -19,21 +23,41 @@ class ApolloAvatarStatusPolicy(StatusPolicy):
         updates: Dict[str, Any],
         force: bool = False,
     ) -> Dict[str, Any]:
+        if not updates:
+            return {}
+
+        if force:
+            return updates
+
         merged = dict(task or {})
         merged.update(updates or {})
 
         publish_key = merged.get("publish_key")
-        if publish_key:
-            u = dict(updates or {})
-            # do NOT override explicit failures; only prevent accidental regression
-            u.setdefault("status", "ready")
-            # apollo avatar UI expects "ready" gating; keep it stable
-            u.setdefault("publish_status", "ready")
-            # if pack exists, keep pack_status stable as well
-            pack_key = merged.get("pack_key") or merged.get("pack_path")
-            if pack_key:
-                u.setdefault("pack_status", "ready")
-            return u
+        publish_url = merged.get("publish_url")
+        publish_status = str(merged.get("publish_status") or "").lower()
 
-        return updates or {}
+        deliverable_exists = bool(publish_key or publish_url or publish_status == "done")
+        if not deliverable_exists:
+            return updates
 
+        cur_status = str((task or {}).get("status") or "").lower()
+        cur_pack = str((task or {}).get("pack_status") or "").lower()
+        cur_pub = str((task or {}).get("publish_status") or "").lower()
+
+        u = dict(updates)
+
+        def _drop_if_regress(field: str, cur_val: str) -> None:
+            new_val = str(u.get(field) or "").lower()
+            if not new_val:
+                return
+            if cur_val not in _TERMINAL_BAD and new_val in _REGRESSION_BAD:
+                u.pop(field, None)
+
+        _drop_if_regress("status", cur_status)
+        _drop_if_regress("pack_status", cur_pack)
+        _drop_if_regress("publish_status", cur_pub)
+
+        if "last_step" in u and cur_status not in _TERMINAL_BAD:
+            pass
+
+        return u

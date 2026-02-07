@@ -15,6 +15,7 @@ from gateway.app.services.steps_v1 import (
     run_apollo_avatar_generate_step,
     run_post_generate_pipeline,
 )
+from gateway.app.services.status_policy.utils import policy_upsert
 from gateway.app.services.task_events import append_task_event as _append_task_event
 from gateway.app.task_repo_utils import normalize_task_payload
 from gateway.app.utils.pipeline_config import pipeline_config_to_storage
@@ -23,6 +24,10 @@ from gateway.app.scenes.apollo_avatar.publish_hub import build_apollo_avatar_pub
 
 router = APIRouter(prefix="/api/apollo/avatar", tags=["apollo-avatar"])
 logger = logging.getLogger(__name__)
+
+
+def _policy_upsert(repo, task_id: str, updates: dict, *, task: dict | None = None, step: str = "router.apollo_avatar", force: bool = False):
+    return policy_upsert(repo, task_id, task, updates, step=step, force=force)
 
 
 @router.post("/tasks")
@@ -99,7 +104,7 @@ async def create_apollo_avatar_task(
     )
     meta["apollo_avatar"] = apollo_meta
     meta["live"] = bool(live_enabled)
-    repo.upsert(task_id, {"meta": meta})
+    _policy_upsert(repo, task_id, {"meta": meta})
     return {
         "ok": True,
         "task_id": task_id,
@@ -152,7 +157,7 @@ async def generate_apollo_avatar(
                 message="Live gate disabled",
                 extra={"reason": "live_gate_disabled", "live": True},
             )
-            repo.upsert(task_id, {"events": task.get("events") or []})
+            _policy_upsert(repo, task_id, {"events": task.get("events") or []})
             raise HTTPException(status_code=403, detail="Live gate disabled")
 
         force = bool(payload.get("force")) if payload else False

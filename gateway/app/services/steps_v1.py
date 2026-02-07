@@ -31,6 +31,7 @@ from gateway.app import config, models
 from gateway.app.services.artifact_storage import upload_task_artifact, get_download_url, object_exists
 from gateway.app.services.task_events import append_task_event as _append_task_event
 from gateway.app.services.status_policy.registry import get_status_policy
+from gateway.app.services.status_policy.utils import policy_upsert
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.parse import detect_platform, parse_video
 from gateway.app.services.publish_service import publish_task_pack
@@ -54,7 +55,14 @@ def _append_event(repo, task_id: str, *, channel: str, code: str, message: str, 
         message=message,
         extra=extra,
     )
-    repo.upsert(task_id, {"events": task.get("events") or []})
+    policy_upsert(
+        repo,
+        task_id,
+        task,
+        {"events": task.get("events") or []},
+        step="steps_v1.event",
+        force=False,
+    )
 
 
 def _env_int(name: str, default: int) -> int:
@@ -1123,8 +1131,10 @@ async def run_apollo_avatar_generate_step(
             return obj.dict()
         return obj
 
-    repo.upsert(
+    policy_upsert(
+        repo,
         task_id,
+        task,
         {
             "last_step": "apollo_avatar_generate",
             "status": "processing",
@@ -1133,6 +1143,8 @@ async def run_apollo_avatar_generate_step(
             "apollo_avatar": _dump(artifacts),
             "raw_path": raw_key,
         },
+        step="steps_v1.apollo_avatar_generate",
+        force=force,
     )
     _append_event(
         repo,
@@ -1184,12 +1196,16 @@ async def run_post_generate_pipeline(
     pack_key = task.get("pack_key") or task.get("pack_path")
     pack_status = str(task.get("pack_status") or "").lower()
     if pack_key and pack_status in {"ready", "done"} and not force:
-        repo.upsert(
+        task = policy_upsert(
+            repo,
             task_id,
+            task,
             {
                 "status": "done",
                 "last_step": task.get("last_step") or "pack",
             },
+            step="steps_v1.post_pipeline",
+            force=force,
         )
         return
 
@@ -1226,9 +1242,14 @@ async def run_post_generate_pipeline(
 
     def _update(fields: dict) -> None:
         nonlocal task
-        patched = _policy.reconcile_after_step(task, step="post", updates=dict(fields or {}), force=force)
-        if patched:
-            repo.upsert(task_id, patched)
+        task = policy_upsert(
+            repo,
+            task_id,
+            task,
+            dict(fields or {}),
+            step="steps_v1.update",
+            force=force,
+        )
         # refresh local cache to avoid stale merges across steps
         task = repo.get(task_id) or task
 
@@ -1537,7 +1558,14 @@ async def run_post_generate_pipeline(
                 updates["publish_status"] = "ready"
             if updates:
                 updates["status"] = "ready"
-                repo.upsert(task_id, updates)
+                task = policy_upsert(
+                    repo,
+                    task_id,
+                    task,
+                    updates,
+                    step="steps_v1.post_pipeline",
+                    force=force,
+                )
             task = repo.get(task_id) or task
     pack_key = task.get("pack_key") or task.get("pack_path")
     if pack_key:

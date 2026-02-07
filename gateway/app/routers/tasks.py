@@ -65,6 +65,11 @@ from ..services.steps_v1 import (
     run_subtitles_step_entry,
     run_dub_step as run_dub_step_v1,
 )
+from gateway.app.services.status_policy.utils import policy_upsert
+
+
+def _policy_upsert(repo, task_id: str, updates: dict, *, task: dict | None = None, step: str = "router.tasks", force: bool = False):
+    return policy_upsert(repo, task_id, task, updates, step=step, force=force)
 def coerce_datetime(v: Any) -> Optional[datetime]:
     """
     Best-effort convert repository stored value into a timezone-aware datetime.
@@ -1154,7 +1159,7 @@ def _sha256_file(path: Path) -> str | None:
 
 
 def _repo_upsert(repo, task_id: str, patch: dict) -> None:
-    repo.upsert(task_id, patch)
+    _policy_upsert(repo, task_id, patch)
 
 
 def _merge_probe_into_pipeline_config(
@@ -1187,7 +1192,7 @@ def _update_pipeline_probe(repo, task_id: str, probe: dict[str, Any] | None) -> 
     current = parse_pipeline_config(task.get("pipeline_config"))
     updated = _merge_probe_into_pipeline_config(current, probe)
     if updated != current:
-        repo.upsert(task_id, {"pipeline_config": pipeline_config_to_storage(updated)})
+        _policy_upsert(repo, task_id, {"pipeline_config": pipeline_config_to_storage(updated)})
 
 
 def _should_autostart(task: dict) -> bool:
@@ -1270,13 +1275,13 @@ def auto_run_pipeline(task_id: str, repo) -> None:
         )
         if not has_pack:
             logger.info("AUTO_PIPELINE_STEP", extra={"task_id": task_id, "step": "pack"})
-            repo.upsert(task_id, {"status": "processing", "last_step": "pack"})
+            _policy_upsert(repo, task_id, {"status": "processing", "last_step": "pack"})
             pack_req = PackRequest(task_id=task_id)
             pack_res = asyncio.run(run_pack_step_v1(pack_req))
             pack_key = None
             if isinstance(pack_res, dict):
                 pack_key = pack_res.get("pack_key") or pack_res.get("zip_key")
-            repo.upsert(
+            _policy_upsert(repo, 
                 task_id,
                 {
                     "last_step": "pack",
@@ -1805,7 +1810,7 @@ def create_task_local_upload(
         _update_pipeline_probe(repo, task_id, probe)
 
     raw_key = upload_task_artifact(stored_task, raw_file_path, "raw.mp4", task_id=task_id)
-    repo.upsert(
+    _policy_upsert(repo, 
         task_id,
         {
             "raw_path": raw_key,
@@ -1840,7 +1845,7 @@ def update_task_selected_tools(
     if not updates:
         raise HTTPException(status_code=400, detail="No updatable fields provided")
 
-    repo.upsert(task_id, updates)
+    _policy_upsert(repo, task_id, updates)
     updated = repo.get(task_id)
     if not updated:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -2009,7 +2014,7 @@ def save_mm_edited(task_id: str, payload: EditedTextRequest, repo=Depends(get_ta
                 (isinstance(task, dict) and "mm_txt_path" in task)
                 or hasattr(task, "mm_txt_path")
             ):
-                repo.upsert(task_id, {"mm_txt_path": mm_txt_key})
+                _policy_upsert(repo, task_id, {"mm_txt_path": mm_txt_key})
         return JSONResponse(
             {
                 "ok": True,
@@ -2145,7 +2150,7 @@ def build_parse(
 
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
     if pipeline_config.get("ingest_mode") == "local":
-        repo.upsert(
+        _policy_upsert(repo, 
             task_id,
             {
                 "status": task.get("status") or "processing",
@@ -2162,13 +2167,13 @@ def build_parse(
         raise HTTPException(status_code=400, detail="source_url is empty; cannot parse")
 
     platform = (payload.platform if payload else None) or task.get("platform")
-    repo.upsert(task_id, {"status": "processing", "last_step": "parse"})
+    _policy_upsert(repo, task_id, {"status": "processing", "last_step": "parse"})
     parse_req = ParseRequest(task_id=task_id, platform=platform, link=link)
 
     try:
         parse_res = asyncio.run(run_parse_step_v1(parse_req))
     except HTTPException as exc:
-        repo.upsert(
+        _policy_upsert(repo, 
             task_id,
             {
                 "status": "failed",
@@ -2189,7 +2194,7 @@ def build_parse(
         except Exception:
             logger.exception("SUBTITLE_PROBE_FAIL", extra={"task_id": task_id})
     duration_sec = parse_res.get("duration_sec") if isinstance(parse_res, dict) else None
-    repo.upsert(
+    _policy_upsert(repo, 
         task_id,
         {
             "status": "processing",
@@ -2244,7 +2249,7 @@ def _run_subtitles_job(
     subtitles_dir = Path("deliver") / "subtitles" / task_id
     subtitles_key = str(subtitles_dir / "subtitles.json")
 
-    repo.upsert(
+    _policy_upsert(repo, 
         task_id,
         {
             "origin_srt_path": origin_key,
@@ -2277,7 +2282,7 @@ def _run_subtitles_background(
             repo=repo,
         )
     except HTTPException as exc:
-        repo.upsert(
+        _policy_upsert(repo, 
             task_id,
             {"subtitles_status": "error", "subtitles_error": f"{exc.status_code}: {exc.detail}"},
         )
@@ -2397,7 +2402,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     storage = get_storage_service()
                     storage.upload_file(str(audio_path), audio_key, content_type="audio/mpeg")
                     audio_sha256 = _sha256_file(audio_path)
-            repo.upsert(
+            _policy_upsert(repo, 
                 task_id,
                 {
                     "mm_audio_path": audio_key,
@@ -2428,15 +2433,15 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         audio_sha256 = _sha256_file(audio_path)
 
     except HTTPException as exc:
-        repo.upsert(task_id, {"dub_status": "error", "dub_error": f"{exc.status_code}: {exc.detail}"})
+        _policy_upsert(repo, task_id, {"dub_status": "error", "dub_error": f"{exc.status_code}: {exc.detail}"})
         raise
     except Exception as exc:
-        repo.upsert(task_id, {"dub_status": "error", "dub_error": str(exc)})
+        _policy_upsert(repo, task_id, {"dub_status": "error", "dub_error": str(exc)})
         logger.exception("DUB3_FAIL", extra={"task_id": task_id, "step": "dub", "phase": "exception"})
         raise HTTPException(status_code=500, detail=f"Dubbing step failed: {exc}")
 
     # repo.update 未必存在；用 upsert 更稳
-    repo.upsert(
+    _policy_upsert(repo, 
         task_id,
         {
             "mm_audio_path": audio_key,
@@ -2466,7 +2471,7 @@ def _run_dub_background(task_id: str, payload: DubProviderRequest, repo: ITaskRe
     except Exception:
         logger.exception("DUB3_FAIL", extra={"task_id": task_id, "step": "dub", "phase": "exception"})
     except Exception as exc:
-        repo.upsert(task_id, {"subtitles_status": "error", "subtitles_error": str(exc)})
+        _policy_upsert(repo, task_id, {"subtitles_status": "error", "subtitles_error": str(exc)})
         logger.exception(
             "SUB2_FAIL",
             extra={
@@ -2489,7 +2494,7 @@ def build_scenes(
         raise HTTPException(status_code=404, detail="Task not found")
 
     def _update(task_id: str, fields: dict) -> None:
-        repo.upsert(task_id, fields)
+        _policy_upsert(repo, task_id, fields)
 
     return enqueue_scenes_build(
         task_id,
@@ -2508,12 +2513,12 @@ def build_pack(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    repo.upsert(task_id, {"status": "processing", "last_step": "pack"})
+    _policy_upsert(repo, task_id, {"status": "processing", "last_step": "pack"})
     pack_req = PackRequest(task_id=task_id)
     try:
         pack_res = asyncio.run(run_pack_step_v1(pack_req))
     except HTTPException as exc:
-        repo.upsert(
+        _policy_upsert(repo, 
             task_id,
             {
                 "status": "failed",
@@ -2527,7 +2532,7 @@ def build_pack(
     pack_key = None
     if isinstance(pack_res, dict):
         pack_key = pack_res.get("pack_key") or pack_res.get("zip_key")
-    repo.upsert(
+    _policy_upsert(repo, 
         task_id,
         {
             "status": "ready",
@@ -2559,7 +2564,7 @@ async def rerun_dub(
             raise HTTPException(status_code=404, detail="Task not found")
 
         run_async = os.getenv("RUN_STEPS_ASYNC", "1").strip().lower() not in ("0", "false", "no")
-        repo.upsert(task_id, {"dub_status": "running", "dub_error": None, "last_step": "dub"})
+        _policy_upsert(repo, task_id, {"dub_status": "running", "dub_error": None, "last_step": "dub"})
 
         if run_async:
             background_tasks.add_task(_run_dub_background, task_id, payload, repo)
@@ -2595,7 +2600,7 @@ def publish_task(
         )
         task = db.query(models.Task).filter(models.Task.id == task_id).first()
         if task:
-            repo.upsert(
+            _policy_upsert(repo, 
                 task_id,
                 {
                     "publish_provider": task.publish_provider,
@@ -2642,7 +2647,7 @@ def build_subtitles(
         target_lang, force, translate = compute_subtitles_params(task, payload)
 
         run_async = os.getenv("RUN_STEPS_ASYNC", "1").strip().lower() not in ("0", "false", "no")
-        repo.upsert(
+        _policy_upsert(repo, 
             task_id,
             {
                 "subtitles_status": "running",
